@@ -1,0 +1,6 @@
+12 juli 2026
+Semua dokumen panduan arsitektur dan kode revisi di atas telah saya pahami sepenuhnya. Bagaimana Anda ingin memulai langkah implementasinya?
+1. Mempersiapkan Basis Data lokal (setup_database_sqlite.py) dengan skema baru yang sinkron? DONE
+2. Membangun Modul Scraping terintegrasi Apify SDK dengan input dinamis dari target_config.json?
+3. Mengintegrasikan Modul NLG Generator menggunakan SDK google-genai terbaru?
+4. Membangun visual dasbor Streamlit (app.py) dengan panduan visual Swiss Modern?
