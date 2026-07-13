@@ -6,11 +6,31 @@ Basis data telah diselaraskan dengan arsitektur multi-platform (Langkah 1 selesa
 
 Langkah logis berikutnya berdasarkan Peta Jalan Modul Scraping adalah:
 
-Fase 1: Persiapan Lingkungan Dasar & Pemasangan Pustaka Scraping
-- Memasang pustaka apify-client.
-- Menyiapkan Token API Apify di file .env.
+Fase 1: Persiapan Lingkungan Dasar & Pemasangan Pustaka Scraping [DONE]
+- Memasang pustaka apify-client. [DONE]
+- Menyiapkan Token API Apify di file .env. [DONE]
 
-Fase 2: Konfigurasi Input Dinamis
-- Membuat berkas konfigurasi pencarian target_config.json.
-- Membuat berkas orkestrator scraper 01_run_scraper.py.
+Fase 2: Konfigurasi Input Dinamis [DONE]
+- Membuat berkas konfigurasi pencarian target_config.json. [DONE]
+- Membuat berkas orkestrator scraper 01_run_scraper.py. [DONE]
+- Membuat berkas parser config_parser.py. [DONE]
+
+Seluruh tahapan penyiapan modul scraping dinamis telah berhasil diselesaikan dan diverifikasi secara lokal.
+
+Fase 3 & 4: Pipa Data AI (Gemini SDK) & Model Klasifikasi ML (SVM) [DONE]
+- Menginstal pustaka google-genai, scikit-learn, dan joblib. [DONE]
+- Membuat berkas pembuat data latih generate_mock_training_data.py dan melatih model dengan 02_train_model.py. [DONE]
+- Membuat berkas pipa data utama 01_pipeline_data.py untuk membersihkan teks dengan Gemini dan mengklasifikasikan sentimen secara otomatis. [DONE]
+- Melakukan verifikasi pipa data lokal secara menyeluruh dengan data uji. [DONE]
+
+Seluruh sistem pipa data AI dan pembelajaran mesin pengklasifikasi sentimen telah berhasil diintegrasikan secara lokal.
+
+Fase 5 & 6: Generator Laporan AI (NLG) & Pembangunan Dasbor Streamlit (app.py) [DONE]
+- Menginstal pustaka streamlit dan plotly. [DONE]
+- Membuat modul generator laporan eksekutif nlg_generator.py menggunakan google-genai SDK. [DONE]
+- Membangun dasbor visual interaktif app.py dengan tiga tab fungsional utama (analitik sentimen, tabel jejak audit, dan panel kendali target). [DONE]
+- Memperbaiki bug parsing rentang tanggal (KeyError: 'date_parsed') agar stabil dan bebas galat. [DONE]
+- Melakukan verifikasi visual penuh menggunakan peramban lokal dan merekam fungsionalitas UI. [DONE]
+
+Seluruh infrastruktur pengembangan lokal (Fase 1: Lokal MVP) telah selesai dibangun, diintegrasikan, dan diverifikasi dengan sukses! Langkah strategis berikutnya adalah memulai Fase 2: Cloud Production (migrasi database ke Supabase, deployment repositori ke GitHub, scheduling dengan GitHub Actions, dan deployment dasbor ke Streamlit Cloud).
 
