@@ -1,13 +1,16 @@
 13 JULI 2026
 
-Hasil verifikasi REPL menunjukkan bahwa seluruh 10 kolom data (termasuk kolom metrik likes, retweets, dan kolom audit raw_text/cleaned_text) telah berhasil dimuat dengan benar ke dalam Pandas DataFrame ([2 rows x 10 columns]).
+Hasil verifikasi REPL menunjukkan bahwa seluruh 11 kolom data (termasuk kolom metrik likes, retweets, kolom audit raw_text/cleaned_text, serta kolom asal source_platform) telah berhasil dimuat dengan benar ke dalam Pandas DataFrame ([2 rows x 11 columns]).
 
-Dengan selesainya langkah inisialisasi basis data lokal ini, langkah logis berikutnya berdasarkan Peta Jalan Modul Scraping (Dokumen 6) adalah:
+Basis data telah diselaraskan dengan arsitektur multi-platform (Langkah 1 selesai).
+
+Langkah logis berikutnya berdasarkan Peta Jalan Modul Scraping adalah:
 
 Fase 1: Persiapan Lingkungan Dasar & Pemasangan Pustaka Scraping
-Memasang pustaka apify-client.
-Menyiapkan Token API Apify di file .env.
+- Memasang pustaka apify-client.
+- Menyiapkan Token API Apify di file .env.
+
 Fase 2: Konfigurasi Input Dinamis
-Membuat berkas konfigurasi pencarian target_config.json.
-Membuat berkas pengurai kueri pencarian config_parser.py.
-Apakah Anda ingin melanjutkan ke Fase 1 & Fase 2 Modul Scraping di atas?
+- Membuat berkas konfigurasi pencarian target_config.json.
+- Membuat berkas orkestrator scraper 01_run_scraper.py.
+

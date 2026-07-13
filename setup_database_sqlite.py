@@ -25,7 +25,8 @@ def buat_tabel():
             confidence_score REAL,              -- Tingkat akurasi/keyakinan model klasifikasi (0.0 - 1.0)
             likes INTEGER DEFAULT 0,            -- Jumlah suka (metrik analitik tambahan)
             retweets INTEGER DEFAULT 0,         -- Jumlah bagikan (metrik analitik tambahan)
-            status TEXT DEFAULT 'RAW'           -- Status pemrosesan data ('RAW' / 'CLEANED')
+            status TEXT DEFAULT 'RAW',          -- Status pemrosesan data ('RAW' / 'CLEANED')
+            source_platform TEXT NOT NULL       -- Keterangan sumber: 'Twitter', 'Instagram', 'LinkedIn', 'News'
         )
     ''')
     
@@ -46,8 +47,9 @@ def simpan_data_ke_db(data_cuitan):
         query = '''
             INSERT OR IGNORE INTO log_cuitan (
                 tweet_id, date, username, raw_text, cleaned_text, 
-                sentiment_label, confidence_score, likes, retweets, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                sentiment_label, confidence_score, likes, retweets, status,
+                source_platform
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         '''
         
         # Ekstraksi dan pemetaan yang aman dari List of Dictionary
@@ -62,7 +64,8 @@ def simpan_data_ke_db(data_cuitan):
                 d.get('confidence_score', 0.0),
                 d.get('likes', 0),
                 d.get('retweets', 0),
-                d.get('status', 'RAW')
+                d.get('status', 'RAW'),
+                d.get('source_platform', 'Twitter')
             )
             for d in data_cuitan
         ]
@@ -106,7 +109,8 @@ if __name__ == "__main__":
             'confidence_score': 0.94,
             'likes': 152,
             'retweets': 45,
-            'status': 'CLEANED'
+            'status': 'CLEANED',
+            'source_platform': 'Twitter'
         },
         {
             'tweet_id': '1811739213481230337',
@@ -118,7 +122,8 @@ if __name__ == "__main__":
             'confidence_score': 0.89,
             'likes': 80,
             'retweets': 12,
-            'status': 'CLEANED'
+            'status': 'CLEANED',
+            'source_platform': 'Twitter'
         }
     ]
     
