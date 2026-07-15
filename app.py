@@ -1,12 +1,12 @@
 import os
 import json
-import sqlite3
 import datetime
 import subprocess
 import collections
 import pandas as pd
 import streamlit as st
 import plotly.express as px
+import db_manager
 
 # Impor generator NLG
 from nlg_generator import generate_executive_summary
@@ -99,18 +99,9 @@ st.markdown("""
 # 3. Fungsi Basis Data
 def load_data_from_db():
     """
-    Mengambil data dari database SQLite.
+    Mengambil data dari database (SQLite/PostgreSQL).
     """
-    if not os.path.exists(DB_FILE):
-        return pd.DataFrame()
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        df = pd.read_sql_query("SELECT * FROM log_cuitan ORDER BY date DESC", conn)
-        conn.close()
-        return df
-    except Exception as e:
-        st.error(f"[ERROR] Gagal memuat data dari database: {e}")
-        return pd.DataFrame()
+    return db_manager.baca_data_untuk_streamlit()
 
 # 4. Fungsi Pembantu Analisis Teks (Top Keywords)
 def extract_top_keywords(df, num_words=5):

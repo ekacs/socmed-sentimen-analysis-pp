@@ -9,7 +9,7 @@ from apify_client import ApifyClient
 # Impor fungsi pembaca konfigurasi
 from config_parser import load_config, build_twitter_query
 # Impor fungsi basis data
-from setup_database_sqlite import simpan_data_ke_db, buat_tabel
+from db_manager import simpan_data_ke_db, buat_tabel
 
 # Memuat file .env
 load_dotenv()

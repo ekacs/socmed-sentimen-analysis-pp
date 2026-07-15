@@ -1,0 +1,10 @@
+streamlit
+pandas
+plotly
+google-genai
+apify-client
+scikit-learn
+joblib
+python-dotenv
+psycopg2-binary
+SQLAlchemy

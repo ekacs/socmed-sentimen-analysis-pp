@@ -1,10 +1,10 @@
 import os
-import sqlite3
 import numpy as np
 import joblib
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+import db_manager
 
 # Memuat file .env
 load_dotenv()
@@ -95,17 +95,11 @@ def process_pipeline():
     gemini_client = get_gemini_client()
     svm_model, vectorizer = load_svm_model()
     
-    # 2. Hubungkan ke database
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    
-    # 3. Ambil data dengan status 'RAW'
-    cursor.execute("SELECT tweet_id, raw_text FROM log_cuitan WHERE status = 'RAW'")
-    rows = cursor.fetchall()
+    # 2. Ambil data dengan status 'RAW'
+    rows = db_manager.ambil_cuitan_mentah()
     
     if not rows:
         print("[INFO] Tidak ada data cuitan mentah baru (status 'RAW') untuk diproses.")
-        conn.close()
         return
         
     print(f"[INFO] Memulai pemrosesan untuk {len(rows)} data cuitan mentah baru...")
@@ -140,24 +134,10 @@ def process_pipeline():
                 
         # Langkah C: Perbarui baris di Database
         try:
-            if sentiment_label:
-                cursor.execute('''
-                    UPDATE log_cuitan
-                    SET cleaned_text = ?, sentiment_label = ?, confidence_score = ?, status = 'CLEANED'
-                    WHERE tweet_id = ?
-                ''', (cleaned_text, sentiment_label, confidence_score, tweet_id))
-            else:
-                cursor.execute('''
-                    UPDATE log_cuitan
-                    SET cleaned_text = ?, status = 'CLEANED'
-                    WHERE tweet_id = ?
-                ''', (cleaned_text, tweet_id))
-            conn.commit()
+            db_manager.perbarui_cuitan_setelah_proses(tweet_id, cleaned_text, sentiment_label, confidence_score)
             success_count += 1
-        except sqlite3.Error as e:
+        except Exception as e:
             print(f"  [ERROR]: Gagal memperbarui database: {e}")
-            
-    conn.close()
     print(f"[SUCCESS] Pipa data selesai! Berhasil memproses {success_count} dari {len(rows)} data.")
 
 if __name__ == "__main__":
