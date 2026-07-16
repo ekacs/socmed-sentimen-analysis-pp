@@ -66,7 +66,7 @@ def generate_executive_summary(
         
         # 3. Eksekusi menggunakan model generasi terbaru
         response = client.models.generate_content(
-            model='gemini-2.5-flash',  # Menggunakan gemini-2.5-flash yang sangat responsif
+            model='gemini-3.1-flash-lite',  # gemini-3.1-flash-lite: kompatibel dengan API key baru
             contents=prompt_narasi,
             config=types.GenerateContentConfig(
                 temperature=0.15,
