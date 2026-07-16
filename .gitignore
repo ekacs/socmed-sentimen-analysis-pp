@@ -1,0 +1,46 @@
+# ─── Kredensial & Konfigurasi Sensitif ──────────────────────────────────────
+# JANGAN PERNAH COMMIT file ini ke repositori publik
+.env
+.env.*
+!.env.example
+
+# ─── Basis Data Lokal ────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ─── Virtual Environment Python ──────────────────────────────────────────────
+unpar/
+venv/
+env/
+.venv/
+
+# ─── Cache Python ────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+
+# ─── File Sementara & Build ───────────────────────────────────────────────────
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ─── Log & Output Sementara ──────────────────────────────────────────────────
+*.log
+*.tmp
+
+# ─── IDE & Editor ────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.code-workspace
+
+# ─── OS Files ────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Script Verifikasi (hanya untuk pengembangan lokal) ──────────────────────
+test_supabase_connection.py
