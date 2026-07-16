@@ -6,8 +6,8 @@ from google import genai
 from google.genai import types
 import db_manager
 
-# Memuat file .env
-load_dotenv()
+# Memuat file .env — override=False agar env var sistem (GitHub Actions) tidak tertimpa
+load_dotenv(override=False)
 
 DB_FILE = 'sentimen_kebijakan.db'
 MODEL_PATH = 'models/svm_model.pkl'

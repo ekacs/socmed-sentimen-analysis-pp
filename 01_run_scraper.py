@@ -11,8 +11,8 @@ from config_parser import load_config, build_twitter_query
 # Impor fungsi basis data
 from db_manager import simpan_data_ke_db, buat_tabel
 
-# Memuat file .env
-load_dotenv()
+# Memuat file .env — override=False agar env var sistem (GitHub Actions) tidak tertimpa
+load_dotenv(override=False)
 
 def get_apify_client():
     """

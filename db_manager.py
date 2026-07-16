@@ -3,8 +3,8 @@ import sqlite3
 import pandas as pd
 from dotenv import load_dotenv
 
-# Memuat file .env
-load_dotenv()
+# Memuat file .env — override=False agar env var sistem (GitHub Actions) tidak tertimpa
+load_dotenv(override=False)
 
 DB_FILE = 'sentimen_kebijakan.db'
 
