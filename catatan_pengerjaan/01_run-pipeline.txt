@@ -1,0 +1,445 @@
+﻿2026-07-16T22:43:30.1019605Z Current runner version: '2.335.1'
+2026-07-16T22:43:30.1056079Z ##[group]Runner Image Provisioner
+2026-07-16T22:43:30.1057700Z Hosted Compute Agent
+2026-07-16T22:43:30.1058801Z Version: 20260707.563
+2026-07-16T22:43:30.1060129Z Commit: 02667638d2b423fbc733a8e32a88b44996a3ba6e
+2026-07-16T22:43:30.1061419Z Build Date: 2026-07-07T19:33:50Z
+2026-07-16T22:43:30.1063039Z Worker ID: {f2499f25-f542-488b-97eb-420c4a686c8b}
+2026-07-16T22:43:30.1064580Z Azure Region: eastus
+2026-07-16T22:43:30.1065682Z ##[endgroup]
+2026-07-16T22:43:30.1068365Z ##[group]Operating System
+2026-07-16T22:43:30.1069435Z Ubuntu
+2026-07-16T22:43:30.1070443Z 24.04.4
+2026-07-16T22:43:30.1071370Z LTS
+2026-07-16T22:43:30.1073087Z ##[endgroup]
+2026-07-16T22:43:30.1074080Z ##[group]Runner Image
+2026-07-16T22:43:30.1075243Z Image: ubuntu-24.04
+2026-07-16T22:43:30.1076284Z Version: 20260714.240.1
+2026-07-16T22:43:30.1078533Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260714.240/images/ubuntu/Ubuntu2404-Readme.md
+2026-07-16T22:43:30.1081408Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260714.240
+2026-07-16T22:43:30.1083691Z ##[endgroup]
+2026-07-16T22:43:30.1085763Z ##[group]GITHUB_TOKEN Permissions
+2026-07-16T22:43:30.1088933Z Contents: read
+2026-07-16T22:43:30.1089920Z Metadata: read
+2026-07-16T22:43:30.1090985Z Packages: read
+2026-07-16T22:43:30.1092324Z ##[endgroup]
+2026-07-16T22:43:30.1095662Z Secret source: Actions
+2026-07-16T22:43:30.1097757Z Prepare workflow directory
+2026-07-16T22:43:30.1594635Z Prepare all required actions
+2026-07-16T22:43:30.1653001Z Getting action download info
+2026-07-16T22:43:30.3024488Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-07-16T22:43:30.4348053Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+2026-07-16T22:43:30.6793588Z Complete job name: run-pipeline
+2026-07-16T22:43:30.7542148Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-16T22:43:30.7550987Z ##[group]Run actions/checkout@v4
+2026-07-16T22:43:30.7552005Z with:
+2026-07-16T22:43:30.7552558Z   repository: ekacs/socmed-sentimen-analysis-pp
+2026-07-16T22:43:30.7556297Z   token: ***
+2026-07-16T22:43:30.7556754Z   ssh-strict: true
+2026-07-16T22:43:30.7557221Z   ssh-user: git
+2026-07-16T22:43:30.7557684Z   persist-credentials: true
+2026-07-16T22:43:30.7558192Z   clean: true
+2026-07-16T22:43:30.7558665Z   sparse-checkout-cone-mode: true
+2026-07-16T22:43:30.7559219Z   fetch-depth: 1
+2026-07-16T22:43:30.7559681Z   fetch-tags: false
+2026-07-16T22:43:30.7560148Z   show-progress: true
+2026-07-16T22:43:30.7560627Z   lfs: false
+2026-07-16T22:43:30.7561106Z   submodules: false
+2026-07-16T22:43:30.7561799Z   set-safe-directory: true
+2026-07-16T22:43:30.7562613Z ##[endgroup]
+2026-07-16T22:43:30.8540001Z Syncing repository: ekacs/socmed-sentimen-analysis-pp
+2026-07-16T22:43:30.8542970Z ##[group]Getting Git version info
+2026-07-16T22:43:30.8544533Z Working directory is '/home/runner/work/socmed-sentimen-analysis-pp/socmed-sentimen-analysis-pp'
+2026-07-16T22:43:30.8546598Z [command]/usr/bin/git version
+2026-07-16T22:43:30.8607060Z git version 2.54.0
+2026-07-16T22:43:30.8665016Z ##[endgroup]
+2026-07-16T22:43:30.8681327Z Temporarily overriding HOME='/home/runner/work/_temp/ca23c7bb-452a-4a96-a0f6-e8bb968e7d93' before making global git config changes
+2026-07-16T22:43:30.8683980Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-16T22:43:30.8687621Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/socmed-sentimen-analysis-pp/socmed-sentimen-analysis-pp
+2026-07-16T22:43:30.8740839Z Deleting the contents of '/home/runner/work/socmed-sentimen-analysis-pp/socmed-sentimen-analysis-pp'
+2026-07-16T22:43:30.8744747Z ##[group]Initializing the repository
+2026-07-16T22:43:30.8749731Z [command]/usr/bin/git init /home/runner/work/socmed-sentimen-analysis-pp/socmed-sentimen-analysis-pp
+2026-07-16T22:43:30.8856514Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-07-16T22:43:30.8858435Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-07-16T22:43:30.8860137Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-07-16T22:43:30.8861487Z hint: call:
+2026-07-16T22:43:30.8862470Z hint:
+2026-07-16T22:43:30.8863466Z hint: 	git config --global init.defaultBranch <name>
+2026-07-16T22:43:30.8864621Z hint:
+2026-07-16T22:43:30.8865590Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-07-16T22:43:30.8867186Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-07-16T22:43:30.8868619Z hint:
+2026-07-16T22:43:30.8869424Z hint: 	git branch -m <name>
+2026-07-16T22:43:30.8870289Z hint:
+2026-07-16T22:43:30.8871369Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-07-16T22:43:30.8873875Z Initialized empty Git repository in /home/runner/work/socmed-sentimen-analysis-pp/socmed-sentimen-analysis-pp/.git/
+2026-07-16T22:43:30.8877362Z [command]/usr/bin/git remote add origin https://github.com/ekacs/socmed-sentimen-analysis-pp
+2026-07-16T22:43:30.8920304Z ##[endgroup]
+2026-07-16T22:43:30.8921902Z ##[group]Disabling automatic garbage collection
+2026-07-16T22:43:30.8923738Z [command]/usr/bin/git config --local gc.auto 0
+2026-07-16T22:43:30.8955509Z ##[endgroup]
+2026-07-16T22:43:30.8956804Z ##[group]Setting up auth
+2026-07-16T22:43:30.8963740Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-16T22:43:30.9000203Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-16T22:43:30.9366458Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-16T22:43:30.9405673Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-16T22:43:30.9632578Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-16T22:43:30.9667671Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-16T22:43:30.9889894Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-07-16T22:43:30.9928438Z ##[endgroup]
+2026-07-16T22:43:30.9929433Z ##[group]Fetching the repository
+2026-07-16T22:43:30.9938585Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +13d6216f710b3f37787f43c58421527b0593e8b6:refs/remotes/origin/main
+2026-07-16T22:43:31.1860905Z From https://github.com/ekacs/socmed-sentimen-analysis-pp
+2026-07-16T22:43:31.1863142Z  * [new ref]         13d6216f710b3f37787f43c58421527b0593e8b6 -> origin/main
+2026-07-16T22:43:31.1901081Z ##[endgroup]
+2026-07-16T22:43:31.1902846Z ##[group]Determining the checkout info
+2026-07-16T22:43:31.1904147Z ##[endgroup]
+2026-07-16T22:43:31.1908466Z [command]/usr/bin/git sparse-checkout disable
+2026-07-16T22:43:31.1962793Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-07-16T22:43:31.2002521Z ##[group]Checking out the ref
+2026-07-16T22:43:31.2009018Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-07-16T22:43:31.2106653Z Switched to a new branch 'main'
+2026-07-16T22:43:31.2109763Z branch 'main' set up to track 'origin/main'.
+2026-07-16T22:43:31.2116861Z ##[endgroup]
+2026-07-16T22:43:31.2171359Z [command]/usr/bin/git log -1 --format=%H
+2026-07-16T22:43:31.2199104Z 13d6216f710b3f37787f43c58421527b0593e8b6
+2026-07-16T22:43:31.2505221Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-16T22:43:31.2508271Z ##[group]Run actions/setup-python@v5
+2026-07-16T22:43:31.2508877Z with:
+2026-07-16T22:43:31.2509359Z   python-version: 3.10
+2026-07-16T22:43:31.2509880Z   cache: pip
+2026-07-16T22:43:31.2510362Z   check-latest: false
+2026-07-16T22:43:31.2514484Z   token: ***
+2026-07-16T22:43:31.2515007Z   update-environment: true
+2026-07-16T22:43:31.2515574Z   allow-prereleases: false
+2026-07-16T22:43:31.2516131Z   freethreaded: false
+2026-07-16T22:43:31.2516645Z ##[endgroup]
+2026-07-16T22:43:31.3860261Z ##[group]Installed versions
+2026-07-16T22:43:31.3959329Z (node:2279) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-16T22:43:31.3961998Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-16T22:43:31.3963467Z Successfully set up CPython (3.10.20)
+2026-07-16T22:43:31.3965172Z ##[endgroup]
+2026-07-16T22:43:31.4741284Z [command]/opt/hostedtoolcache/Python/3.10.20/x64/bin/pip cache dir
+2026-07-16T22:43:33.3799620Z /home/runner/.cache/pip
+2026-07-16T22:43:33.4595335Z Cache hit for: setup-python-Linux-x64-24.04-Ubuntu-python-3.10.20-pip-57384ae661d5b2b731801a72ed6d80e2dc0bad17749a26e2274054beddd37232
+2026-07-16T22:43:33.4708274Z (node:2279) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-16T22:43:34.5206119Z Received 159383552 of 196465904 (81.1%), 151.7 MBs/sec
+2026-07-16T22:43:34.6895519Z Received 196465904 of 196465904 (100.0%), 160.0 MBs/sec
+2026-07-16T22:43:34.6896721Z Cache Size: ~187 MB (196465904 B)
+2026-07-16T22:43:34.6973679Z [command]/usr/bin/tar -xf /home/runner/work/_temp/cf3e2790-e998-4c23-843f-e648df31c7f3/cache.tzst -P -C /home/runner/work/socmed-sentimen-analysis-pp/socmed-sentimen-analysis-pp --use-compress-program unzstd
+2026-07-16T22:43:34.9916915Z Cache restored successfully
+2026-07-16T22:43:35.0007752Z Cache restored from key: setup-python-Linux-x64-24.04-Ubuntu-python-3.10.20-pip-57384ae661d5b2b731801a72ed6d80e2dc0bad17749a26e2274054beddd37232
+2026-07-16T22:43:35.0207606Z ##[group]Run python -m pip install --upgrade pip
+2026-07-16T22:43:35.0208094Z [36;1mpython -m pip install --upgrade pip[0m
+2026-07-16T22:43:35.0208464Z [36;1mpip install -r requirements.txt[0m
+2026-07-16T22:43:35.0291252Z shell: /usr/bin/bash -e {0}
+2026-07-16T22:43:35.0291846Z env:
+2026-07-16T22:43:35.0292185Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-07-16T22:43:35.0292698Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+2026-07-16T22:43:35.0293208Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-07-16T22:43:35.0293616Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-07-16T22:43:35.0294048Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-07-16T22:43:35.0294458Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+2026-07-16T22:43:35.0294808Z ##[endgroup]
+2026-07-16T22:43:36.1429476Z Requirement already satisfied: pip in /opt/hostedtoolcache/Python/3.10.20/x64/lib/python3.10/site-packages (26.1.2)
+2026-07-16T22:43:36.8076848Z Collecting streamlit (from -r requirements.txt (line 1))
+2026-07-16T22:43:36.8092862Z   Using cached streamlit-1.59.2-py3-none-any.whl.metadata (9.6 kB)
+2026-07-16T22:43:36.9437734Z Collecting pandas (from -r requirements.txt (line 2))
+2026-07-16T22:43:36.9454314Z   Using cached pandas-2.3.3-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (91 kB)
+2026-07-16T22:43:37.0044291Z Collecting plotly (from -r requirements.txt (line 3))
+2026-07-16T22:43:37.0059441Z   Using cached plotly-6.9.0-py3-none-any.whl.metadata (9.0 kB)
+2026-07-16T22:43:37.0411244Z Collecting google-genai (from -r requirements.txt (line 4))
+2026-07-16T22:43:37.0425940Z   Using cached google_genai-2.12.1-py3-none-any.whl.metadata (55 kB)
+2026-07-16T22:43:37.0783751Z Collecting apify-client (from -r requirements.txt (line 5))
+2026-07-16T22:43:37.0799006Z   Using cached apify_client-2.5.1-py3-none-any.whl.metadata (18 kB)
+2026-07-16T22:43:37.1701936Z Collecting scikit-learn (from -r requirements.txt (line 6))
+2026-07-16T22:43:37.1717808Z   Using cached scikit_learn-1.7.2-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (11 kB)
+2026-07-16T22:43:37.1986458Z Collecting joblib (from -r requirements.txt (line 7))
+2026-07-16T22:43:37.2000472Z   Using cached joblib-1.5.3-py3-none-any.whl.metadata (5.5 kB)
+2026-07-16T22:43:37.2147634Z Collecting python-dotenv (from -r requirements.txt (line 8))
+2026-07-16T22:43:37.2161157Z   Using cached python_dotenv-1.2.2-py3-none-any.whl.metadata (27 kB)
+2026-07-16T22:43:37.2832989Z Collecting psycopg2-binary (from -r requirements.txt (line 9))
+2026-07-16T22:43:37.2849122Z   Using cached psycopg2_binary-2.9.12-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (4.9 kB)
+2026-07-16T22:43:37.6095182Z Collecting SQLAlchemy (from -r requirements.txt (line 10))
+2026-07-16T22:43:37.6112681Z   Using cached sqlalchemy-2.0.51-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (9.5 kB)
+2026-07-16T22:43:37.6415261Z Collecting altair!=5.4.0,!=5.4.1,<7,>=4.0 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:37.6429929Z   Using cached altair-6.2.2-py3-none-any.whl.metadata (11 kB)
+2026-07-16T22:43:37.6583557Z Collecting blinker<2,>=1.5.0 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:37.6597975Z   Using cached blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+2026-07-16T22:43:37.6795418Z Collecting cachetools<8,>=5.5 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:37.6811929Z   Using cached cachetools-7.1.4-py3-none-any.whl.metadata (5.5 kB)
+2026-07-16T22:43:37.6989139Z Collecting click<9,>=7.0 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:37.7004697Z   Using cached click-8.4.2-py3-none-any.whl.metadata (2.6 kB)
+2026-07-16T22:43:37.7212373Z Collecting gitpython!=3.1.19,<4,>=3.0.7 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:37.7227461Z   Using cached gitpython-3.1.52-py3-none-any.whl.metadata (14 kB)
+2026-07-16T22:43:37.9708107Z Collecting numpy<3,>=1.23 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:37.9725353Z   Using cached numpy-2.2.6-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (62 kB)
+2026-07-16T22:43:37.9896669Z Collecting packaging>=20 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:37.9911900Z   Using cached packaging-26.2-py3-none-any.whl.metadata (3.5 kB)
+2026-07-16T22:43:38.1850565Z Collecting pillow<13,>=7.1.0 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.1866466Z   Using cached pillow-12.3.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (9.1 kB)
+2026-07-16T22:43:38.2037529Z Collecting pydeck<1,>=0.8.0b4 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.2050816Z   Using cached pydeck-0.9.3-py2.py3-none-any.whl.metadata (4.2 kB)
+2026-07-16T22:43:38.3826045Z Collecting protobuf<8,>=3.20 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.3842166Z   Using cached protobuf-7.35.1-cp310-abi3-manylinux2014_x86_64.whl.metadata (595 bytes)
+2026-07-16T22:43:38.5005673Z Collecting pyarrow<25,>=7.0 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.5021903Z   Using cached pyarrow-24.0.0-cp310-cp310-manylinux_2_28_x86_64.whl.metadata (3.0 kB)
+2026-07-16T22:43:38.5239034Z Collecting requests<3,>=2.27 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.5253874Z   Using cached requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+2026-07-16T22:43:38.5398782Z Collecting tenacity<10,>=8.1.0 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.5413114Z   Using cached tenacity-9.1.4-py3-none-any.whl.metadata (1.2 kB)
+2026-07-16T22:43:38.5500183Z Collecting toml<2,>=0.10.1 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.5513675Z   Using cached toml-0.10.2-py2.py3-none-any.whl.metadata (7.1 kB)
+2026-07-16T22:43:38.5667277Z Collecting typing-extensions<5,>=4.10.0 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.5680473Z   Using cached typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+2026-07-16T22:43:38.5950597Z Collecting starlette>=0.40.0 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.5964820Z   Using cached starlette-1.3.1-py3-none-any.whl.metadata (6.4 kB)
+2026-07-16T22:43:38.6208095Z Collecting uvicorn>=0.30.0 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.6220902Z   Using cached uvicorn-0.51.0-py3-none-any.whl.metadata (6.6 kB)
+2026-07-16T22:43:38.6549087Z Collecting httptools>=0.6.3 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.6564028Z   Using cached httptools-0.8.0-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (3.5 kB)
+2026-07-16T22:43:38.6724545Z Collecting anyio>=4.0.0 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.6737457Z   Using cached anyio-4.14.2-py3-none-any.whl.metadata (4.6 kB)
+2026-07-16T22:43:38.6861315Z Collecting python-multipart>=0.0.10 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.6874623Z   Using cached python_multipart-0.0.32-py3-none-any.whl.metadata (2.1 kB)
+2026-07-16T22:43:38.7822879Z Collecting websockets>=12.0.0 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.7838547Z   Using cached websockets-16.1-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (6.8 kB)
+2026-07-16T22:43:38.7930839Z Collecting itsdangerous>=2.1.2 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.7943493Z   Using cached itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+2026-07-16T22:43:38.8379824Z Collecting watchdog<7,>=2.1.5 (from streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.8394760Z   Using cached watchdog-6.0.0-py3-none-manylinux2014_x86_64.whl.metadata (44 kB)
+2026-07-16T22:43:38.8560749Z Collecting python-dateutil>=2.8.2 (from pandas->-r requirements.txt (line 2))
+2026-07-16T22:43:38.8574307Z   Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+2026-07-16T22:43:38.8926675Z Collecting pytz>=2020.1 (from pandas->-r requirements.txt (line 2))
+2026-07-16T22:43:38.8939853Z   Using cached pytz-2026.2-py2.py3-none-any.whl.metadata (22 kB)
+2026-07-16T22:43:38.9065792Z Collecting tzdata>=2022.7 (from pandas->-r requirements.txt (line 2))
+2026-07-16T22:43:38.9078682Z   Using cached tzdata-2026.3-py2.py3-none-any.whl.metadata (1.4 kB)
+2026-07-16T22:43:38.9217318Z Collecting jinja2 (from altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.9230750Z   Using cached jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+2026-07-16T22:43:38.9472706Z Collecting jsonschema>=3.0 (from altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.9486127Z   Using cached jsonschema-4.26.0-py3-none-any.whl.metadata (7.6 kB)
+2026-07-16T22:43:38.9847891Z Collecting narwhals>=2.4.0 (from altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:38.9861058Z   Using cached narwhals-2.24.0-py3-none-any.whl.metadata (15 kB)
+2026-07-16T22:43:39.0057052Z Collecting gitdb<5,>=4.0.1 (from gitpython!=3.1.19,<4,>=3.0.7->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:39.0070042Z   Using cached gitdb-4.0.12-py3-none-any.whl.metadata (1.2 kB)
+2026-07-16T22:43:39.0177575Z Collecting smmap<6,>=3.0.1 (from gitdb<5,>=4.0.1->gitpython!=3.1.19,<4,>=3.0.7->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:39.0190342Z   Using cached smmap-5.0.3-py3-none-any.whl.metadata (4.6 kB)
+2026-07-16T22:43:39.1688924Z Collecting charset_normalizer<4,>=2 (from requests<3,>=2.27->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:39.1705285Z   Using cached charset_normalizer-3.4.9-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (41 kB)
+2026-07-16T22:43:39.1846283Z Collecting idna<4,>=2.5 (from requests<3,>=2.27->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:39.1860357Z   Using cached idna-3.18-py3-none-any.whl.metadata (6.1 kB)
+2026-07-16T22:43:39.2071201Z Collecting urllib3<3,>=1.26 (from requests<3,>=2.27->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:39.2084766Z   Using cached urllib3-2.7.0-py3-none-any.whl.metadata (6.9 kB)
+2026-07-16T22:43:39.2248398Z Collecting certifi>=2023.5.7 (from requests<3,>=2.27->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:39.2262151Z   Using cached certifi-2026.6.17-py3-none-any.whl.metadata (2.5 kB)
+2026-07-16T22:43:39.2710466Z Collecting google-auth<2.56.0,>=2.48.1 (from google-auth[requests]<2.56.0,>=2.48.1->google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:39.2724756Z   Using cached google_auth-2.55.2-py3-none-any.whl.metadata (5.2 kB)
+2026-07-16T22:43:39.2940567Z Collecting httpx<1.0.0,>=0.28.1 (from google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:39.2954147Z   Using cached httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+2026-07-16T22:43:39.4124738Z Collecting pydantic<3.0.0,>=2.12.5 (from google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:39.4141510Z   Using cached pydantic-2.13.4-py3-none-any.whl.metadata (109 kB)
+2026-07-16T22:43:39.4358324Z Collecting distro<2,>=1.7.0 (from google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:39.4372569Z   Using cached distro-1.9.0-py3-none-any.whl.metadata (6.8 kB)
+2026-07-16T22:43:39.4454150Z Collecting sniffio (from google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:39.4468142Z   Using cached sniffio-1.3.1-py3-none-any.whl.metadata (3.9 kB)
+2026-07-16T22:43:39.4584338Z Collecting exceptiongroup>=1.0.2 (from anyio>=4.0.0->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:39.4598019Z   Using cached exceptiongroup-1.3.1-py3-none-any.whl.metadata (6.7 kB)
+2026-07-16T22:43:39.4827238Z Collecting pyasn1-modules>=0.2.1 (from google-auth<2.56.0,>=2.48.1->google-auth[requests]<2.56.0,>=2.48.1->google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:39.4840509Z   Using cached pyasn1_modules-0.4.2-py3-none-any.whl.metadata (3.5 kB)
+2026-07-16T22:43:39.7252385Z Collecting cryptography>=38.0.3 (from google-auth<2.56.0,>=2.48.1->google-auth[requests]<2.56.0,>=2.48.1->google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:39.7269529Z   Using cached cryptography-49.0.0-cp39-abi3-manylinux_2_34_x86_64.whl.metadata (4.3 kB)
+2026-07-16T22:43:39.7494459Z Collecting httpcore==1.* (from httpx<1.0.0,>=0.28.1->google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:39.7509310Z   Using cached httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+2026-07-16T22:43:39.7641493Z Collecting h11>=0.16 (from httpcore==1.*->httpx<1.0.0,>=0.28.1->google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:39.7656979Z   Using cached h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+2026-07-16T22:43:39.7768113Z Collecting annotated-types>=0.6.0 (from pydantic<3.0.0,>=2.12.5->google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:39.7782669Z   Using cached annotated_types-0.7.0-py3-none-any.whl.metadata (15 kB)
+2026-07-16T22:43:40.5569518Z Collecting pydantic-core==2.46.4 (from pydantic<3.0.0,>=2.12.5->google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:40.5587153Z   Using cached pydantic_core-2.46.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.6 kB)
+2026-07-16T22:43:40.5698543Z Collecting typing-inspection>=0.4.2 (from pydantic<3.0.0,>=2.12.5->google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:40.5712430Z   Using cached typing_inspection-0.4.2-py3-none-any.whl.metadata (2.6 kB)
+2026-07-16T22:43:40.5857657Z Collecting apify-shared<3.0.0,>=2.1.0 (from apify-client->-r requirements.txt (line 5))
+2026-07-16T22:43:40.5871210Z   Using cached apify_shared-2.2.1-py3-none-any.whl.metadata (14 kB)
+2026-07-16T22:43:40.5995723Z Collecting colorama>=0.4.0 (from apify-client->-r requirements.txt (line 5))
+2026-07-16T22:43:40.6008519Z   Using cached colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+2026-07-16T22:43:40.6659709Z Collecting impit>=0.9.2 (from apify-client->-r requirements.txt (line 5))
+2026-07-16T22:43:40.6676187Z   Using cached impit-0.13.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (2.9 kB)
+2026-07-16T22:43:40.6827728Z Collecting more-itertools>=10.0.0 (from apify-client->-r requirements.txt (line 5))
+2026-07-16T22:43:40.6841724Z   Using cached more_itertools-11.1.0-py3-none-any.whl.metadata (41 kB)
+2026-07-16T22:43:40.8728564Z Collecting scipy>=1.8.0 (from scikit-learn->-r requirements.txt (line 6))
+2026-07-16T22:43:40.8746296Z   Using cached scipy-1.15.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (61 kB)
+2026-07-16T22:43:40.8918692Z Collecting threadpoolctl>=3.1.0 (from scikit-learn->-r requirements.txt (line 6))
+2026-07-16T22:43:40.8932994Z   Using cached threadpoolctl-3.6.0-py3-none-any.whl.metadata (13 kB)
+2026-07-16T22:43:41.0519219Z Collecting greenlet>=1 (from SQLAlchemy->-r requirements.txt (line 10))
+2026-07-16T22:43:41.0536437Z   Using cached greenlet-3.5.3-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (3.8 kB)
+2026-07-16T22:43:41.1723063Z Collecting cffi>=2.0.0 (from cryptography>=38.0.3->google-auth<2.56.0,>=2.48.1->google-auth[requests]<2.56.0,>=2.48.1->google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:41.1740161Z   Using cached cffi-2.1.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.5 kB)
+2026-07-16T22:43:41.1867172Z Collecting pycparser (from cffi>=2.0.0->cryptography>=38.0.3->google-auth<2.56.0,>=2.48.1->google-auth[requests]<2.56.0,>=2.48.1->google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:41.1880146Z   Using cached pycparser-3.0-py3-none-any.whl.metadata (8.2 kB)
+2026-07-16T22:43:41.2469576Z Collecting MarkupSafe>=2.0 (from jinja2->altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:41.2484344Z   Using cached markupsafe-3.0.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+2026-07-16T22:43:41.2605581Z Collecting attrs>=22.2.0 (from jsonschema>=3.0->altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:41.2618747Z   Using cached attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+2026-07-16T22:43:41.2754235Z Collecting jsonschema-specifications>=2023.03.6 (from jsonschema>=3.0->altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:41.2766784Z   Using cached jsonschema_specifications-2025.9.1-py3-none-any.whl.metadata (2.9 kB)
+2026-07-16T22:43:41.2962492Z Collecting referencing>=0.28.4 (from jsonschema>=3.0->altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:41.2975594Z   Using cached referencing-0.37.0-py3-none-any.whl.metadata (2.8 kB)
+2026-07-16T22:43:41.6339956Z Collecting rpds-py>=0.25.0 (from jsonschema>=3.0->altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit->-r requirements.txt (line 1))
+2026-07-16T22:43:41.6355784Z   Using cached rpds_py-0.30.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (4.1 kB)
+2026-07-16T22:43:41.6628191Z Collecting pyasn1<0.7.0,>=0.6.1 (from pyasn1-modules>=0.2.1->google-auth<2.56.0,>=2.48.1->google-auth[requests]<2.56.0,>=2.48.1->google-genai->-r requirements.txt (line 4))
+2026-07-16T22:43:41.6640924Z   Using cached pyasn1-0.6.4-py3-none-any.whl.metadata (8.4 kB)
+2026-07-16T22:43:41.6868965Z Collecting six>=1.5 (from python-dateutil>=2.8.2->pandas->-r requirements.txt (line 2))
+2026-07-16T22:43:41.6881268Z   Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+2026-07-16T22:43:41.7138565Z Using cached streamlit-1.59.2-py3-none-any.whl (10.3 MB)
+2026-07-16T22:43:41.7188838Z Using cached pandas-2.3.3-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (12.8 MB)
+2026-07-16T22:43:41.7245637Z Using cached altair-6.2.2-py3-none-any.whl (797 kB)
+2026-07-16T22:43:41.7260530Z Using cached blinker-1.9.0-py3-none-any.whl (8.5 kB)
+2026-07-16T22:43:41.7273096Z Using cached cachetools-7.1.4-py3-none-any.whl (16 kB)
+2026-07-16T22:43:41.7285063Z Using cached click-8.4.2-py3-none-any.whl (119 kB)
+2026-07-16T22:43:41.7297720Z Using cached gitpython-3.1.52-py3-none-any.whl (215 kB)
+2026-07-16T22:43:41.7310626Z Using cached gitdb-4.0.12-py3-none-any.whl (62 kB)
+2026-07-16T22:43:41.7323374Z Using cached numpy-2.2.6-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (16.8 MB)
+2026-07-16T22:43:41.7394590Z Using cached pillow-12.3.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (6.9 MB)
+2026-07-16T22:43:41.7431272Z Using cached protobuf-7.35.1-cp310-abi3-manylinux2014_x86_64.whl (327 kB)
+2026-07-16T22:43:41.7445189Z Using cached pyarrow-24.0.0-cp310-cp310-manylinux_2_28_x86_64.whl (48.8 MB)
+2026-07-16T22:43:41.7635456Z Using cached pydeck-0.9.3-py2.py3-none-any.whl (11.4 MB)
+2026-07-16T22:43:41.7689343Z Using cached requests-2.34.2-py3-none-any.whl (73 kB)
+2026-07-16T22:43:41.7702444Z Using cached charset_normalizer-3.4.9-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (223 kB)
+2026-07-16T22:43:41.7715460Z Using cached idna-3.18-py3-none-any.whl (65 kB)
+2026-07-16T22:43:41.7727647Z Using cached smmap-5.0.3-py3-none-any.whl (24 kB)
+2026-07-16T22:43:41.7740025Z Using cached tenacity-9.1.4-py3-none-any.whl (28 kB)
+2026-07-16T22:43:41.7752711Z Using cached toml-0.10.2-py2.py3-none-any.whl (16 kB)
+2026-07-16T22:43:41.7765000Z Using cached typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+2026-07-16T22:43:41.7777608Z Using cached urllib3-2.7.0-py3-none-any.whl (131 kB)
+2026-07-16T22:43:41.7790203Z Using cached watchdog-6.0.0-py3-none-manylinux2014_x86_64.whl (79 kB)
+2026-07-16T22:43:41.7802796Z Using cached plotly-6.9.0-py3-none-any.whl (9.9 MB)
+2026-07-16T22:43:41.7850532Z Using cached google_genai-2.12.1-py3-none-any.whl (1.0 MB)
+2026-07-16T22:43:41.7866620Z Using cached anyio-4.14.2-py3-none-any.whl (125 kB)
+2026-07-16T22:43:41.7879315Z Using cached distro-1.9.0-py3-none-any.whl (20 kB)
+2026-07-16T22:43:41.7891820Z Using cached google_auth-2.55.2-py3-none-any.whl (256 kB)
+2026-07-16T22:43:41.7905189Z Using cached httpx-0.28.1-py3-none-any.whl (73 kB)
+2026-07-16T22:43:41.7917638Z Using cached httpcore-1.0.9-py3-none-any.whl (78 kB)
+2026-07-16T22:43:41.7930497Z Using cached pydantic-2.13.4-py3-none-any.whl (472 kB)
+2026-07-16T22:43:41.7944687Z Using cached pydantic_core-2.46.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+2026-07-16T22:43:41.7964713Z Using cached websockets-16.1-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (186 kB)
+2026-07-16T22:43:41.7977270Z Using cached apify_client-2.5.1-py3-none-any.whl (86 kB)
+2026-07-16T22:43:41.7989882Z Using cached apify_shared-2.2.1-py3-none-any.whl (16 kB)
+2026-07-16T22:43:41.8002674Z Using cached scikit_learn-1.7.2-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (9.7 MB)
+2026-07-16T22:43:41.8049895Z Using cached joblib-1.5.3-py3-none-any.whl (309 kB)
+2026-07-16T22:43:41.8063694Z Using cached python_dotenv-1.2.2-py3-none-any.whl (22 kB)
+2026-07-16T22:43:41.8076554Z Using cached psycopg2_binary-2.9.12-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (4.3 MB)
+2026-07-16T22:43:41.8104520Z Using cached sqlalchemy-2.0.51-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (3.2 MB)
+2026-07-16T22:43:41.8127795Z Using cached annotated_types-0.7.0-py3-none-any.whl (13 kB)
+2026-07-16T22:43:41.8140182Z Using cached certifi-2026.6.17-py3-none-any.whl (133 kB)
+2026-07-16T22:43:41.8153314Z Using cached colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+2026-07-16T22:43:41.8166017Z Using cached cryptography-49.0.0-cp39-abi3-manylinux_2_34_x86_64.whl (4.7 MB)
+2026-07-16T22:43:41.8195478Z Using cached cffi-2.1.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (218 kB)
+2026-07-16T22:43:41.8208350Z Using cached exceptiongroup-1.3.1-py3-none-any.whl (16 kB)
+2026-07-16T22:43:41.8221270Z Using cached greenlet-3.5.3-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (615 kB)
+2026-07-16T22:43:41.8235982Z Using cached h11-0.16.0-py3-none-any.whl (37 kB)
+2026-07-16T22:43:41.8249011Z Using cached httptools-0.8.0-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (450 kB)
+2026-07-16T22:43:41.8263154Z Using cached impit-0.13.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (4.2 MB)
+2026-07-16T22:43:41.8290460Z Using cached itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+2026-07-16T22:43:41.8303207Z Using cached jinja2-3.1.6-py3-none-any.whl (134 kB)
+2026-07-16T22:43:41.8315888Z Using cached jsonschema-4.26.0-py3-none-any.whl (90 kB)
+2026-07-16T22:43:41.8329774Z Using cached attrs-26.1.0-py3-none-any.whl (67 kB)
+2026-07-16T22:43:41.8342953Z Using cached jsonschema_specifications-2025.9.1-py3-none-any.whl (18 kB)
+2026-07-16T22:43:41.8356033Z Using cached markupsafe-3.0.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (20 kB)
+2026-07-16T22:43:41.8367932Z Using cached more_itertools-11.1.0-py3-none-any.whl (72 kB)
+2026-07-16T22:43:41.8380504Z Using cached narwhals-2.24.0-py3-none-any.whl (461 kB)
+2026-07-16T22:43:41.8394445Z Using cached packaging-26.2-py3-none-any.whl (100 kB)
+2026-07-16T22:43:41.8406929Z Using cached pyasn1_modules-0.4.2-py3-none-any.whl (181 kB)
+2026-07-16T22:43:41.8419693Z Using cached pyasn1-0.6.4-py3-none-any.whl (84 kB)
+2026-07-16T22:43:41.8432380Z Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+2026-07-16T22:43:41.8445313Z Using cached python_multipart-0.0.32-py3-none-any.whl (30 kB)
+2026-07-16T22:43:41.8457727Z Using cached pytz-2026.2-py2.py3-none-any.whl (510 kB)
+2026-07-16T22:43:41.8471661Z Using cached referencing-0.37.0-py3-none-any.whl (26 kB)
+2026-07-16T22:43:41.8484381Z Using cached rpds_py-0.30.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (390 kB)
+2026-07-16T22:43:41.8498037Z Using cached scipy-1.15.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (37.7 MB)
+2026-07-16T22:43:41.8647043Z Using cached six-1.17.0-py2.py3-none-any.whl (11 kB)
+2026-07-16T22:43:41.8658945Z Using cached starlette-1.3.1-py3-none-any.whl (73 kB)
+2026-07-16T22:43:41.8671434Z Using cached threadpoolctl-3.6.0-py3-none-any.whl (18 kB)
+2026-07-16T22:43:41.8683862Z Using cached typing_inspection-0.4.2-py3-none-any.whl (14 kB)
+2026-07-16T22:43:41.8696721Z Using cached tzdata-2026.3-py2.py3-none-any.whl (348 kB)
+2026-07-16T22:43:41.8709939Z Using cached uvicorn-0.51.0-py3-none-any.whl (73 kB)
+2026-07-16T22:43:41.8722872Z Using cached pycparser-3.0-py3-none-any.whl (48 kB)
+2026-07-16T22:43:41.8735649Z Using cached sniffio-1.3.1-py3-none-any.whl (10 kB)
+2026-07-16T22:43:42.3589796Z Installing collected packages: pytz, websockets, watchdog, urllib3, tzdata, typing-extensions, toml, threadpoolctl, tenacity, sniffio, smmap, six, rpds-py, python-multipart, python-dotenv, pycparser, pyasn1, pyarrow, psycopg2-binary, protobuf, pillow, packaging, numpy, narwhals, more-itertools, MarkupSafe, joblib, itsdangerous, impit, idna, httptools, h11, greenlet, distro, colorama, click, charset_normalizer, certifi, cachetools, blinker, attrs, apify-shared, annotated-types, uvicorn, typing-inspection, SQLAlchemy, scipy, requests, referencing, python-dateutil, pydantic-core, pyasn1-modules, plotly, jinja2, httpcore, gitdb, exceptiongroup, cffi, apify-client, scikit-learn, pydeck, pydantic, pandas, jsonschema-specifications, gitpython, cryptography, anyio, starlette, jsonschema, httpx, google-auth, altair, streamlit, google-genai
+2026-07-16T22:44:02.4758310Z 
+2026-07-16T22:44:02.4859335Z Successfully installed MarkupSafe-3.0.3 SQLAlchemy-2.0.51 altair-6.2.2 annotated-types-0.7.0 anyio-4.14.2 apify-client-2.5.1 apify-shared-2.2.1 attrs-26.1.0 blinker-1.9.0 cachetools-7.1.4 certifi-2026.6.17 cffi-2.1.0 charset_normalizer-3.4.9 click-8.4.2 colorama-0.4.6 cryptography-49.0.0 distro-1.9.0 exceptiongroup-1.3.1 gitdb-4.0.12 gitpython-3.1.52 google-auth-2.55.2 google-genai-2.12.1 greenlet-3.5.3 h11-0.16.0 httpcore-1.0.9 httptools-0.8.0 httpx-0.28.1 idna-3.18 impit-0.13.1 itsdangerous-2.2.0 jinja2-3.1.6 joblib-1.5.3 jsonschema-4.26.0 jsonschema-specifications-2025.9.1 more-itertools-11.1.0 narwhals-2.24.0 numpy-2.2.6 packaging-26.2 pandas-2.3.3 pillow-12.3.0 plotly-6.9.0 protobuf-7.35.1 psycopg2-binary-2.9.12 pyarrow-24.0.0 pyasn1-0.6.4 pyasn1-modules-0.4.2 pycparser-3.0 pydantic-2.13.4 pydantic-core-2.46.4 pydeck-0.9.3 python-dateutil-2.9.0.post0 python-dotenv-1.2.2 python-multipart-0.0.32 pytz-2026.2 referencing-0.37.0 requests-2.34.2 rpds-py-0.30.0 scikit-learn-1.7.2 scipy-1.15.3 six-1.17.0 smmap-5.0.3 sniffio-1.3.1 starlette-1.3.1 streamlit-1.59.2 tenacity-9.1.4 threadpoolctl-3.6.0 toml-0.10.2 typing-extensions-4.16.0 typing-inspection-0.4.2 tzdata-2026.3 urllib3-2.7.0 uvicorn-0.51.0 watchdog-6.0.0 websockets-16.1
+2026-07-16T22:44:02.7355530Z ##[group]Run python 01_run_scraper.py
+2026-07-16T22:44:02.7355908Z [36;1mpython 01_run_scraper.py[0m
+2026-07-16T22:44:02.7416912Z shell: /usr/bin/bash -e {0}
+2026-07-16T22:44:02.7417194Z env:
+2026-07-16T22:44:02.7417467Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-07-16T22:44:02.7417926Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+2026-07-16T22:44:02.7418385Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-07-16T22:44:02.7418781Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-07-16T22:44:02.7419200Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-07-16T22:44:02.7419605Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+2026-07-16T22:44:02.7420587Z   APIFY_API_TOKEN: ***
+2026-07-16T22:44:02.7421411Z   DATABASE_URL: ***
+2026-07-16T22:44:02.7421816Z ##[endgroup]
+2026-07-16T22:44:03.7785768Z [36m[apify.tweet-scraper runId:pesNuC2m4uWNADjwi][0m -> Status: RUNNING, Message: 
+2026-07-16T22:44:03.8052321Z [36m[apify.tweet-scraper runId:pesNuC2m4uWNADjwi][0m -> 2026-07-16T22:44:03.673Z [33mACTOR: [39mPulling container image of build OWreeFRLyu7uTYfaJ from registry.
+2026-07-16T22:44:04.0655553Z [36m[apify.tweet-scraper runId:pesNuC2m4uWNADjwi][0m -> 2026-07-16T22:44:03.676Z [33mACTOR: [39mCreating container.
+2026-07-16T22:44:04.0670900Z [36m[apify.tweet-scraper runId:pesNuC2m4uWNADjwi][0m -> 2026-07-16T22:44:04.061Z [33mACTOR: [39mStarting container.
+2026-07-16T22:44:05.6565932Z [36m[apify.tweet-scraper runId:pesNuC2m4uWNADjwi][0m -> 2026-07-16T22:44:04.064Z [33mACTOR: [39mRunning under "LIMITED_PERMISSIONS".
+2026-07-16T22:44:05.7259081Z [36m[apify.tweet-scraper runId:pesNuC2m4uWNADjwi][0m -> 2026-07-16T22:44:05.652Z [32mINFO[39m  System info[90m {"apifyVersion":"3.4.2","apifyClientVersion":"2.12.4","crawleeVersion":"3.13.5","osType":"Linux","nodeVersion":"v22.23.1"}[39m
+2026-07-16T22:44:06.5565641Z [36m[apify.tweet-scraper runId:pesNuC2m4uWNADjwi][0m -> 2026-07-16T22:44:05.719Z [32mINFO[39m  PHASE -- STARTING ACTOR.
+2026-07-16T22:44:06.6147279Z [36m[apify.tweet-scraper runId:pesNuC2m4uWNADjwi][0m -> 2026-07-16T22:44:06.552Z [32mINFO[39m  [Status message]: The developer of this actor doesn't allow the use of API in the Free Plan. Please subscribe to a paid plan on Apify if you want to use the API with this actor. Link: https://apify.com/pricing?fpr=yhdrb
+2026-07-16T22:44:06.6574802Z [36m[apify.tweet-scraper runId:pesNuC2m4uWNADjwi][0m -> 2026-07-16T22:44:06.611Z [31mERROR[39m The developer of this actor doesn't allow the use of API in the Free Plan. Please subscribe to a paid plan on Apify if you want to use the API with this actor. Link: https://apify.com/pricing?fpr=yhdrb
+2026-07-16T22:44:06.9630640Z [36m[apify.tweet-scraper runId:pesNuC2m4uWNADjwi][0m -> Status: RUNNING, Message: Your run has finished. Please subscribe to a paid plan on Apify for the best experience. Link: https://apify.com/pricing?fpr=yhdrb
+2026-07-16T22:44:07.2106488Z [36m[apify.tweet-scraper runId:pesNuC2m4uWNADjwi][0m -> 2026-07-16T22:44:06.654Z [32mINFO[39m  [Status message]: Your run has finished. Please subscribe to a paid plan on Apify for the best experience. Link: https://apify.com/pricing?fpr=yhdrb
+2026-07-16T22:44:07.9813071Z [36m[apify.tweet-scraper runId:pesNuC2m4uWNADjwi][0m -> Status: SUCCEEDED, Message: Your run has finished. Please subscribe to a paid plan on Apify for the best experience. Link: https://apify.com/pricing?fpr=yhdrb
+2026-07-16T22:44:14.2163313Z [OK] Basis data (sqlite) dan tabel 'log_cuitan' berhasil diselaraskan!
+2026-07-16T22:44:14.2164072Z [INFO] Memulai penarikan data dari Twitter (X)...
+2026-07-16T22:44:14.2164910Z [INFO] Menggunakan kueri Twitter: '(mbg) OR (#IKNNusantara) OR (from:jokowi OR from:kemenpupr) lang:id'
+2026-07-16T22:44:14.2165718Z [INFO] Batas maksimal data: 100
+2026-07-16T22:44:14.2166282Z [INFO] Tidak ada data baru yang berhasil ditarik atau terjadi kesalahan.
+2026-07-16T22:44:14.2712581Z ##[group]Run python 01_pipeline_data.py
+2026-07-16T22:44:14.2712981Z [36;1mpython 01_pipeline_data.py[0m
+2026-07-16T22:44:14.2771524Z shell: /usr/bin/bash -e {0}
+2026-07-16T22:44:14.2772058Z env:
+2026-07-16T22:44:14.2772363Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-07-16T22:44:14.2772853Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+2026-07-16T22:44:14.2773337Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-07-16T22:44:14.2773762Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-07-16T22:44:14.2774186Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-07-16T22:44:14.2774602Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+2026-07-16T22:44:14.2775215Z   GEMINI_API_KEY: 
+***
+2026-07-16T22:44:14.2775964Z   DATABASE_URL: ***
+2026-07-16T22:44:14.2776207Z ##[endgroup]
+2026-07-16T22:44:17.0043782Z /opt/hostedtoolcache/Python/3.10.20/x64/lib/python3.10/site-packages/sklearn/base.py:442: InconsistentVersionWarning: Trying to unpickle estimator SVC from version 1.9.0 when using version 1.7.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+2026-07-16T22:44:17.0045626Z https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+2026-07-16T22:44:17.0046244Z   warnings.warn(
+2026-07-16T22:44:17.0080600Z /opt/hostedtoolcache/Python/3.10.20/x64/lib/python3.10/site-packages/sklearn/base.py:442: InconsistentVersionWarning: Trying to unpickle estimator TfidfTransformer from version 1.9.0 when using version 1.7.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+2026-07-16T22:44:17.0082856Z https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+2026-07-16T22:44:17.0083409Z   warnings.warn(
+2026-07-16T22:44:17.0230404Z /opt/hostedtoolcache/Python/3.10.20/x64/lib/python3.10/site-packages/sklearn/base.py:442: InconsistentVersionWarning: Trying to unpickle estimator TfidfVectorizer from version 1.9.0 when using version 1.7.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+2026-07-16T22:44:17.0232522Z https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+2026-07-16T22:44:17.0233052Z   warnings.warn(
+2026-07-16T22:44:17.0250589Z [INFO] Tidak ada data cuitan mentah baru (status 'RAW') untuk diproses.
+2026-07-16T22:44:17.3465320Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-16T22:44:17.3466584Z Post job cleanup.
+2026-07-16T22:44:17.4662235Z Cache hit occurred on the primary key setup-python-Linux-x64-24.04-Ubuntu-python-3.10.20-pip-57384ae661d5b2b731801a72ed6d80e2dc0bad17749a26e2274054beddd37232, not saving cache.
+2026-07-16T22:44:17.4664487Z (node:2390) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-16T22:44:17.4666608Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-16T22:44:17.4810848Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-16T22:44:17.4812384Z Post job cleanup.
+2026-07-16T22:44:17.5660507Z [command]/usr/bin/git version
+2026-07-16T22:44:17.5706786Z git version 2.54.0
+2026-07-16T22:44:17.5750490Z Temporarily overriding HOME='/home/runner/work/_temp/75d08a82-46a9-4dd0-b2a9-2ae197fab18f' before making global git config changes
+2026-07-16T22:44:17.5752050Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-16T22:44:17.5766001Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/socmed-sentimen-analysis-pp/socmed-sentimen-analysis-pp
+2026-07-16T22:44:17.5797604Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-16T22:44:17.5834277Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-16T22:44:17.6087312Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-16T22:44:17.6117329Z http.https://github.com/.extraheader
+2026-07-16T22:44:17.6129110Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-07-16T22:44:17.6162776Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-16T22:44:17.6464883Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-16T22:44:17.6499314Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-16T22:44:17.6897988Z Cleaning up orphan processes
+2026-07-16T22:44:17.7198220Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-python@v5. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
