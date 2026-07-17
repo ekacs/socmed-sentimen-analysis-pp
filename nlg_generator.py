@@ -60,6 +60,8 @@ def generate_executive_summary(
            
            ### [Rekomendasi Kebijakan]
            (Sajikan 2-3 butir rekomendasi taktis-realistis yang ditujukan bagi pimpinan/manajemen)
+           
+        5. DILARANG KERAS menuliskan judul laporan formal (seperti "LAPORAN RINGKASAN EKSEKUTIF: ..."), salam pembuka, perihal, rincian penerima (seperti "Kepada: Yth..."), atau penutup surat formal di awal maupun di akhir output. Hasil generasi harus langsung diawali dengan sub-heading pertama: "### [Situasi Saat Ini]".
 
         Tuliskan laporan analisis Anda sekarang:
         """
