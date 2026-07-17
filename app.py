@@ -346,8 +346,8 @@ with tab1:
             st.divider()
             
             # AI Narrative Laporan (NLG)
-            st.subheader("📝 Laporan Narasi Eksekutif AI")
-            st.markdown("Ringkasan narasi kebijakan publik disusun otomatis menggunakan model Gemini.")
+            st.subheader("📝 Ringkasan Eksekutif")
+            st.markdown("Ringkasan narasi kebijakan publik disusun otomatis berdasarkan data yang tersedia di basis data.")
             
             # Dapatkan keyword populer dan contoh suara negatif
             top_words = extract_top_keywords(df_filtered, 5)
