@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import json
 import datetime
@@ -11,6 +12,14 @@ import db_manager
 
 # Impor generator NLG
 from nlg_generator import generate_executive_summary
+
+def get_supabase_dashboard_url():
+    db_url = os.getenv("DATABASE_URL", "")
+    match = re.search(r"postgres\.([a-zA-Z0-9\-]+)", db_url)
+    if match:
+        project_ref = match.group(1)
+        return f"https://supabase.com/dashboard/project/{project_ref}/editor"
+    return "https://supabase.com/dashboard"
 
 # 1. Konfigurasi Halaman Streamlit
 st.set_page_config(
@@ -177,6 +186,16 @@ new_mode = 'auto' if mode_pilihan == "Otomatis (Cronjob Harian)" else 'manual'
 if new_mode != mode_sekarang:
     db_manager.set_scraping_mode(new_mode)
     st.sidebar.success(f"Mode berhasil diubah ke: {mode_pilihan}")
+
+# Akses Database
+st.sidebar.divider()
+st.sidebar.markdown("### 🗄️ Akses Database Awan")
+st.sidebar.link_button(
+    "🌐 Buka Tabel Supabase",
+    get_supabase_dashboard_url(),
+    use_container_width=True,
+    help="Buka editor tabel PostgreSQL Supabase secara instan."
+)
 
 st.sidebar.divider()
 st.sidebar.header("📁 Filter Analisis Global")
@@ -406,8 +425,18 @@ with tab1:
 # TAB 2: JEJAK AUDIT DATA
 # =====================================================================
 with tab2:
-    st.subheader("📑 Jejak Audit Data Mentah & Baku")
-    st.markdown("Transparansi analisis: bandingkan teks asli dari masyarakat dengan hasil standardisasi bahasa oleh AI.")
+    col_audit1, col_audit2 = st.columns([3, 1])
+    with col_audit1:
+        st.subheader("📑 Jejak Audit Data Mentah & Baku")
+        st.markdown("Transparansi analisis: bandingkan teks asli dari masyarakat dengan hasil standardisasi bahasa oleh AI.")
+    with col_audit2:
+        st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
+        st.link_button(
+            "🌐 Editor Supabase",
+            get_supabase_dashboard_url(),
+            use_container_width=True,
+            help="Buka dan sunting database langsung di Supabase Cloud."
+        )
     
     if df_filtered.empty:
         st.info("Belum ada data untuk diaudit.")
