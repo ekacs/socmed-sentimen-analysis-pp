@@ -12,8 +12,8 @@ def get_db_type():
     """
     Menentukan tipe database yang digunakan berdasarkan ketersediaan DATABASE_URL.
     """
-    db_url = os.getenv("DATABASE_URL")
-    if db_url and db_url.startswith("postgresql://") and "YOUR_DATABASE_URL" not in db_url:
+    db_url = os.getenv("DATABASE_URL", "")
+    if db_url and "postgresql://" in db_url and "YOUR_DATABASE_URL" not in db_url:
         return "postgresql"
     return "sqlite"
 
