@@ -1,0 +1,30 @@
+﻿2026-07-17T01:07:15.8238323Z ##[group]Run python 01_run_scraper.py
+2026-07-17T01:07:15.8238613Z [36;1mpython 01_run_scraper.py[0m
+2026-07-17T01:07:15.8293417Z shell: /usr/bin/bash -e {0}
+2026-07-17T01:07:15.8293657Z env:
+2026-07-17T01:07:15.8293890Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-07-17T01:07:15.8294265Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib/pkgconfig
+2026-07-17T01:07:15.8294606Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-07-17T01:07:15.8294924Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-07-17T01:07:15.8295230Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-07-17T01:07:15.8295549Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib
+2026-07-17T01:07:15.8296153Z   APIFY_API_TOKEN: ***
+2026-07-17T01:07:15.8296663Z   DATABASE_URL: ***
+2026-07-17T01:07:15.8296848Z ##[endgroup]
+2026-07-17T01:07:18.5677559Z [36m[apify.tweet-scraper runId:JZBxrNLsJmHZNfVwI][0m -> Status: RUNNING, Message: 
+2026-07-17T01:07:18.8489779Z [36m[apify.tweet-scraper runId:JZBxrNLsJmHZNfVwI][0m -> 2026-07-17T01:07:18.277Z [33mACTOR: [39mPulling container image of build OWreeFRLyu7uTYfaJ from registry.
+2026-07-17T01:07:18.8490868Z [36m[apify.tweet-scraper runId:JZBxrNLsJmHZNfVwI][0m -> 2026-07-17T01:07:18.279Z [33mACTOR: [39mCreating container.
+2026-07-17T01:07:18.8491536Z [36m[apify.tweet-scraper runId:JZBxrNLsJmHZNfVwI][0m -> 2026-07-17T01:07:18.409Z [33mACTOR: [39mStarting container.
+2026-07-17T01:07:19.9318201Z [36m[apify.tweet-scraper runId:JZBxrNLsJmHZNfVwI][0m -> 2026-07-17T01:07:18.411Z [33mACTOR: [39mRunning under "LIMITED_PERMISSIONS".
+2026-07-17T01:07:19.9786007Z [36m[apify.tweet-scraper runId:JZBxrNLsJmHZNfVwI][0m -> 2026-07-17T01:07:19.894Z [32mINFO[39m  System info[90m {"apifyVersion":"3.4.2","apifyClientVersion":"2.12.4","crawleeVersion":"3.13.5","osType":"Linux","nodeVersion":"v22.23.1"}[39m
+2026-07-17T01:07:38.6919564Z [36m[apify.tweet-scraper runId:JZBxrNLsJmHZNfVwI][0m -> 2026-07-17T01:07:19.939Z [32mINFO[39m  PHASE -- STARTING ACTOR.
+2026-07-17T01:07:38.9957900Z [36m[apify.tweet-scraper runId:JZBxrNLsJmHZNfVwI][0m -> 2026-07-17T01:07:38.654Z [32mINFO[39m  [Status message]: The developer of this actor doesn't allow the use of API in the Free Plan. Please subscribe to a paid plan on Apify if you want to use the API with this actor. Link: https://apify.com/pricing?fpr=yhdrb
+2026-07-17T01:07:39.1932203Z [36m[apify.tweet-scraper runId:JZBxrNLsJmHZNfVwI][0m -> 2026-07-17T01:07:38.957Z [31mERROR[39m The developer of this actor doesn't allow the use of API in the Free Plan. Please subscribe to a paid plan on Apify if you want to use the API with this actor. Link: https://apify.com/pricing?fpr=yhdrb
+2026-07-17T01:07:39.4174774Z [36m[apify.tweet-scraper runId:JZBxrNLsJmHZNfVwI][0m -> Status: RUNNING, Message: Your run has finished. Please subscribe to a paid plan on Apify for the best experience. Link: https://apify.com/pricing?fpr=yhdrb
+2026-07-17T01:07:40.5137473Z [36m[apify.tweet-scraper runId:JZBxrNLsJmHZNfVwI][0m -> 2026-07-17T01:07:39.155Z [32mINFO[39m  [Status message]: Your run has finished. Please subscribe to a paid plan on Apify for the best experience. Link: https://apify.com/pricing?fpr=yhdrb
+2026-07-17T01:07:41.5829544Z [36m[apify.tweet-scraper runId:JZBxrNLsJmHZNfVwI][0m -> Status: SUCCEEDED, Message: Your run has finished. Please subscribe to a paid plan on Apify for the best experience. Link: https://apify.com/pricing?fpr=yhdrb
+2026-07-17T01:07:47.1252628Z [OK] Basis data (postgresql) dan tabel 'log_cuitan' berhasil diselaraskan!
+2026-07-17T01:07:47.1253255Z [INFO] Memulai penarikan data dari Twitter (X)...
+2026-07-17T01:07:47.1253887Z [INFO] Menggunakan kueri Twitter: '(mbg) OR (#IKNNusantara) OR (from:jokowi OR from:kemenpupr) lang:id'
+2026-07-17T01:07:47.1254867Z [INFO] Batas maksimal data: 100
+2026-07-17T01:07:47.1255243Z [INFO] Tidak ada data baru yang berhasil ditarik atau terjadi kesalahan.
