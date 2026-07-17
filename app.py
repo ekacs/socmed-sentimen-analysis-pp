@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import datetime
 import subprocess
@@ -521,7 +522,7 @@ with tab3:
                 try:
                     # Jalankan subprocess run scraper
                     result = subprocess.run(
-                        ["unpar\\Scripts\\python", "01_run_scraper.py"],
+                        [sys.executable, "01_run_scraper.py"],
                         capture_output=True, text=True, check=True
                     )
                     st.success("✅ Proses penarikan data mentah selesai!")
@@ -541,7 +542,7 @@ with tab3:
                 try:
                     # Jalankan subprocess run pipeline data
                     result = subprocess.run(
-                        ["unpar\\Scripts\\python", "01_pipeline_data.py"],
+                        [sys.executable, "01_pipeline_data.py"],
                         capture_output=True, text=True, check=True
                     )
                     st.success("✅ Prapemrosesan AI & Klasifikasi SVM selesai!")
