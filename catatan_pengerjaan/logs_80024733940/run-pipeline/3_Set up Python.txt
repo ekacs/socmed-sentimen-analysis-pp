@@ -1,0 +1,27 @@
+﻿2026-07-17T03:30:31.1092699Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-17T03:30:31.1096558Z ##[group]Run actions/setup-python@v5
+2026-07-17T03:30:31.1097184Z with:
+2026-07-17T03:30:31.1097653Z   python-version: 3.11
+2026-07-17T03:30:31.1098145Z   cache: pip
+2026-07-17T03:30:31.1098618Z   check-latest: false
+2026-07-17T03:30:31.1105148Z   token: ***
+2026-07-17T03:30:31.1105705Z   update-environment: true
+2026-07-17T03:30:31.1106590Z   allow-prereleases: false
+2026-07-17T03:30:31.1107154Z   freethreaded: false
+2026-07-17T03:30:31.1107657Z ##[endgroup]
+2026-07-17T03:30:31.2733555Z ##[group]Installed versions
+2026-07-17T03:30:31.2797335Z (node:2171) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-17T03:30:31.2799098Z Successfully set up CPython (3.11.15)
+2026-07-17T03:30:31.2800403Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-17T03:30:31.2802292Z ##[endgroup]
+2026-07-17T03:30:31.3650229Z [command]/opt/hostedtoolcache/Python/3.11.15/x64/bin/pip cache dir
+2026-07-17T03:30:31.7270120Z /home/runner/.cache/pip
+2026-07-17T03:30:31.9780406Z Cache hit for: setup-python-Linux-x64-24.04-Ubuntu-python-3.11.15-pip-d4bd072785ae58d6189bb5b0b264828354e9fd023e6e09c8a77832c6dd8ce83e
+2026-07-17T03:30:31.9928409Z (node:2171) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-17T03:30:33.1968424Z Received 20971520 of 192404227 (10.9%), 20.0 MBs/sec
+2026-07-17T03:30:34.1983479Z Received 167772160 of 192404227 (87.2%), 79.9 MBs/sec
+2026-07-17T03:30:34.3175964Z Received 192404227 of 192404227 (100.0%), 86.5 MBs/sec
+2026-07-17T03:30:34.3177482Z Cache Size: ~183 MB (192404227 B)
+2026-07-17T03:30:34.3230077Z [command]/usr/bin/tar -xf /home/runner/work/_temp/a92789ed-4123-49e0-8f1e-ca7e7c58838c/cache.tzst -P -C /home/runner/work/socmed-sentimen-analysis-pp/socmed-sentimen-analysis-pp --use-compress-program unzstd
+2026-07-17T03:30:34.7371167Z Cache restored successfully
+2026-07-17T03:30:34.7477955Z Cache restored from key: setup-python-Linux-x64-24.04-Ubuntu-python-3.11.15-pip-d4bd072785ae58d6189bb5b0b264828354e9fd023e6e09c8a77832c6dd8ce83e

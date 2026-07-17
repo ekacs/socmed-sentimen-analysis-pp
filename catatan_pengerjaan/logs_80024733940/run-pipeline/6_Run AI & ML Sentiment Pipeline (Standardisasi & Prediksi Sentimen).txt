@@ -1,0 +1,14 @@
+﻿2026-07-17T03:31:07.2722671Z ##[group]Run python 01_pipeline_data.py
+2026-07-17T03:31:07.2723079Z [36;1mpython 01_pipeline_data.py[0m
+2026-07-17T03:31:07.2782080Z shell: /usr/bin/bash -e {0}
+2026-07-17T03:31:07.2782351Z env:
+2026-07-17T03:31:07.2782639Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-07-17T03:31:07.2783116Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib/pkgconfig
+2026-07-17T03:31:07.2783580Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-07-17T03:31:07.2783979Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-07-17T03:31:07.2784405Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-07-17T03:31:07.2784826Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib
+2026-07-17T03:31:07.2785399Z   GEMINI_API_KEY: ***
+2026-07-17T03:31:07.2786181Z   DATABASE_URL: ***
+2026-07-17T03:31:07.2786408Z ##[endgroup]
+2026-07-17T03:31:10.4544581Z [INFO] Mode penarikan data saat ini diatur ke MANUAL. Pemrosesan otomatis dilewati.
