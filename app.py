@@ -204,7 +204,7 @@ else:
     df_filtered = df_all.copy()
 
 # 8. Struktur Layout Tab Utama
-tab1, tab2, tab3 = st.tabs(["📊 Analitik Sentimen", "📑 Jejak Audit Data", "⚙️ Pengaturan Target"])
+tab3, tab1, tab2 = st.tabs(["⚙️ Pengaturan Target", "📊 Analitik Sentimen", "📑 Jejak Audit Data"])
 
 # =====================================================================
 # TAB 1: ANALITIK SENTIMEN
