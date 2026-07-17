@@ -529,9 +529,12 @@ with tab3:
                     with st.expander("Tampilkan Log Scraper"):
                         st.code(result.stdout)
                 except subprocess.CalledProcessError as e:
-                    st.error("❌ Gagal menjalankan modul scraper.")
-                    with st.expander("Tampilkan Log Kesalahan"):
-                        st.code(e.stderr)
+                    st.error(f"❌ Gagal menjalankan modul scraper (Exit code: {e.returncode}).")
+                    with st.expander("Tampilkan Log Kesalahan", expanded=True):
+                        st.markdown("**Output (stdout):**")
+                        st.code(e.stdout if e.stdout else "Tidak ada output.")
+                        st.markdown("**Error (stderr):**")
+                        st.code(e.stderr if e.stderr else "Tidak ada error.")
                         
     # Pemicu Pipeline AI/ML
     with col_run2:
@@ -551,6 +554,9 @@ with tab3:
                     # Force refresh page
                     st.rerun()
                 except subprocess.CalledProcessError as e:
-                    st.error("❌ Gagal menjalankan modul prapemrosesan AI/ML.")
-                    with st.expander("Tampilkan Log Kesalahan"):
-                        st.code(e.stderr)
+                    st.error(f"❌ Gagal menjalankan modul prapemrosesan AI/ML (Exit code: {e.returncode}).")
+                    with st.expander("Tampilkan Log Kesalahan", expanded=True):
+                        st.markdown("**Output (stdout):**")
+                        st.code(e.stdout if e.stdout else "Tidak ada output.")
+                        st.markdown("**Error (stderr):**")
+                        st.code(e.stderr if e.stderr else "Tidak ada error.")
