@@ -159,7 +159,7 @@ def extract_top_keywords(df, num_words=5):
 
 # 5. Dashboard Header
 st.title("🏛️ Pusat Analisis Sentimen Kebijakan Publik")
-st.markdown("Dasbor eksekutif berbasis AI untuk memantau sentimen publik terhadap kebijakan pembangunan dan transportasi nasional.")
+st.markdown("Dasbor eksekutif berbasis AI untuk memantau sentimen publik terhadap kebijakan publik.")
 st.divider()
 
 # 6. Memuat Data Aktual
