@@ -9,7 +9,7 @@ from apify_client import ApifyClient
 # Impor fungsi pembaca konfigurasi
 from config_parser import load_config, build_twitter_query
 # Impor fungsi basis data
-from db_manager import simpan_data_ke_db, buat_tabel
+from db_manager import simpan_data_ke_db, buat_tabel, get_scraping_mode
 
 # Memuat file .env — override=False agar env var sistem (GitHub Actions) tidak tertimpa
 load_dotenv(override=False)
@@ -294,6 +294,12 @@ def scrape_news_portal(client, general_cfg):
 def main():
     # 1. Pastikan tabel database siap
     buat_tabel()
+    
+    # 1b. Cek Mode Scraping (Manual vs Otomatis)
+    mode = get_scraping_mode()
+    if mode == 'manual':
+        print("[INFO] Mode penarikan data saat ini diatur ke MANUAL. Cronjob otomatis dilewati.")
+        sys.exit(0)
     
     # 2. Muat konfigurasi
     config = load_config()

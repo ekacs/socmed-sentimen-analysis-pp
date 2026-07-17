@@ -156,8 +156,22 @@ if df_all.empty:
     df_all = pd.DataFrame(columns=['tweet_id', 'date', 'username', 'raw_text', 'cleaned_text', 'sentiment_label', 'confidence_score', 'likes', 'retweets', 'status', 'source_platform'])
 
 # 7. Sidebar Filter
-st.sidebar.markdown("### 🎨 Pengaturan Tampilan")
+st.sidebar.markdown("### 🎨 Pengaturan Tampilan & Sistem")
 st.sidebar.info("💡 **Tips Tema:** Klik ikon **⋮** di sudut kanan atas layar, lalu pilih **Settings > Theme** untuk beralih antara *Light* dan *Dark Mode*.")
+
+# Mode Penarikan Data (Scraping Mode)
+mode_sekarang = db_manager.get_scraping_mode()
+mode_pilihan = st.sidebar.radio(
+    "🔄 Mode Penarikan Data (Scraping):",
+    options=["Otomatis (Cronjob Harian)", "Manual (Hanya via Dasbor)"],
+    index=0 if mode_sekarang == 'auto' else 1
+)
+
+new_mode = 'auto' if mode_pilihan == "Otomatis (Cronjob Harian)" else 'manual'
+if new_mode != mode_sekarang:
+    db_manager.set_scraping_mode(new_mode)
+    st.sidebar.success(f"Mode berhasil diubah ke: {mode_pilihan}")
+
 st.sidebar.divider()
 st.sidebar.header("📁 Filter Analisis Global")
 

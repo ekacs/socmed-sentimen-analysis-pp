@@ -41,13 +41,13 @@ def get_placeholder():
 
 def buat_tabel():
     """
-    Membuat skema tabel 'log_cuitan' yang kompatibel dengan SQLite dan PostgreSQL.
+    Membuat skema tabel 'log_cuitan' dan 'system_config' yang kompatibel dengan SQLite dan PostgreSQL.
     """
     conn = get_connection()
     cursor = conn.cursor()
     
     try:
-        # Skema tabel identik untuk kedua tipe database
+        # Skema tabel log_cuitan
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS log_cuitan (
                 tweet_id TEXT PRIMARY KEY,          -- Mencegah duplikasi data tweet secara mutlak
@@ -63,8 +63,22 @@ def buat_tabel():
                 source_platform TEXT NOT NULL       -- Keterangan sumber: 'Twitter', 'Instagram', 'LinkedIn', 'News'
             )
         ''')
+        
+        # Skema tabel system_config
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS system_config (
+                config_key TEXT PRIMARY KEY,
+                config_value TEXT NOT NULL
+            )
+        ''')
+        
+        # Cek dan seed nilai default jika kosong
+        cursor.execute("SELECT COUNT(*) FROM system_config WHERE config_key = 'scraping_mode'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("INSERT INTO system_config (config_key, config_value) VALUES ('scraping_mode', 'auto')")
+            
         conn.commit()
-        print(f"[OK] Basis data ({get_db_type()}) dan tabel 'log_cuitan' berhasil diselaraskan!")
+        print(f"[OK] Basis data ({get_db_type()}) dan tabel-tabel sistem berhasil diselaraskan!")
     except Exception as e:
         print(f"[ERROR] Gagal menyelaraskan tabel: {e}")
     finally:
@@ -203,3 +217,43 @@ def perbarui_cuitan_setelah_proses(tweet_id, cleaned_text, sentiment_label, conf
         print(f"[ERROR] Gagal memperbarui status data cuitan {tweet_id}: {e}")
     finally:
         conn.close()
+
+def get_scraping_mode():
+    """
+    Mengambil mode penarikan data ('auto' atau 'manual') dari tabel system_config.
+    Default-nya adalah 'auto'.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT config_value FROM system_config WHERE config_key = 'scraping_mode'")
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+        else:
+            return 'auto'
+    except Exception as e:
+        print(f"[ERROR] Gagal mengambil scraping mode: {e}")
+        return 'auto'
+    finally:
+        conn.close()
+
+def set_scraping_mode(mode):
+    """
+    Memperbarui mode penarikan data ('auto' atau 'manual') ke tabel system_config.
+    """
+    if mode not in ['auto', 'manual']:
+        raise ValueError("Mode harus berupa 'auto' atau 'manual'")
+        
+    conn = get_connection()
+    cursor = conn.cursor()
+    placeholder = get_placeholder()
+    try:
+        cursor.execute(f"UPDATE system_config SET config_value = {placeholder} WHERE config_key = 'scraping_mode'", (mode,))
+        conn.commit()
+        print(f"[OK] Mode scraping diperbarui ke: {mode}")
+    except Exception as e:
+        print(f"[ERROR] Gagal memperbarui scraping mode: {e}")
+    finally:
+        conn.close()
+

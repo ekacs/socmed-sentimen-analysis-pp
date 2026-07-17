@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 import joblib
 from dotenv import load_dotenv
@@ -91,6 +92,12 @@ def clean_text_with_gemini(client, raw_text):
         return raw_text
 
 def process_pipeline():
+    # 0. Cek Mode Scraping (Manual vs Otomatis)
+    mode = db_manager.get_scraping_mode()
+    if mode == 'manual':
+        print("[INFO] Mode penarikan data saat ini diatur ke MANUAL. Pemrosesan otomatis dilewati.")
+        sys.exit(0)
+        
     # 1. Inisialisasi Klien Gemini & Muat Model SVM
     gemini_client = get_gemini_client()
     svm_model, vectorizer = load_svm_model()
