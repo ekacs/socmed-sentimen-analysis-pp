@@ -22,6 +22,12 @@ st.set_page_config(
 DB_FILE = 'sentimen_kebijakan.db'
 CONFIG_FILE = 'target_config.json'
 
+# Jalankan buat_tabel() untuk memastikan basis data ter-inisialisasi
+try:
+    db_manager.buat_tabel()
+except Exception as e:
+    st.error(f"Gagal menginisialisasi basis data: {e}")
+
 # 2. Injeksi CSS Kustom (Swiss Modern Estetika)
 st.markdown("""
     <style>

@@ -249,7 +249,11 @@ def set_scraping_mode(mode):
     cursor = conn.cursor()
     placeholder = get_placeholder()
     try:
-        cursor.execute(f"UPDATE system_config SET config_value = {placeholder} WHERE config_key = 'scraping_mode'", (mode,))
+        cursor.execute("SELECT COUNT(*) FROM system_config WHERE config_key = 'scraping_mode'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute(f"INSERT INTO system_config (config_key, config_value) VALUES ('scraping_mode', {placeholder})", (mode,))
+        else:
+            cursor.execute(f"UPDATE system_config SET config_value = {placeholder} WHERE config_key = 'scraping_mode'", (mode,))
         conn.commit()
         print(f"[OK] Mode scraping diperbarui ke: {mode}")
     except Exception as e:
