@@ -25,22 +25,24 @@ CONFIG_FILE = 'target_config.json'
 # 2. Injeksi CSS Kustom (Swiss Modern Estetika)
 st.markdown("""
     <style>
-        /* Sembunyikan elemen bawaan Streamlit */
-        #MainMenu {visibility: hidden;}
+        /* Sembunyikan footer, tapi biarkan header/menu (untuk pengaturan tema) */
         footer {visibility: hidden;}
-        header {visibility: hidden;}
+        /* Sembunyikan tombol tutup sidebar di desktop agar selalu terbuka */
+        @media (min-width: 768px) {
+            [data-testid="collapsedControl"] { display: none !important; }
+        }
 
         /* Tipografi & Warna Latar Belakang */
         html, body, [class*="css"] {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #F8F9FA;
-            color: #212529;
+            background-color: var(--background-color);
+            color: var(--text-color);
         }
 
         /* Kartu Metrik Kustom */
         .metric-card {
-            background-color: #FFFFFF;
-            border: 1px solid #E9ECEF;
+            background-color: var(--secondary-background-color);
+            border: 1px solid rgba(128, 128, 128, 0.2);
             border-radius: 8px;
             padding: 1.5rem;
             box-shadow: 0 1px 3px rgba(0,0,0,0.02);
@@ -49,22 +51,23 @@ st.markdown("""
         .metric-value {
             font-size: 2.2rem;
             font-weight: 700;
-            color: #1A1D20;
+            color: var(--text-color);
             margin-bottom: 0.2rem;
         }
         .metric-label {
             font-size: 0.9rem;
             font-weight: 500;
-            color: #6C757D;
+            color: var(--text-color);
+            opacity: 0.8;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         /* Border Kontainer Grafis */
         div.stBox {
-            border: 1px solid #E9ECEF !important;
+            border: 1px solid rgba(128, 128, 128, 0.2) !important;
             border-radius: 8px !important;
-            background-color: #FFFFFF !important;
+            background-color: var(--secondary-background-color) !important;
             padding: 1.5rem !important;
             box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
         }
@@ -79,14 +82,15 @@ st.markdown("""
             font-size: 1rem;
             background-color: transparent;
             border-bottom: 2px solid transparent;
-            color: #6C757D;
+            color: var(--text-color);
+            opacity: 0.7;
         }
         .stTabs [data-baseweb="tab"]:hover {
-            color: #212529;
+            opacity: 1;
         }
         .stTabs [aria-selected="true"] {
-            color: #000000 !important;
-            border-bottom-color: #000000 !important;
+            opacity: 1 !important;
+            border-bottom-color: var(--primary-color) !important;
         }
         
         /* Tombol */
@@ -152,6 +156,9 @@ if df_all.empty:
     df_all = pd.DataFrame(columns=['tweet_id', 'date', 'username', 'raw_text', 'cleaned_text', 'sentiment_label', 'confidence_score', 'likes', 'retweets', 'status', 'source_platform'])
 
 # 7. Sidebar Filter
+st.sidebar.markdown("### 🎨 Pengaturan Tampilan")
+st.sidebar.info("💡 **Tips Tema:** Klik ikon **⋮** di sudut kanan atas layar, lalu pilih **Settings > Theme** untuk beralih antara *Light* dan *Dark Mode*.")
+st.sidebar.divider()
 st.sidebar.header("📁 Filter Analisis Global")
 
 # Filter Platform
