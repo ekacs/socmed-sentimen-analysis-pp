@@ -547,12 +547,87 @@ with tab3:
         default_keywords = ", ".join(general_cfg.get("keywords", ["Ibu Kota Baru", "IKN"]))
         default_profiles = ", ".join(general_cfg.get("profiles", ["jokowi", "kemenpupr"]))
         default_hashtags = ", ".join(general_cfg.get("hashtags", ["#IKNNusantara"]))
-        default_max = general_cfg.get("max_results", 100)
+        fallback_max = general_cfg.get("max_results", 100)
         
         keywords_input = st.text_input("Target Kata Kunci (pisahkan dengan koma):", value=default_keywords)
         profiles_input = st.text_input("Target Profil Akun (pisahkan dengan koma):", value=default_profiles)
         hashtags_input = st.text_input("Target Tagar/Hashtag (pisahkan dengan koma):", value=default_hashtags)
-        max_results_input = st.slider("Batas Maksimal Data yang Ditarik:", min_value=10, max_value=1000, value=int(default_max), step=10)
+        
+        # 3. Batas Maksimal Data PER PLATFORM (hanya tampil jika platform dipilih)
+        st.markdown("#### 📊 Batas Maksimal Data per Platform")
+        st.caption("Setiap platform memiliki batas independen. Nilai default disarankan berdasarkan karakteristik dan biaya Apify tiap platform.")
+        
+        # Helper: dapatkan default per platform (backward compat)
+        def get_platform_default(field_name: str, fallback_val: int) -> int:
+            val = general_cfg.get(field_name)
+            if val is None:
+                val = fallback_max if fallback_max else fallback_val
+            try:
+                return int(val)
+            except (TypeError, ValueError):
+                return fallback_val
+        
+        # Variabel penampung nilai per platform
+        max_twitter = None
+        max_instagram = None
+        max_linkedin = None
+        max_news = None
+        
+        # Tampilkan slider hanya untuk platform yang DIPILIH
+        if "Twitter (X)" in selected_platforms:
+            max_twitter = st.slider(
+                "🐦 Twitter (X) — Batas maksimal cuitan:",
+                min_value=10, max_value=5000,
+                value=get_platform_default("max_results_twitter", 500),
+                step=10,
+                help="Total cuitan yang akan ditarik dari search query Twitter."
+            )
+        
+        if "Instagram" in selected_platforms:
+            max_instagram = st.slider(
+                "📸 Instagram — Batas postingan per profil:",
+                min_value=5, max_value=500,
+                value=get_platform_default("max_results_instagram", 100),
+                step=5,
+                help="Jumlah postingan TERBARU yang ditarik per profil target (dikali jumlah profil)."
+            )
+        
+        if "LinkedIn" in selected_platforms:
+            max_linkedin = st.slider(
+                "💼 LinkedIn — Batas postingan per perusahaan:",
+                min_value=5, max_value=500,
+                value=get_platform_default("max_results_linkedin", 100),
+                step=5,
+                help="Jumlah postingan TERBARU yang ditarik per profil perusahaan."
+            )
+        
+        if "Portal Berita" in selected_platforms:
+            max_news = st.slider(
+                "📰 Portal Berita — Batas halaman per domain:",
+                min_value=5, max_value=200,
+                value=get_platform_default("max_results_news", 50),
+                step=5,
+                help="Maksimal halaman artikel yang di-crawl per domain portal berita (dikali jumlah keyword × jumlah domain)."
+            )
+            # Default URL portal berita: baca dari config, fallback ke kompas.com
+            raw_news_urls = general_cfg.get("news_portal_urls")
+            if not raw_news_urls:
+                default_news_portals_str = "https://www.kompas.com/"
+            elif isinstance(raw_news_urls, list):
+                default_news_portals_str = ", ".join(u.strip() for u in raw_news_urls if u.strip())
+            elif isinstance(raw_news_urls, str):
+                default_news_portals_str = raw_news_urls
+            else:
+                default_news_portals_str = "https://www.kompas.com/"
+            if not default_news_portals_str.strip():
+                default_news_portals_str = "https://www.kompas.com/"
+            
+            news_portals_input = st.text_input(
+                "📰 Portal Berita — Daftar URL Portal (pisahkan dengan koma):",
+                value=default_news_portals_str,
+                placeholder="https://www.kompas.com/, https://www.cnnindonesia.com/",
+                help="Masukkan URL homepage portal berita. Sistem akan otomatis menggunakan URL pencarian internal masing-masing portal. Default: https://www.kompas.com/"
+            )
         
         # Simpan
         save_btn = st.form_submit_button("💾 Simpan Konfigurasi Target")
@@ -570,17 +645,64 @@ with tab3:
                 if not source_types_to_save:
                     source_types_to_save = ["twitter_"]
                 
+                # Susun general config (selalu simpan SEMUA field per-platform agar konsisten)
+                general_obj = {
+                    "start_date": start_date_input.strftime("%Y-%m-%d"),
+                    "end_date": end_date_input.strftime("%Y-%m-%d"),
+                    "keywords": [k.strip() for k in keywords_input.split(",") if k.strip()],
+                    "profiles": [p.strip() for p in profiles_input.split(",") if p.strip()],
+                    "hashtags": [h.strip() for h in hashtags_input.split(",") if h.strip()],
+                    # max_results tetap disimpan sebagai legacy / aggregate fallback
+                    "max_results": fallback_max if isinstance(fallback_max, int) else 100
+                }
+                
+                # Simpan batas per platform (gunakan nilai UI jika platform dipilih,
+                # jika tidak dipilih: pertahankan nilai lama jika ada, atau isi default)
+                if max_twitter is not None:
+                    general_obj["max_results_twitter"] = int(max_twitter)
+                else:
+                    general_obj["max_results_twitter"] = get_platform_default("max_results_twitter", 500)
+                
+                if max_instagram is not None:
+                    general_obj["max_results_instagram"] = int(max_instagram)
+                else:
+                    general_obj["max_results_instagram"] = get_platform_default("max_results_instagram", 100)
+                
+                if max_linkedin is not None:
+                    general_obj["max_results_linkedin"] = int(max_linkedin)
+                else:
+                    general_obj["max_results_linkedin"] = get_platform_default("max_results_linkedin", 100)
+                
+                if max_news is not None:
+                    general_obj["max_results_news"] = int(max_news)
+                else:
+                    general_obj["max_results_news"] = get_platform_default("max_results_news", 50)
+                
+                # Simpan news_portal_urls (baik Portal Berita dipilih atau tidak, agar konsisten)
+                if "news_portals_input" in locals() and news_portals_input is not None:
+                    parsed_urls = []
+                    for u in [x.strip() for x in news_portals_input.split(",") if x.strip()]:
+                        # Pastikan minimal punya format domain, tambah https jika tidak ada skema
+                        if u and not u.startswith("http"):
+                            u = "https://" + u.lstrip("/")
+                        if u:
+                            parsed_urls.append(u.rstrip("/"))
+                    # Jika hasilnya kosong, pakai default kompas.com agar tidak error
+                    if not parsed_urls:
+                        parsed_urls = ["https://www.kompas.com"]
+                    general_obj["news_portal_urls"] = parsed_urls
+                else:
+                    # Portal Berita tidak dipilih, pertahankan nilai lama atau default
+                    old_news_urls = general_cfg.get("news_portal_urls")
+                    if isinstance(old_news_urls, list) and old_news_urls:
+                        general_obj["news_portal_urls"] = old_news_urls
+                    else:
+                        general_obj["news_portal_urls"] = ["https://www.kompas.com"]
+                
                 new_config = {
                     "source_types": source_types_to_save,
                     "config": {
-                        "general": {
-                            "start_date": start_date_input.strftime("%Y-%m-%d"),
-                            "end_date": end_date_input.strftime("%Y-%m-%d"),
-                            "keywords": [k.strip() for k in keywords_input.split(",") if k.strip()],
-                            "profiles": [p.strip() for p in profiles_input.split(",") if p.strip()],
-                            "hashtags": [h.strip() for h in hashtags_input.split(",") if h.strip()],
-                            "max_results": int(max_results_input)
-                        }
+                        "general": general_obj
                     }
                 }
                 

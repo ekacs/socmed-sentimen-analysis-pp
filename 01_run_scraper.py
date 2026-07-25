@@ -33,10 +33,14 @@ def scrape_twitter(client, general_cfg):
     
     # Rangkai kueri pencarian tingkat lanjut
     query_string = build_twitter_query({"config": {"general": general_cfg}})
-    max_tweets = general_cfg.get("max_results", 100)
+    # Prioritas: field spesifik twitter > general max_results > default 100
+    max_tweets = general_cfg.get("max_results_twitter")
+    if max_tweets is None:
+        max_tweets = general_cfg.get("max_results", 500)
+    max_tweets = int(max_tweets)
     
     print(f"[INFO] Menggunakan kueri Twitter: '{query_string}'")
-    print(f"[INFO] Batas maksimal data: {max_tweets}")
+    print(f"[INFO] Batas maksimal cuitan Twitter (X): {max_tweets}")
     
     run_input = {
         "searchTerms": [query_string],
@@ -102,7 +106,12 @@ def scrape_instagram(client, general_cfg):
     """
     print("[INFO] Memulai penarikan data dari Instagram...")
     profiles = general_cfg.get("profiles", [])
-    max_results = general_cfg.get("max_results", 10)
+    # Prioritas: field spesifik instagram > general max_results > default 10
+    max_results = general_cfg.get("max_results_instagram")
+    if max_results is None:
+        max_results = general_cfg.get("max_results", 100)
+    max_results = int(max_results)
+    print(f"[INFO] Batas postingan PER PROFIL Instagram: {max_results} ({len(profiles)} profil × {max_results} = ~{len(profiles) * max_results} posts + komentar)")
     
     if not profiles:
         print("[WARNING] Profil target tidak ditemukan di konfigurasi. Proses Instagram dibatalkan.")
@@ -170,7 +179,12 @@ def scrape_linkedin(client, general_cfg):
     """
     print("[INFO] Memulai penarikan data dari LinkedIn...")
     profiles = general_cfg.get("profiles", [])
-    max_results = general_cfg.get("max_results", 10)
+    # Prioritas: field spesifik linkedin > general max_results > default 10
+    max_results = general_cfg.get("max_results_linkedin")
+    if max_results is None:
+        max_results = general_cfg.get("max_results", 100)
+    max_results = int(max_results)
+    print(f"[INFO] Batas postingan PER PERUSAHAAN LinkedIn: {max_results} ({len(profiles)} target × {max_results} = ~{len(profiles) * max_results} posts)")
     
     if not profiles:
         print("[WARNING] Profil target tidak ditemukan di konfigurasi. Proses LinkedIn dibatalkan.")
@@ -219,28 +233,117 @@ def scrape_linkedin(client, general_cfg):
 def scrape_news_portal(client, general_cfg):
     """
     Menggunakan cheerio-scraper untuk menarik konten berita berdasarkan kata kunci.
+    Mendukung konfigurasi portal berita dinamis dari UI Streamlit.
     """
     print("[INFO] Memulai penarikan data dari Portal Berita...")
     keywords = general_cfg.get("keywords", [])
-    max_results = general_cfg.get("max_results", 10)
+    
+    # ---- Baca daftar portal berita dari config (backward compatible) ----
+    raw_urls = general_cfg.get("news_portal_urls")
+    
+    # Mapping domain → template URL pencarian
+    # Kunci = string yang akan dicocokkan menggunakan 'in' terhadap hostname
+    SEARCH_URL_MAP = [
+        ("kompas.com",          "https://search.kompas.com/search/?q={kw}"),
+        ("cnnindonesia.com",    "https://www.cnnindonesia.com/search/?query={kw}"),
+        ("katadata.co.id",      "https://katadata.co.id/search?q={kw}"),
+        ("detik.com",           "https://www.detik.com/search/searchall?query={kw}"),
+        ("tribunnews.com",      "https://www.tribunnews.com/search?q={kw}"),
+        ("liputan6.com",        "https://www.liputan6.com/search?q={kw}"),
+        ("merdeka.com",         "https://www.merdeka.com/search/?q={kw}"),
+        ("tempo.co",            "https://www.tempo.co/search?q={kw}"),
+        ("republika.co.id",     "https://www.republika.co.id/search?q={kw}"),
+        ("suara.com",           "https://www.suara.com/search?q={kw}"),
+    ]
+    
+    # --- Parse portal list dari config --- 
+    domains = []  # hanya untuk logging jumlah
+    start_urls = []
+    url_parsed_info = []  # list[(label_display, hostname)]
+    
+    def parse_portal_url(url_str: str):
+        """Ekstrak skema + hostname dari URL portal, normalisasi."""
+        try:
+            from urllib.parse import urlparse
+        except ImportError:
+            from urlparse import urlparse
+        # Pastikan ada scheme
+        if not url_str.startswith("http"):
+            url_str = "https://" + url_str.lstrip("/")
+        parsed = urlparse(url_str.rstrip("/"))
+        hostname = parsed.hostname or ""
+        return hostname.lower(), parsed
+    
+    portal_list_normalized = []  # list[(hostname, parsed)]
+    
+    if raw_urls and isinstance(raw_urls, list):
+        # Config baru: array URL dari UI
+        for entry in raw_urls:
+            if isinstance(entry, str) and entry.strip():
+                h, p = parse_portal_url(entry)
+                if h:
+                    portal_list_normalized.append((h, p, entry.strip()))
+    
+    if not portal_list_normalized:
+        # Fallback config LAMA: pakai domain hardcoded legacy
+        print("[INFO] news_portal_urls belum terdefinisi, pakai default legacy (kompas, cnn, katadata).")
+        LEGACY = ["https://www.kompas.com/", "https://www.cnnindonesia.com/", "https://katadata.co.id/"]
+        for entry in LEGACY:
+            h, p = parse_portal_url(entry)
+            if h:
+                portal_list_normalized.append((h, p, entry))
+    
+    # Prioritas: field spesifik news > general max_results > default 10
+    max_results = general_cfg.get("max_results_news")
+    if max_results is None:
+        max_results = general_cfg.get("max_results", 50)
+    max_results = int(max_results)
+    
+    n_portals = len(portal_list_normalized)
+    print(f"[INFO] Daftar portal berita aktif ({n_portals}):")
+    for h, _, orig in portal_list_normalized:
+        print(f"       → {orig}")
+    print(f"[INFO] Batas halaman crawl: {max_results} start URLs × keywords")
+    est = len(keywords) * n_portals
+    print(f"[INFO] Estimasi start URLs: {len(keywords)} keyword × {n_portals} portal = {est} start URLs × {max_results} pages ≈ ~{est * max_results} artikel (maks)")
     
     if not keywords:
         print("[WARNING] Kata kunci tidak ditemukan di konfigurasi. Proses Portal Berita dibatalkan.")
         return []
-        
-    # Daftar domain portal berita Indonesia
-    domains = ["kompas.com", "cnnindonesia.com", "katadata.co.id"]
-    start_urls = []
+    if not portal_list_normalized:
+        print("[ERROR] Tidak ada portal berita valid yang terdaftar. Proses dibatalkan.")
+        return []
+    
+    # --- Generate start URLs (pencarian) untuk setiap keyword × portal ---
+    matched_domains_count = 0
+    unknown_warned = set()
     
     for kw in keywords:
         k_encoded = kw.replace(" ", "%20")
-        for domain in domains:
-            if "kompas.com" in domain:
-                start_urls.append({"url": f"https://search.kompas.com/search/?q={k_encoded}"})
-            elif "cnnindonesia.com" in domain:
-                start_urls.append({"url": f"https://www.cnnindonesia.com/search/?query={k_encoded}"})
-            elif "katadata.co.id" in domain:
-                start_urls.append({"url": f"https://katadata.co.id/search?q={k_encoded}"})
+        k_raw = kw
+        
+        for hostname, parsed_url, orig_entry in portal_list_normalized:
+            # Coba cocokkan dengan daftar template yang dikenal
+            template_found = None
+            for domain_needle, url_template in SEARCH_URL_MAP:
+                if domain_needle in hostname:
+                    template_found = url_template
+                    matched_domains_count += 1
+                    break
+            
+            if template_found:
+                search_url = template_found.format(kw=k_encoded)
+                start_urls.append({"url": search_url})
+            else:
+                # Fallback: coba tebak endpoint search generic
+                scheme = parsed_url.scheme or "https"
+                netloc = parsed_url.netloc or hostname
+                # Hanya tampilkan warning sekali per hostname
+                if hostname not in unknown_warned:
+                    unknown_warned.add(hostname)
+                    print(f"[WARNING] Portal '{hostname}' tidak ada di daftar template pencarian. Menggunakan fallback: {{scheme}}://{{host}}/search?q=...")
+                search_url = f"{scheme}://{netloc}/search?q={k_encoded}"
+                start_urls.append({"url": search_url})
                 
     run_input = {
         "startUrls": start_urls,

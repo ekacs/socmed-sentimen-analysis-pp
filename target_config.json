@@ -16,7 +16,14 @@
             "hashtags": [
                 "#IKNNusantara"
             ],
-            "max_results": 100
+            "max_results": 100,
+            "max_results_twitter": 500,
+            "max_results_instagram": 100,
+            "max_results_linkedin": 100,
+            "max_results_news": 50,
+            "news_portal_urls": [
+                "https://www.kompas.com/"
+            ]
         }
     }
 }
