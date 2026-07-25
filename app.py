@@ -200,13 +200,33 @@ st.sidebar.link_button(
 st.sidebar.divider()
 st.sidebar.header("📁 Filter Analisis Global")
 
-# Filter Platform
-platforms_available = df_all['source_platform'].unique().tolist() if not df_all.empty else ["Twitter", "Instagram", "LinkedIn", "News"]
+# Filter Platform (selalu tampilkan SEMUA 4 platform known, meskipun DB baru punya 1 platform)
+KNOWN_PLATFORMS = ["Twitter", "Instagram", "LinkedIn", "News"]
+if not df_all.empty:
+    platforms_in_db = [p for p in df_all['source_platform'].unique().tolist() if p]
+    # Urutkan sesuai urutan KNOWN_PLATFORMS lalu sisanya di belakang
+    platforms_available = []
+    for p in KNOWN_PLATFORMS:
+        if p not in platforms_available:
+            platforms_available.append(p)
+    for p in platforms_in_db:
+        if p not in platforms_available:
+            platforms_available.append(p)
+    # Default pilih hanya yang ada di DB saja (agar tidak milih platform tanpa data)
+    platforms_default = [p for p in platforms_in_db if p in KNOWN_PLATFORMS or True]
+else:
+    platforms_available = KNOWN_PLATFORMS.copy()
+    platforms_default = KNOWN_PLATFORMS.copy()
+
 platform_filter = st.sidebar.multiselect(
     "Pilih Platform Sumber:",
     options=platforms_available,
-    default=platforms_available
+    default=platforms_default if platforms_default else None
 )
+if not df_all.empty:
+    missing_in_db = [p for p in KNOWN_PLATFORMS if p not in platforms_in_db]
+    if missing_in_db:
+        st.sidebar.caption(f"ℹ️ Belum ada data: {', '.join(missing_in_db)} (pilih untuk lihat perbandingan kosong / trigger scraper)")
 
 # Filter Rentang Tanggal
 if not df_all.empty and 'date' in df_all.columns:
