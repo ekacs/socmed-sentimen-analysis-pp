@@ -1,0 +1,13 @@
+# apify/instagram-scraper
+# JSON format
+
+{
+    "addParentData": false,
+    "directUrls": [
+        "https://www.instagram.com/humansofny/"
+    ],
+    "resultsLimit": 100,
+    "resultsType": "posts",
+    "searchLimit": 10,
+    "searchType": "hashtag"
+}
