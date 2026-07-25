@@ -288,7 +288,7 @@ def generate_full_pdf_report(
         s_types_raw = [(config_loaded or {}).get('source_type')] or ['-']
     
     rows_cfg = [
-        _row('Platform Sasaran Aktif', ', '.join(str(s_types_raw)),
+        _row('Platform Sasaran Aktif', ', '.join(str(x) for x in s_types_raw if x)),
         _row('Tanggal Mulai Target', general.get('start_date', '-')),
         _row('Tanggal Akhir Target', general.get('end_date', '-')),
         _row('Kata Kunci Target', ', '.join(general.get('keywords', []) or ['-'])),
@@ -331,7 +331,7 @@ def generate_full_pdf_report(
         rentang_waktu = '-'
     
     filt_rows = [
-        _row('Platform Terfilter', ', '.join(filter_platforms) if filter_platforms else _row('Platform Terfilter', '(Semua)'),
+        _row('Platform Terfilter', ', '.join(filter_platforms) if filter_platforms else '(Semua)'),
         _row('Rentang Waktu Analisis', rentang_waktu),
         _row('Jumlah Baris Sesuai Filter', f"{metrics.get('total_volume', 0):,} baris data"),
         _row('Jumlah Terlabel Sentimen', f"{metrics.get('total_sentiment_labelled', 0):,} baris"),
@@ -512,7 +512,7 @@ def generate_full_pdf_report(
         # Sesuaikan untuk kolom teks (paling lebar)
         for idx, c in enumerate(avail_cols):
             if c in ('cleaned_text', 'raw_text'):
-            widths[idx] = 5.5*cm
+                widths[idx] = 5.5*cm
         t_samp = Table(data_rows, colWidths=widths, repeatRows=1)
         style_cmds = [
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2d3748')),
