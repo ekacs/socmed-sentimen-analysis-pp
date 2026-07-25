@@ -20,7 +20,17 @@ def generate_executive_summary(
     Menghasilkan laporan ringkasan eksekutif analitis berbasis AI (NLG) 
     berdasarkan metrik agregat yang dihitung secara dinamis dari database.
     """
-    # 1. Validasi Kunci API Gemini secara aman
+    # 1. Validasi Jumlah Data Minimum
+    if total_data < 500:
+        return (
+            f"### ⚠️ Volume Data Tidak Mencukupi (Minimal 500 Data)\n\n"
+            f"Jumlah data saat ini hanya **{total_data}** data. "
+            f"Dibutuhkan minimal **500 data** untuk menyusun Ringkasan Eksekutif berbasis AI "
+            f"agar hasil analisis sentimen publik bersifat representatif dan valid.\n\n"
+            f"**Rekomendasi:** Silakan lakukan penarikan data baru atau sesuaikan filter rentang waktu Anda."
+        )
+
+    # 2. Validasi Kunci API Gemini secara aman
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key or api_key == "YOUR_GEMINI_API_KEY_HERE":
         return (

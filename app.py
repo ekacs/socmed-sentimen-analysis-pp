@@ -359,22 +359,30 @@ with tab1:
             if 'ai_report_cache' not in st.session_state:
                 st.session_state['ai_report_cache'] = ""
                 
-            if st.button("🔄 Perbarui Analisis Narasi", type="primary"):
-                with st.spinner("Menganalisis statistik dan merancang laporan..."):
-                    laporan = generate_executive_summary(
-                        total_data=total_volume,
-                        persen_negatif=round(persen_neg, 1),
-                        persen_positif=round(persen_pos, 1),
-                        persen_netral=round(persen_neu, 1),
-                        top_keywords=top_words,
-                        contoh_cuitan=suara_publik
-                    )
-                    st.session_state['ai_report_cache'] = laporan
-                    
-            if st.session_state['ai_report_cache']:
-                st.markdown(st.session_state['ai_report_cache'])
+            if total_volume < 500:
+                st.warning(f"⚠️ **Volume Data Tidak Mencukupi (Minimal 500 Data)**\n\n"
+                           f"Saat ini hanya terdapat **{total_volume}** data yang terpilih. "
+                           f"Batas minimum untuk menyusun Ringkasan Eksekutif berbasis AI adalah **500 data** "
+                           f"agar hasil analisis sentimen publik bersifat representatif dan valid.\n\n"
+                           f"**Rekomendasi:** Silakan lakukan penarikan data baru di tab **⚙️ Pengaturan Target** atau sesuaikan filter rentang waktu Anda.")
+                st.session_state['ai_report_cache'] = ""
             else:
-                st.info("Klik tombol **🔄 Perbarui Analisis Narasi** di atas untuk menyusun ringkasan laporan eksekutif secara otomatis.")
+                if st.button("🔄 Perbarui Analisis Narasi", type="primary"):
+                    with st.spinner("Menganalisis statistik dan merancang laporan..."):
+                        laporan = generate_executive_summary(
+                            total_data=total_volume,
+                            persen_negatif=round(persen_neg, 1),
+                            persen_positif=round(persen_pos, 1),
+                            persen_netral=round(persen_neu, 1),
+                            top_keywords=top_words,
+                            contoh_cuitan=suara_publik
+                        )
+                        st.session_state['ai_report_cache'] = laporan
+                        
+                if st.session_state['ai_report_cache']:
+                    st.markdown(st.session_state['ai_report_cache'])
+                else:
+                    st.info("Klik tombol **🔄 Perbarui Analisis Narasi** di atas untuk menyusun ringkasan laporan eksekutif secara otomatis.")
                 
         with col_right:
             st.subheader("📊 Distribusi Sentimen")
