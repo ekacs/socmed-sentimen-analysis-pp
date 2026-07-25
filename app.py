@@ -271,8 +271,7 @@ def generate_full_pdf_report(
     # ============================
     story.append(Paragraph('BAB I — PENGATURAN TARGET SCRAPER', sH1))
     story.append(Paragraph(
-        'Berikut adalah konfigurasi target scraper yang tersimpan pada file target_config.json '
-        'yang digunakan pada saat penarikan data dari Apify Cloud:', sBody))
+        'Berikut adalah konfigurasi target scraper yang tersimpan pada file target_config.json yang digunakan pada saat penarikan data dari Apify Cloud:', sBody))
     story.append(Spacer(1, 0.2*cm))
     
     general = (config_loaded or {}).get('config', {}).get('general', {})
@@ -357,9 +356,7 @@ def generate_full_pdf_report(
     # ============================
     story.append(Paragraph('BAB III — VISUALISASI ANALITIK SENTIMEN', sH1))
     story.append(Paragraph(
-        'Visualisasi data di bawah ini merepresentasikan hasil analisis sentimen publik '
-        'berdasarkan data yang tersedia beserta distribusi, tren waktu, platform sumber, '
-        dan kata kunci populer:', sBody))
+        'Visualisasi data di bawah ini merepresentasikan hasil analisis sentimen publik berdasarkan data yang tersedia beserta distribusi, tren waktu, platform sumber, dan kata kunci populer:', sBody))
     story.append(Spacer(1, 0.3*cm))
     
     # --- 3.1 Pie Sentimen
@@ -438,11 +435,11 @@ def generate_full_pdf_report(
     story.append(Paragraph('BAB IV — RINGKASAN EKSEKUTIF NARASI', sH1))
     tv = int(metrics.get('total_volume', 0))
     if tv < 500 and not ai_narasi_txt.strip():
-        story.append(Paragraph(
-            f'<b>⚠️ Catatan:</b> Volume data saat ini baru <b>{tv:,}</b> data. '
-            'Batas minimum untuk Ringkasan Eksekutif berbasis AI adalah <b>500 data</b> '
-            'agar hasil analisis sentimen publik bersifat representatif dan valid. '
-            'Disarankan untuk menambah data scraper terlebih dahulu sebelum membuat laporan resmi.',
+        _warn = (f'<b>⚠️ Catatan:</b> Volume data saat ini baru <b>{tv:,}</b> data. '
+                 'Batas minimum untuk Ringkasan Eksekutif berbasis AI adalah <b>500 data</b> '
+                 'agar hasil analisis sentimen publik bersifat representatif dan valid. '
+                 'Disarankan untuk menambah data scraper terlebih dahulu sebelum membuat laporan resmi.')
+        story.append(Paragraph(_warn,
             ParagraphStyle('warning', parent=sBody, textColor=colors.HexColor('#8a6d3b'),
                            backColor=colors.HexColor('#fcf8e3'), borderPadding=8)))
     elif ai_narasi_txt.strip():
@@ -461,8 +458,7 @@ def generate_full_pdf_report(
             story.append(Spacer(1, 0.15*cm))
     else:
         story.append(Paragraph(
-            'Narasi AI belum di-generate. Silakan kembali ke dashboard Tab Analitik Sentimen, '
-            'klik tombol Perbarui Analisis Narasi, lalu export ulang laporan PDF.', sBody))
+            'Narasi AI belum di-generate. Silakan kembali ke dashboard Tab Analitik Sentimen, klik tombol Perbarui Analisis Narasi, lalu export ulang laporan PDF.', sBody))
     story.append(PageBreak())
     
     # ============================
@@ -470,9 +466,7 @@ def generate_full_pdf_report(
     # ============================
     story.append(Paragraph('BAB V — LAMPIRAN: SAMPEL DATA TERBARU', sH1))
     story.append(Paragraph(
-        'Berikut adalah 10 sampel data terbaru yang lolos filter (username, platform, '
-        'sentimen, skor keyakinan, dan cuplikan teks baku). Untuk data lengkap dapat '
-        'dilihat pada Tabel Supabase Cloud.', sBody))
+        'Berikut adalah 10 sampel data terbaru yang lolos filter (username, platform, sentimen, skor keyakinan, dan cuplikan teks baku). Untuk data lengkap dapat dilihat pada Tabel Supabase Cloud.', sBody))
     story.append(Spacer(1, 0.3*cm))
     
     # Susun data sampel (maks 10)
