@@ -746,46 +746,146 @@ with tab3:
     with col_run1:
         st.markdown("**Langkah 1: Penarikan Data (Scraper)**")
         st.caption("Menghubungkan ke platform Apify Cloud untuk menarik data mentah terbaru sesuai konfigurasi.")
-        if st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", use_container_width=True):
-            with st.spinner("Menghubungkan ke Apify Cloud & menarik data mentah..."):
+        
+        scraper_run_btn = st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", use_container_width=True, key="btn_run_scraper")
+        
+        if scraper_run_btn:
+            with st.status("🚀 Menghubungkan ke Apify Cloud & menarik data mentah...", expanded=True) as status_scrape:
                 try:
-                    # Jalankan subprocess run scraper
                     result = subprocess.run(
                         [sys.executable, "01_run_scraper.py"],
                         capture_output=True, text=True, check=True
                     )
-                    st.success("✅ Proses penarikan data mentah selesai!")
-                    with st.expander("Tampilkan Log Scraper"):
-                        st.code(result.stdout)
+                    # Parsing jumlah baris yang disimpan (cari log terakhir total baris)
+                    import re as _re
+                    total_match = _re.search(r"Total\s*(?:baris|rows)\s*(?:telah)?\s*(?:disimpan|saved|inserted):?\s*(\d+)" , result.stdout, flags=_re.IGNORECASE)
+                    sum_text = f" — {total_match.group(1)} baris baru disimpan" if total_match else ""
+                    status_scrape.update(label=f"✅ Penarikan data selesai{sum_text}!", state="complete", expanded=False)
+                    st.toast(f"✅ Scraper selesai{sum_text}", icon="🚀")
+                    st.success(f"✅ Proses penarikan data mentah selesai{sum_text}.")
+                    with st.expander("📋 Tampilkan Log Scraper"):
+                        st.code(result.stdout, language="text")
+                        if result.stderr and result.stderr.strip():
+                            st.markdown("*Catatan stderr (non-blocking):* ")
+                            st.code(result.stderr, language="text")
+                        # Tombol refresh explicit hanya ditampilkan JIKA BERHASIL
+                        if st.button("🔄 Refresh Dashboard (Lihat Data Baru)", use_container_width=True, key="btn_refresh_scrape"):
+                            st.rerun()
                 except subprocess.CalledProcessError as e:
+                    status_scrape.update(label=f"❌ Gagal (Exit code: {e.returncode})", state="error", expanded=True)
+                    st.toast(f"❌ Scraper GAGAL (Exit {e.returncode})", icon="🚨")
                     st.error(f"❌ Gagal menjalankan modul scraper (Exit code: {e.returncode}).")
-                    with st.expander("Tampilkan Log Kesalahan", expanded=True):
+                    with st.expander("📋 Tampilkan Log Kesalahan", expanded=True):
                         st.markdown("**Output (stdout):**")
-                        st.code(e.stdout if e.stdout else "Tidak ada output.")
+                        st.code(e.stdout if e.stdout else "Tidak ada output.", language="text")
                         st.markdown("**Error (stderr):**")
-                        st.code(e.stderr if e.stderr else "Tidak ada error.")
+                        st.code(e.stderr if e.stderr else "Tidak ada error.", language="text")
                         
     # Pemicu Pipeline AI/ML
     with col_run2:
         st.markdown("**Langkah 2: Proses AI & Klasifikasi ML**")
         st.caption("Prapemrosesan bahasa baku EYD oleh model Gemini AI dan pelabelan sentimen oleh SVM lokal.")
-        if st.button("🧠 Jalankan Proses AI & ML Sekarang", use_container_width=True):
-            with st.spinner("Menstandardisasi teks dan melabeli sentimen..."):
+        
+        ml_run_btn = st.button("🧠 Jalankan Proses AI & ML Sekarang", use_container_width=True, key="btn_run_pipeline_ml")
+        
+        if ml_run_btn:
+            import re as _re2
+            with st.status("🧠 Menstandardisasi teks EYD & melabeli sentimen via SVM...", expanded=True) as status_ml:
+                process_error = None
+                combined_out = ""
+                combined_err = ""
+                exit_code = None
                 try:
-                    # Jalankan subprocess run pipeline data
                     result = subprocess.run(
                         [sys.executable, "01_pipeline_data.py"],
                         capture_output=True, text=True, check=True
                     )
-                    st.success("✅ Prapemrosesan AI & Klasifikasi SVM selesai!")
-                    with st.expander("Tampilkan Log Pemrosesan"):
-                        st.code(result.stdout)
-                    # Force refresh page
-                    st.rerun()
+                    combined_out = result.stdout or ""
+                    combined_err = result.stderr or ""
+                    exit_code = 0
                 except subprocess.CalledProcessError as e:
-                    st.error(f"❌ Gagal menjalankan modul prapemrosesan AI/ML (Exit code: {e.returncode}).")
-                    with st.expander("Tampilkan Log Kesalahan", expanded=True):
+                    process_error = e
+                    combined_out = e.stdout or ""
+                    combined_err = e.stderr or ""
+                    exit_code = e.returncode
+                
+                # ---- Parse [SUMMARY] blocks dari output ----
+                def _extract_sum(pattern: str, text: str):
+                    m = _re2.search(pattern, text)
+                    return int(m.group(1)) if m else None
+                sum_total   = _extract_sum(r"\[SUMMARY\]\[TOTAL\][^=]*=\s*(\d+)", combined_out)
+                sum_success = _extract_sum(r"\[SUMMARY\]\[SUCCESS\][^=]*=\s*(\d+)", combined_out)
+                sum_failed  = _extract_sum(r"\[SUMMARY\]\[FAILED\][^=]*=\s*(\d+)", combined_out)
+                has_eyd     = bool(_re2.search(r"\[SUMMARY\]\[EYD\].*=\s*YES", combined_out))
+                has_svm     = bool(_re2.search(r"\[SUMMARY\]\[LABEL\].*=\s*YES", combined_out))
+                no_data_flag = "[INFO][NO_DATA]" in combined_out or exit_code == 2
+                
+                # --- Tampilkan status berdasarkan exit_code ---
+                if exit_code == 2 or no_data_flag:
+                    # ---- Tidak ada data RAW untuk diproses ----
+                    status_ml.update(
+                        label="ℹ️ Tidak ada data mentah (RAW) yang perlu diproses",
+                        state="complete", expanded=True
+                    )
+                    st.toast("ℹ️ Tidak ada data RAW baru — jalankan Langkah 1 Scraper dulu", icon="💡")
+                    st.info(
+                        "💡 **Tidak ada data baru untuk diproses.**\n\n"
+                        "Pemrosesan AI/ML hanya mengolah data dengan status `RAW` (belum diproses).\n"
+                        "**Langkah yang disarankan:** Jalankan terlebih dahulu **🚀 Langkah 1: Penarikan Data (Scraper)** di sebelah kiri untuk mendapatkan data RAW baru."
+                    )
+                    with st.expander("📋 Tampilkan Log Pemrosesan"):
+                        if combined_out:
+                            st.code(combined_out, language="text")
+                        if combined_err and combined_err.strip():
+                            st.markdown("*Catatan (stderr):*")
+                            st.code(combined_err, language="text")
+                elif exit_code == 0:
+                    # ---- BERHASIL memproses data ----
+                    status_label = "✅ Prapemrosesan AI & Klasifikasi SVM selesai!"
+                    if sum_success is not None:
+                        status_label += f" ({sum_success} data diproses)"
+                    status_ml.update(label=status_label, state="complete", expanded=False)
+                    st.toast(
+                        f"✅ AI/ML Selesai — {sum_success} data diproses" if sum_success is not None else "✅ AI/ML Selesai",
+                        icon="🧠"
+                    )
+                    st.success("✅ Prapemrosesan AI & Klasifikasi SVM selesai!")
+                    
+                    # --- Ringkasan visual --- 
+                    if sum_total is not None:
+                        c1, c2, c3 = st.columns(3)
+                        c1.metric("📦 Total Data RAW", f"{sum_total}")
+                        c2.metric("✅ Berhasil Diproses", f"{sum_success or 0}",
+                                  delta=f"-{sum_failed or 0} gagal" if sum_failed else None,
+                                  delta_color="inverse" if sum_failed else "normal")
+                        c3.metric("⚙️ Aktifkan", " + ".join(filter(None, [
+                            "EYD AI" if has_eyd else None,
+                            "SVM Sentimen" if has_svm else None
+                        ])) or "Minimal")
+                    
+                    with st.expander("📋 Tampilkan Log Pemrosesan (detail)"):
+                        st.code(combined_out, language="text")
+                        if combined_err and combined_err.strip():
+                            st.markdown("*Catatan (stderr non-blocking):*")
+                            st.code(combined_err, language="text")
+                        # Refresh explicit — user TAHU apa yang terjadi sebelum page reload
+                        if st.button(
+                            "🔄 Refresh Dashboard (Tampilkan Hasil Sentimen di Tab Analitik)",
+                            use_container_width=True, type="primary", key="btn_refresh_ml"
+                        ):
+                            st.rerun()
+                else:
+                    # ---- ERROR (exit code 1 atau lain) ----
+                    status_ml.update(
+                        label=f"❌ Gagal menjalankan AI/ML (Exit code: {exit_code})",
+                        state="error", expanded=True
+                    )
+                    st.toast(f"❌ AI/ML GAGAL (Exit {exit_code})", icon="🚨")
+                    st.error(f"❌ Gagal menjalankan modul prapemrosesan AI/ML (Exit code: {exit_code}).")
+                    with st.expander("📋 Tampilkan Log Kesalahan", expanded=True):
                         st.markdown("**Output (stdout):**")
-                        st.code(e.stdout if e.stdout else "Tidak ada output.")
+                        st.code(combined_out if combined_out else "Tidak ada output.", language="text")
                         st.markdown("**Error (stderr):**")
-                        st.code(e.stderr if e.stderr else "Tidak ada error.")
+                        st.code(combined_err if combined_err else "Tidak ada error.", language="text")
+                        if no_data_flag:
+                            st.caption("*Catatan: Exit code 2 menandakan tidak ada data RAW yang perlu diproses.*")

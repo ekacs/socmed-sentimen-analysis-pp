@@ -100,23 +100,29 @@ def clean_text_with_gemini(client, raw_text):
 
 def process_pipeline():
     # 0. Cek Mode Scraping (Manual vs Otomatis)
-    mode = db_manager.get_scraping_mode()
-    if mode == 'manual':
-        print("[INFO] Mode penarikan data saat ini diatur ke MANUAL. Pemrosesan otomatis dilewati.")
-        sys.exit(0)
+    mode = db_manager.get_scraping_# 0. Cek Mode Scraping (Manual vs Otomatis) — KETIKA DIPANGGIL via UI Streamlit (manual trigger button),
+    # kita abaikan flag mode manual ini (karena user eksplisit klik tombol Run).
+    # Hanya hormati mode manual JIKA dipanggil dari cron (CI) — deteksi via var environment agar tidak bingung.
+    called_from_cron = os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("PIPELINE_CRON_RUN") == "1"
+    if called_from_cron:
+        mode = db_manager.get_scraping_mode()
+        if mode == 'manual':
+            print("[INFO] Dipanggil dari cron, tapi mode scraping=MANUAL → skip (exit code 2).")
+            sys.exit(2)
         
     # 1. Inisialisasi Klien Gemini & Muat Model SVM
     gemini_client = get_gemini_client()
-    svm_model, vectorizer = load_svm_model()
-    
-    # 2. Ambil data dengan status 'RAW'
+    model, vectorizer = load_svm_model()
     rows = db_manager.ambil_cuitan_mentah()
     
     if not rows:
-        print("[INFO] Tidak ada data cuitan mentah baru (status 'RAW') untuk diproses.")
-        return
+        print("[INFO][NO_DATA] Tidak ada data cuitan mentah baru (status 'RAW') untuk diproses.")
+        print("[HINT] Jalankan dulu Langkah 1: Penarikan Data (Scraper) untuk mendapatkan data RAW baru.")
+        sys.exit(2)
         
     print(f"[INFO] Memulai pemrosesan untuk {len(rows)} data cuitan mentah baru...")
+    print(f"[INFO] Model SVM: {'TERSEDIA' if (model and vectorizer) else 'TIDAK DITEMUKAN (prediksi sentimen dilewati)'}")
+    print(f"[INFO] Gemini Client: {'TERSEDIA' if gemini_client else 'TIDAK ADA API KEY (EYD cleanup otomatis = copy teks asli)'}")
     
     success_count = 0
     
@@ -152,7 +158,28 @@ def process_pipeline():
             success_count += 1
         except Exception as e:
             print(f"  [ERROR]: Gagal memperbarui database: {e}")
+    # --- Ringkasan akhir dengan tag untuk parsing di UI ---
+    failed_count = len(rows) - success_count
+    print("")
+    print("=" * 60)
+    print(f"[SUMMARY][TOTAL]   : Total data RAW tersedia  = {len(rows)}")
+    print(f"[SUMMARY][SUCCESS] : Berhasil diproses        = {success_count}")
+    print(f"[SUMMARY][FAILED]  : Gagal / dilewati          = {failed_count}")
+    if model and vectorizer:
+        print(f"[SUMMARY][LABEL]   : Label sentimen (SVM) diberikan = YES")
+    else:
+        print(f"[SUMMARY][LABEL]   : Label sentimen (SVM) diberikan = NO (model tidak ada)")
+    if gemini_client:
+        print(f"[SUMMARY][EYD]     : Standardisasi EYD (Gemini)  = YES")
+    else:
+        print(f"[SUMMARY][EYD]     : Standardisasi EYD (Gemini)  = NO (teks asli disalin langsung)")
+    print("=" * 60)
+    
+    if success_count == 0 and len(rows) > 0:
+        print("[EXIT_CODE=1] Semua baris GAGAL diproses!")
+        sys.exit(1)
     print(f"[SUCCESS] Pipa data selesai! Berhasil memproses {success_count} dari {len(rows)} data.")
+    sys.exit(0)
 
 if __name__ == "__main__":
     process_pipeline()
