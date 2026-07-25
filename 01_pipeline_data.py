@@ -100,12 +100,15 @@ def clean_text_with_gemini(client, raw_text):
 
 def process_pipeline():
     # 0. Cek Mode Scraping (Manual vs Otomatis)
-    mode = db_manager.get_scraping_# 0. Cek Mode Scraping (Manual vs Otomatis) — KETIKA DIPANGGIL via UI Streamlit (manual trigger button),
-    # kita abaikan flag mode manual ini (karena user eksplisit klik tombol Run).
-    # Hanya hormati mode manual JIKA dipanggil dari cron (CI) — deteksi via var environment agar tidak bingung.
-    called_from_cron = os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("PIPELINE_CRON_RUN") == "1"
+    # KETIKA DIPANGGIL via UI Streamlit (manual trigger button), kita abaikan flag mode
+    # manual ini (karena user eksplisit klik tombol Run). Hanya hormati mode manual JIKA
+    # dipanggil dari cron/CI — deteksi via environment variable agar tidak bingung.
+    called_from_cron = (os.environ.get("GITHUB_ACTIONS") == "true") or (os.environ.get("PIPELINE_CRON_RUN") == "1")
     if called_from_cron:
-        mode = db_manager.get_scraping_mode()
+        try:
+            mode = db_manager.get_scraping_mode()
+        except AttributeError:
+            mode = "auto"
         if mode == 'manual':
             print("[INFO] Dipanggil dari cron, tapi mode scraping=MANUAL → skip (exit code 2).")
             sys.exit(2)
@@ -139,14 +142,14 @@ def process_pipeline():
         sentiment_label = None
         confidence_score = 0.0
         
-        if svm_model and vectorizer:
+        if model and vectorizer:
             try:
                 # Transformasi teks
                 vec_text = vectorizer.transform([cleaned_text])
                 # Prediksi label
-                sentiment_label = svm_model.predict(vec_text)[0]
+                sentiment_label = model.predict(vec_text)[0]
                 # Hitung skor keyakinan (probabilitas maksimum)
-                probs = svm_model.predict_proba(vec_text)[0]
+                probs = model.predict_proba(vec_text)[0]
                 confidence_score = float(np.max(probs))
                 print(f"  [SVM] : Sentimen -> {sentiment_label} (Keyakinan: {confidence_score:.2%})")
             except Exception as e:
