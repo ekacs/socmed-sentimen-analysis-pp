@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import numpy as np
 import joblib
 from dotenv import load_dotenv
@@ -64,32 +65,38 @@ def clean_text_with_gemini(client, raw_text):
         "4. Cukup kembalikan teks hasil standardisasi murni secara langsung."
     )
     
-    try:
-        response = client.models.generate_content(
-            model='gemini-3.1-flash-lite',
-            contents=raw_text,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                temperature=0.1,
-                max_output_tokens=300
+    # Coba memanggil API Gemini dengan mekanisme retry (3x percobaan)
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model='gemini-3.1-flash-lite',
+                contents=raw_text,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    temperature=0.1,
+                    max_output_tokens=300
+                )
             )
-        )
-        
-        cleaned = response.text.strip()
-        
-        # Bersihkan pembungkus blok markdown jika ada
-        if cleaned.startswith("```") and cleaned.endswith("```"):
-            cleaned = cleaned.strip("`").strip()
-            if cleaned.startswith("text\n"):
-                cleaned = cleaned[5:].strip()
-                
-        # Hapus tanda kutip luar pembungkus teks jika ada
-        cleaned = cleaned.strip('"\'')
-        return cleaned
-        
-    except Exception as e:
-        print(f"[ERROR] Galat saat menghubungi Gemini API untuk teks '{raw_text[:30]}...': {e}")
-        return raw_text
+            cleaned = response.text.strip()
+            
+            # Bersihkan pembungkus blok markdown jika ada
+            if cleaned.startswith("```") and cleaned.endswith("```"):
+                cleaned = cleaned.strip("`").strip()
+                if cleaned.startswith("text\n"):
+                    cleaned = cleaned[5:].strip()
+                    
+            # Hapus tanda kutip luar pembungkus teks jika ada
+            cleaned = cleaned.strip('"\'')
+            return cleaned
+            
+        except Exception as e:
+            if attempt == 2:
+                print(f"[ERROR] Gagal permanen setelah 3x percobaan menghubungi Gemini API untuk teks '{raw_text[:30]}...': {e}")
+                return raw_text
+            # Exponential backoff: tunggu sebentar sebelum mencoba lagi
+            time.sleep(2 * (attempt + 1))
+            
+    return raw_text
 
 def process_pipeline():
     # 0. Cek Mode Scraping (Manual vs Otomatis)

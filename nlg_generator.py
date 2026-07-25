@@ -1,4 +1,5 @@
 import os
+import time
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
@@ -66,16 +67,24 @@ def generate_executive_summary(
         Tuliskan laporan analisis Anda sekarang:
         """
         
-        # 3. Eksekusi menggunakan model generasi terbaru
-        response = client.models.generate_content(
-            model='gemini-3.1-flash-lite',  # gemini-3.1-flash-lite: kompatibel dengan API key baru
-            contents=prompt_narasi,
-            config=types.GenerateContentConfig(
-                temperature=0.15,
-                max_output_tokens=1000
-            )
-        )
-        return response.text
+        # 3. Eksekusi menggunakan model generasi terbaru dengan retry loop
+        for attempt in range(3):
+            try:
+                response = client.models.generate_content(
+                    model='gemini-3.1-flash-lite',  # gemini-3.1-flash-lite adalah model aktif dan didukung
+                    contents=prompt_narasi,
+                    config=types.GenerateContentConfig(
+                        temperature=0.15,
+                        max_output_tokens=1000
+                    )
+                )
+                return response.text
+            except Exception as e:
+                # Jika sudah mencapai batas percobaan, lempar error agar ditangkap blok except terluar
+                if attempt == 2:
+                    raise e
+                # Tunggu sebentar sebelum mencoba lagi (exponential backoff)
+                time.sleep(2 * (attempt + 1))
         
     except Exception as e:
         return f"### ❌ Kesalahan API Gemini\n\nGagal menghubungi server AI Gemini. Detail kesalahan: {e}"
