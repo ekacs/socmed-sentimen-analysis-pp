@@ -894,17 +894,41 @@ with tab1:
                         st.warning("⚠️ Library export PDF belum terpasang!\n\nJalankan perintah di terminal:\n\n```cmd\npip install reportlab matplotlib\n```\n\nLalu refresh halaman ini.")
                         st.caption(f"Detail error: {PDF_ERR_MSG[:220]}..." if len(PDF_ERR_MSG)>220 else f"Detail: {PDF_ERR_MSG}")
                 else:
-                    # Build metrics dict untuk dikirim ke PDF builder
-                    _met = {
-                        "total_volume": total_volume,
-                        "sentiment_dominant": sentiment_dominant,
-                        "total_engagement": total_engagement,
-                        "total_sentiment_labelled": total_sentiment_labelled,
-                        "persen_pos": persen_pos, "persen_neu": persen_neu, "persen_neg": persen_neg,
-                        "pos_count": pos_count, "neu_count": neu_count, "neg_count": neg_count,
+                    # =================================================================
+                    # [SCOPE FIX AMAN] Capture semua variabel ke LOKAL VAR DULU sebelum define nested function.
+                    # Ini menghindari Streamlit re-run closure capture ambiguity & NameError.
+                    # =================================================================
+                    try:
+                        df_report_data = df_filtered.copy()  # BAB III & BAB V butuh ini
+                    except Exception:
+                        df_report_data = pd.DataFrame()
+                    report_platforms = list(platform_filter) if isinstance(platform_filter, (list, tuple, set)) else []
+                    report_daterange = date_range if isinstance(date_range, tuple) else ('-', '-')
+                    report_metrics_payload = {
+                        "total_volume": int(total_volume or 0),
+                        "sentiment_dominant": str(sentiment_dominant),
+                        "total_engagement": int(total_engagement or 0),
+                        "total_sentiment_labelled": int(total_sentiment_labelled or 0),
+                        "persen_pos": float(persen_pos or 0),
+                        "persen_neu": float(persen_neu or 0),
+                        "persen_neg": float(persen_neg or 0),
+                        "pos_count": int(pos_count or 0),
+                        "neu_count": int(neu_count or 0),
+                        "neg_count": int(neg_count or 0),
                     }
+                    report_narasi_txt = (st.session_state.get('ai_report_cache') or '').strip()
                     
-                    def _build_charts_and_pdf() -> Optional[BytesIO]:
+                    # Build metrics dict untuk dikirim ke PDF builder
+                    _met = report_metrics_payload
+                    
+                    # --- Default arg (agar closure capture aman di Streamlit re-run) ---
+                    def _build_charts_and_pdf(
+                        _df_report: pd.DataFrame = df_report_data,
+                        _plats: List[str] = report_platforms,
+                        _drng: tuple = report_daterange,
+                        _metrics: Dict = report_metrics_payload,
+                        _narasi: str = report_narasi_txt,
+                    ) -> Optional[BytesIO]:
                         """Helper in-Scope: build 4 matplotlib charts + PDF full report -> BytesIO."""
                         try:
                             # ===== Helper 1: matplotlib fig -> PNG bytes =====
@@ -1068,18 +1092,20 @@ with tab1:
                             story.append(Paragraph('BAB II — FILTER ANALISIS SAAT INI', sH1))
                             story.append(Paragraph('Filter sidebar yang diterapkan saat laporan diekspor:', sBody))
                             story.append(Spacer(1, 0.2*cm))
-                            _plat = ', '.join(filter_platforms) if filter_platforms else '(Semua)'
-                            if isinstance(date_range, tuple) and len(date_range)==2:
-                                _rw = f'{date_range[0]} s/d {date_range[1]}'
+                            _plat = ', '.join(_plats) if _plats else '(Semua)'
+                            if isinstance(_drng, tuple) and len(_drng)==2:
+                                _rw = f'{_drng[0]} s/d {_drng[1]}'
                             else: _rw = '-'
+                            # (gunakan _metrics untuk metrik, ganti semua reference _met → _metrics dibawah)
+                            _m = _metrics
                             _rows_f = [
                                 _rv('Platform Terfilter', _plat),
                                 _rv('Rentang Waktu Analisis', _rw),
-                                _rv('Jumlah Baris Sesuai Filter', f"{_met['total_volume']:,} baris"),
-                                _rv('Jumlah Terlabel Sentimen', f"{_met['total_sentiment_labelled']:,}"),
-                                _rv('Persentase Positif', f"{_met['persen_pos']:.2f}%"),
-                                _rv('Persentase Netral', f"{_met['persen_neu']:.2f}%"),
-                                _rv('Persentase Negatif', f"{_met['persen_neg']:.2f}%"),
+                                _rv('Jumlah Baris Sesuai Filter', f"{_m['total_volume']:,} baris"),
+                                _rv('Jumlah Terlabel Sentimen', f"{_m['total_sentiment_labelled']:,}"),
+                                _rv('Persentase Positif', f"{_m['persen_pos']:.2f}%"),
+                                _rv('Persentase Netral', f"{_m['persen_neu']:.2f}%"),
+                                _rv('Persentase Negatif', f"{_m['persen_neg']:.2f}%"),
                             ]
                             _t_fi = Table(_rows_f, colWidths=[4.5*cm, 11.5*cm], style=TableStyle([
                                 ('VALIGN',(0,0),(-1,-1),'TOP'),('GRID',(0,0),(-1,-1),0.3,colors.lightgrey),
@@ -1096,16 +1122,16 @@ with tab1:
                             
                             # 3.1 Pie
                             story.append(Paragraph('3.1 Distribusi Sentimen Publik', sH2))
-                            pie_b = _c_pie(int(_met['pos_count']), int(_met['neg_count']), int(_met['neu_count']))
+                            pie_b = _c_pie(int(_m['pos_count']), int(_m['neg_count']), int(_m['neu_count']))
                             if pie_b:
                                 story.append(Image(pie_b, width=12*cm, height=9.5*cm, hAlign='CENTER'))
                                 story.append(Spacer(1, 0.3*cm))
                                 _rows_d = [
                                     ['Kategori','Jumlah','Persentase'],
-                                    ['Positif', f"{_met['pos_count']:,}", f"{_met['persen_pos']:.2f}%"],
-                                    ['Netral', f"{_met['neu_count']:,}", f"{_met['persen_neu']:.2f}%"],
-                                    ['Negatif', f"{_met['neg_count']:,}", f"{_met['persen_neg']:.2f}%"],
-                                    ['Total (Terlabel)', f"{_met['pos_count']+_met['neu_count']+_met['neg_count']:,}", '100.00%'],
+                                    ['Positif', f"{_m['pos_count']:,}", f"{_m['persen_pos']:.2f}%"],
+                                    ['Netral',  f"{_m['neu_count']:,}", f"{_m['persen_neu']:.2f}%"],
+                                    ['Negatif', f"{_m['neg_count']:,}", f"{_m['persen_neg']:.2f}%"],
+                                    ['Total (Terlabel)', f"{_m['pos_count']+_m['neu_count']+_m['neg_count']:,}", '100.00%'],
                                 ]
                                 _td = Table(_rows_d, colWidths=[5*cm,4*cm,4*cm], hAlign='CENTER', style=TableStyle([
                                     ('BACKGROUND',(0,0),(-1,0),colors.HexColor('#2c5282')),('TEXTCOLOR',(0,0),(-1,0),colors.white),
@@ -1121,20 +1147,20 @@ with tab1:
                             
                             # 3.2 Tren
                             story.append(Paragraph('3.2 Tren Sentimen Harian', sH2))
-                            _tr_b = _c_tren(df_filtered)
+                            _tr_b = _c_tren(_df_report)
                             if _tr_b: story.append(Image(_tr_b, width=17*cm, height=8*cm, hAlign='CENTER'))
                             else: story.append(Paragraph('_Data tanggal tidak mencukupi untuk grafik tren._', sBody))
                             story.append(Spacer(1, 0.4*cm))
                             # 3.3 Platform
                             story.append(Paragraph('3.3 Volume Data per Platform Sumber', sH2))
-                            _pl_b = _c_plat(df_filtered)
+                            _pl_b = _c_plat(_df_report)
                             if _pl_b: story.append(Image(_pl_b, width=17*cm, height=7*cm, hAlign='CENTER'))
                             else: story.append(Paragraph('_Data platform sumber tidak tersedia._', sBody))
                             story.append(Spacer(1, 0.4*cm))
                             # 3.4 Keywords
                             story.append(Paragraph('3.4 Top Kata Kunci Populer', sH2))
                             try:
-                                _kw_t = extract_top_keywords(df_filtered, 10)
+                                _kw_t = extract_top_keywords(_df_report, 10)
                                 _kw_l = [w.strip() for w in _kw_t.split(',') if w.strip()]
                             except Exception: _kw_l = []
                             _kw_b = _c_kw(_kw_l)
@@ -1146,8 +1172,8 @@ with tab1:
                             
                             # ========== BAB IV ==========
                             story.append(Paragraph('BAB IV — RINGKASAN EKSEKUTIF NARASI', sH1))
-                            _tv = int(_met['total_volume'])
-                            _ai_txt = (st.session_state.get('ai_report_cache') or '').strip()
+                            _tv = int(_m['total_volume'])
+                            _ai_txt = _narasi
                             if _tv < 500 and not _ai_txt:
                                 story.append(Paragraph(
                                     f'<b>⚠️ Catatan:</b> Volume data baru <b>{_tv:,}</b> data. '
@@ -1179,8 +1205,8 @@ with tab1:
                             story.append(Paragraph('BAB V — LAMPIRAN: 10 SAMPEL DATA TERBARU', sH1))
                             story.append(Paragraph('Sampel 10 data terbaru yang lolos filter. Data lengkap lihat Supabase Cloud:', sBody))
                             story.append(Spacer(1, 0.3*cm))
-                            if not df_filtered.empty:
-                                _ds = df_filtered.head(10).copy()
+                            if not _df_report.empty:
+                                _ds = _df_report.head(10).copy()
                                 _nc = ['date','username','source_platform','sentiment_label','confidence_score','cleaned_text','raw_text']
                                 _av = [c for c in _nc if c in _ds.columns]; _ds = _ds[_av].fillna('-')
                                 _hm = {'date':'Tgl','username':'Username','source_platform':'Platform','sentiment_label':'Sent.',
