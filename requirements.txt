@@ -8,3 +8,5 @@ joblib
 python-dotenv
 psycopg2-binary
 SQLAlchemy
+reportlab
+matplotlib
