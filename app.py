@@ -490,29 +490,43 @@ with tab3:
         
     general_cfg = current_config.get("config", {}).get("general", {})
     
-    # Cari nilai default untuk form
-    source_type_val = current_config.get("source_type", "twitter_")
-    # Mapping untuk Selectbox
+    # Cari nilai default untuk form (dukung source_types array baru & source_type string lama)
+    raw_source_list = current_config.get("source_types")
+    if not raw_source_list:
+        single = current_config.get("source_type", "twitter_")
+        raw_source_list = [single] if single else ["twitter_"]
+    elif isinstance(raw_source_list, str):
+        raw_source_list = [raw_source_list]
+    
     mapping_source_types = {
         "twitter_": "Twitter (X)",
         "instagram": "Instagram",
         "linkedin": "LinkedIn",
         "portal_berita": "Portal Berita"
     }
+    rev_mapping = {v: k for k, v in mapping_source_types.items()}
     
-    default_platform = mapping_source_types.get(source_type_val, "Twitter (X)")
     platform_options = ["Twitter (X)", "Instagram", "LinkedIn", "Portal Berita"]
-    default_platform_idx = platform_options.index(default_platform) if default_platform in platform_options else 0
+    default_selected = []
+    for s in raw_source_list:
+        label = mapping_source_types.get(s)
+        if label and label not in default_selected:
+            default_selected.append(label)
+    if not default_selected:
+        default_selected = ["Twitter (X)"]
     
-    selected_platform = st.selectbox(
-        "Pilih Platform Sasaran:",
+    selected_platforms = st.multiselect(
+        "Pilih Platform Sasaran (bisa pilih lebih dari satu):",
         options=platform_options,
-        index=default_platform_idx
+        default=default_selected
     )
+    if not selected_platforms:
+        st.warning("⚠️ Silakan pilih setidaknya satu platform sasaran.")
     
     # Form dinamis
     with st.form("form_target_config"):
-        st.write(f"**Konfigurasi Parameter: {selected_platform}**")
+        label_platforms = ", ".join(selected_platforms) if selected_platforms else "Belum dipilih"
+        st.write(f"**Konfigurasi Parameter: {label_platforms}**")
         
         # 1. Rentang Tanggal Target
         col_start, col_end = st.columns(2)
@@ -544,30 +558,39 @@ with tab3:
         save_btn = st.form_submit_button("💾 Simpan Konfigurasi Target")
         
         if save_btn:
-            # Rangkai format source_type untuk disimpan
-            rev_mapping = {v: k for k, v in mapping_source_types.items()}
-            source_type_to_save = rev_mapping.get(selected_platform, "twitter_")
-            
-            new_config = {
-                "source_type": source_type_to_save,
-                "config": {
-                    "general": {
-                        "start_date": start_date_input.strftime("%Y-%m-%d"),
-                        "end_date": end_date_input.strftime("%Y-%m-%d"),
-                        "keywords": [k.strip() for k in keywords_input.split(",") if k.strip()],
-                        "profiles": [p.strip() for p in profiles_input.split(",") if p.strip()],
-                        "hashtags": [h.strip() for h in hashtags_input.split(",") if h.strip()],
-                        "max_results": int(max_results_input)
+            if not selected_platforms:
+                st.error("❌ Gagal menyimpan: Pilih setidaknya SATU platform sasaran terlebih dahulu.")
+            else:
+                # Rangkai array source_types untuk disimpan
+                source_types_to_save = []
+                for sp in selected_platforms:
+                    code = rev_mapping.get(sp)
+                    if code and code not in source_types_to_save:
+                        source_types_to_save.append(code)
+                if not source_types_to_save:
+                    source_types_to_save = ["twitter_"]
+                
+                new_config = {
+                    "source_types": source_types_to_save,
+                    "config": {
+                        "general": {
+                            "start_date": start_date_input.strftime("%Y-%m-%d"),
+                            "end_date": end_date_input.strftime("%Y-%m-%d"),
+                            "keywords": [k.strip() for k in keywords_input.split(",") if k.strip()],
+                            "profiles": [p.strip() for p in profiles_input.split(",") if p.strip()],
+                            "hashtags": [h.strip() for h in hashtags_input.split(",") if h.strip()],
+                            "max_results": int(max_results_input)
+                        }
                     }
                 }
-            }
-            
-            try:
-                with open(CONFIG_FILE, 'w') as f:
-                    json.dump(new_config, f, indent=4)
-                st.success("✅ Konfigurasi target berhasil disimpan ke target_config.json!")
-            except Exception as e:
-                st.error(f"[ERROR] Gagal menyimpan konfigurasi: {e}")
+                
+                try:
+                    with open(CONFIG_FILE, 'w') as f:
+                        json.dump(new_config, f, indent=4)
+                    label_simpan = ", ".join(selected_platforms)
+                    st.success(f"✅ Konfigurasi target berhasil disimpan! Platform aktif: {label_simpan}")
+                except Exception as e:
+                    st.error(f"[ERROR] Gagal menyimpan konfigurasi: {e}")
                 
     st.divider()
     

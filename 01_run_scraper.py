@@ -307,7 +307,20 @@ def main():
         print("[ERROR] Konfigurasi kosong atau gagal dimuat. Proses dihentikan.")
         sys.exit(1)
         
-    source_type = config.get("source_type", "").strip().lower()
+    # Ambil daftar sumber (dukung format baru source_types array & format lama source_type string)
+    raw_sources = config.get("source_types")
+    if not raw_sources:
+        single = config.get("source_type", "")
+        raw_sources = [single] if single else []
+    if isinstance(raw_sources, str):
+        raw_sources = [raw_sources]
+    
+    source_types = [str(s).strip().lower() for s in raw_sources if s and str(s).strip()]
+    if not source_types:
+        print("[ERROR] Tidak ada platform sasaran yang diaktifkan di konfigurasi.")
+        print("[ERROR] Silakan buka dasbor Streamlit > tab Pengaturan Target > pilih minimal 1 platform.")
+        sys.exit(1)
+    
     general_cfg = config.get("config", {}).get("general", {})
     
     # 3. Muat Apify Client
@@ -315,26 +328,37 @@ def main():
     if not client:
         sys.exit(1)
         
-    # Normalisasi tipe sumber
-    if source_type.startswith("twitter"):
-        results = scrape_twitter(client, general_cfg)
-    elif source_type == "instagram":
-        results = scrape_instagram(client, general_cfg)
-    elif source_type == "linkedin":
-        results = scrape_linkedin(client, general_cfg)
-    elif source_type in ["portal_berita", "news_portal", "news"]:
-        results = scrape_news_portal(client, general_cfg)
-    else:
-        print(f"[ERROR] Tipe sumber '{source_type}' tidak dikenal atau tidak didukung.")
-        sys.exit(1)
+    # 4. Iterasi scraping untuk SETIAP platform yang dipilih (multi-platform sekaligus)
+    all_results = []
+    for source_type in source_types:
+        print(f"\n{'='*60}")
+        print(f"[INFO] >>> Memulai proses scraping untuk platform: {source_type}")
+        print(f"{'='*60}")
         
-    # 4. Simpan ke database jika ada hasil
-    if results:
-        print(f"[INFO] Menemukan {len(results)} baris data baru. Menyimpan ke database...")
-        simpan_data_ke_db(results)
-        print("[SUCCESS] Penarikan data selesai dengan sukses!")
+        if source_type.startswith("twitter"):
+            partial = scrape_twitter(client, general_cfg)
+        elif source_type == "instagram":
+            partial = scrape_instagram(client, general_cfg)
+        elif source_type == "linkedin":
+            partial = scrape_linkedin(client, general_cfg)
+        elif source_type in ["portal_berita", "news_portal", "news"]:
+            partial = scrape_news_portal(client, general_cfg)
+        else:
+            print(f"[WARNING] Tipe sumber '{source_type}' tidak dikenal. Dilewati.")
+            continue
+        
+        print(f"[INFO] Platform '{source_type}' menghasilkan {len(partial)} baris data.")
+        all_results.extend(partial)
+        
+    # 5. Simpan ke database jika ada hasil gabungan
+    print(f"\n{'='*60}")
+    if all_results:
+        print(f"[INFO] Total gabungan {len(all_results)} baris data dari {len(source_types)} platform. Menyimpan ke database...")
+        simpan_data_ke_db(all_results)
+        print("[SUCCESS] Penarikan data multi-platform selesai dengan sukses!")
     else:
-        print("[INFO] Tidak ada data baru yang berhasil ditarik atau terjadi kesalahan.")
+        print("[INFO] Tidak ada data baru yang berhasil ditarik dari seluruh platform atau terjadi kesalahan.")
+    print(f"{'='*60}")
 
 if __name__ == "__main__":
     main()

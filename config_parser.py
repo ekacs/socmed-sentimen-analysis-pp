@@ -80,11 +80,29 @@ def build_twitter_query(config):
     query += " lang:id"
     return query
 
+def get_source_types(config):
+    """
+    Mendapatkan daftar platform sumber dari konfigurasi.
+    Dukung format baru (source_types array) dan backward compat (source_type string).
+    """
+    raw = config.get("source_types")
+    if not raw:
+        single = config.get("source_type", "")
+        raw = [single] if single else []
+    if isinstance(raw, str):
+        raw = [raw]
+    return [str(s).strip().lower() for s in raw if s and str(s).strip()]
+
+
 if __name__ == "__main__":
     # Uji coba parser kueri secara mandiri
     cfg = load_config()
     if cfg:
         print("[INFO] Konfigurasi berhasil dimuat.")
-        print(f"[INFO] Tipe sumber: {cfg.get('source_type')}")
-        query = build_twitter_query(cfg)
-        print(f"[INFO] Twitter Query hasil rancangan: {query}")
+        sources = get_source_types(cfg)
+        print(f"[INFO] Daftar platform sasaran ({len(sources)}): {sources}")
+        if "twitter_" in sources or any(s.startswith("twitter") for s in sources):
+            query = build_twitter_query(cfg)
+            print(f"[INFO] Twitter Query hasil rancangan: {query}")
+        else:
+            print("[INFO] Twitter tidak termasuk dalam platform aktif, query Twitter dilewati.")
