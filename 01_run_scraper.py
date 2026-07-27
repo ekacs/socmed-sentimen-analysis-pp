@@ -573,9 +573,12 @@ def main():
     buat_tabel()
     
     # 1b. Cek Mode Scraping (Manual vs Otomatis)
+    # Mode 'manual' hanya memblokir eksekusi otomatis yang dipanggil oleh cron/CI.
+    # Jika dipanggil secara eksplisit (via tombol Dasbor UI atau CLI manual), scraper HARUS tetap berjalan.
+    called_from_cron = (os.environ.get("GITHUB_ACTIONS") == "true") or (os.environ.get("PIPELINE_CRON_RUN") == "1") or ("--cron" in sys.argv)
     mode = get_scraping_mode()
-    if mode == 'manual':
-        print("[INFO] Mode penarikan data saat ini diatur ke MANUAL. Cronjob otomatis dilewati.")
+    if called_from_cron and mode == 'manual':
+        print("[INFO] Dipanggil dari cron, tetapi mode penarikan data diatur ke MANUAL. Cronjob otomatis dilewati.")
         sys.exit(0)
     
     # 2. Muat konfigurasi
