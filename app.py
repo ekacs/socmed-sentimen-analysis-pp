@@ -1738,12 +1738,13 @@ with tab3:
     with col_run1:
         st.markdown("**Langkah 1: Penarikan Data (Scraper)**")
         st.caption("Menghubungkan ke platform Apify Cloud untuk menarik data mentah terbaru sesuai konfigurasi.")
+        st.info("⏳ **Estimasi Waktu:** ~1 – 3 menit (tergantung kuota & batas max data).\n\n⚠️ **Mohon menunggu proses memakan waktu tergantung dengan jaringan.**")
         
         scraper_run_btn = st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", use_container_width=True, key="btn_run_scraper")
         
         if scraper_run_btn:
             import re as _re
-            with st.status("🚀 Menghubungkan ke Apify Cloud & menarik data mentah...", expanded=True) as status_scrape:
+            with st.status("🚀 Menghubungkan ke Apify Cloud & menarik data mentah... (Mohon menunggu proses memakan waktu tergantung dengan jaringan)", expanded=True) as status_scrape:
                 try:
                     result = subprocess.run(
                         [sys.executable, "01_run_scraper.py"],
@@ -1798,6 +1799,7 @@ with tab3:
     with col_run2:
         st.markdown("**Langkah 2: Proses AI & Klasifikasi ML**")
         st.caption("Prapemrosesan bahasa baku EYD oleh model Gemini AI dan pelabelan sentimen oleh SVM lokal.")
+        st.info("⏳ **Estimasi Waktu:** ~10 – 60 detik (tergantung jumlah baris data RAW).\n\n⚠️ **Mohon menunggu proses memakan waktu tergantung dengan jaringan.**")
         
         ml_run_btn = st.button("🧠 Jalankan Proses AI & ML Sekarang", use_container_width=True, key="btn_run_pipeline_ml")
         
@@ -1808,7 +1810,7 @@ with tab3:
                 m = _re2.search(pattern, text)
                 return int(m.group(1)) if m else None
             
-            with st.status("🧠 Menstandardisasi teks EYD & melabeli sentimen via SVM...", expanded=True) as status_ml:
+            with st.status("🧠 Menstandardisasi teks EYD & melabeli sentimen via SVM... (Mohon menunggu proses memakan waktu tergantung dengan jaringan)", expanded=True) as status_ml:
                 combined_out = ""
                 combined_err = ""
                 exit_code = None
