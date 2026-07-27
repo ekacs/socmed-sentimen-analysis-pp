@@ -644,11 +644,23 @@ def load_data_from_db():
 def extract_top_keywords(df, num_words=5):
     """
     Ekstraksi frekuensi kata kunci sederhana dari cleaned_text (atau raw_text jika cleaned kosong).
+    Mendukung penanganan aman jika sel bernilai NaN, None, atau float.
     """
     text_list = []
+    if df is None or df.empty:
+        return "Tidak ada kata kunci dominan"
+        
     for _, row in df.iterrows():
-        t = row.get('cleaned_text') or row.get('raw_text') or ''
-        if t:
+        val_cleaned = row.get('cleaned_text')
+        val_raw = row.get('raw_text')
+        
+        t = ""
+        if pd.notna(val_cleaned) and val_cleaned is not None:
+            t = str(val_cleaned).strip()
+        elif pd.notna(val_raw) and val_raw is not None:
+            t = str(val_raw).strip()
+            
+        if t and t.lower() != 'nan':
             text_list.append(t.lower())
             
     stopwords = {
