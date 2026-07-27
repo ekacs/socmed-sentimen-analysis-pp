@@ -904,7 +904,7 @@ with tab1:
                 if not PDF_LIBS_OK:
                     with st.popover("📥 Download PDF"):
                         st.warning("⚠️ Library export PDF belum terpasang!\n\nJalankan perintah di terminal:\n\n```cmd\npip install reportlab matplotlib\n```\n\nLalu refresh halaman ini.")
-                        st.caption(f"Detail error: {PDF_ERR_MSG[:220]}..." if len(PDF_ERR_MSG)>220 else f"Detail: {PDF_ERR_MSG}")
+                        st.caption(f"Detail error: {PDF_IMPORT_ERROR_MSG[:220]}..." if len(PDF_IMPORT_ERROR_MSG)>220 else f"Detail: {PDF_IMPORT_ERROR_MSG}")
                 else:
                     # =================================================================
                     # [SCOPE FIX AMAN] Capture semua variabel ke LOKAL VAR DULU sebelum define nested function.
