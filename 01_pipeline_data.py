@@ -130,8 +130,8 @@ def process_pipeline():
     success_count = 0
     
     # 4. Iterasi dan proses setiap baris
-    for tweet_id, raw_text in rows:
-        print(f"[INFO] Memproses Tweet ID: {tweet_id}")
+    for platform_id, raw_text in rows:
+        print(f"[INFO] Memproses Platform ID: {platform_id}")
         
         # Langkah A: Pembersihan Bahasa via AI
         cleaned_text = clean_text_with_gemini(gemini_client, raw_text)
@@ -157,7 +157,7 @@ def process_pipeline():
                 
         # Langkah C: Perbarui baris di Database
         try:
-            db_manager.perbarui_cuitan_setelah_proses(tweet_id, cleaned_text, sentiment_label, confidence_score)
+            db_manager.perbarui_cuitan_setelah_proses(platform_id, cleaned_text, sentiment_label, confidence_score)
             success_count += 1
         except Exception as e:
             print(f"  [ERROR]: Gagal memperbarui database: {e}")

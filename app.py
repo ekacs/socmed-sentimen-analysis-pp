@@ -13,6 +13,14 @@ import streamlit as st
 import plotly.express as px
 import db_manager
 
+# Inisialisasi tabel database saat aplikasi Streamlit pertama kali dimuat.
+# Ini memastikan skema v2 (platform_id, views, log_activity, user_app) sudah tersedia
+# di Supabase maupun SQLite lokal sebelum ada operasi baca/tulis.
+try:
+    db_manager.buat_tabel()
+except Exception as _e:
+    pass  # Jika DB belum siap, biarkan error ditangani saat dibutuhkan
+
 # Impor generator NLG
 from nlg_generator import generate_executive_summary
 
@@ -697,7 +705,7 @@ df_all = load_data_from_db()
 # Cek apakah database kosong
 if df_all.empty:
     st.info("ℹ️ Basis data kosong atau belum ada data ditarik. Silakan gunakan menu **⚙️ Pengaturan Target** untuk memicu penarikan data pertama.")
-    df_all = pd.DataFrame(columns=['tweet_id', 'date', 'username', 'raw_text', 'cleaned_text', 'sentiment_label', 'confidence_score', 'likes', 'retweets', 'status', 'source_platform'])
+    df_all = pd.DataFrame(columns=['platform_id', 'date', 'username', 'raw_text', 'cleaned_text', 'sentiment_label', 'confidence_score', 'likes', 'retweets', 'views', 'status', 'source_platform', 'log_activity', 'user_app'])
 
 # 7. Sidebar Filter
 st.sidebar.markdown("### 🎨 Pengaturan Tampilan & Sistem")
@@ -1406,16 +1414,34 @@ with tab2:
             st.info("Belum ada data untuk diaudit.")
     else:
         # Persiapkan data audit
-        audit_cols = [
-            'tweet_id', 'date', 'username', 'raw_text', 'cleaned_text', 
-            'sentiment_label', 'confidence_score', 'source_platform'
-        ]
+        # Tentukan kolom yang tersedia (handle migrasi data lama yang mungkin belum punya kolom baru)
+        _base_audit = ['platform_id', 'date', 'username', 'raw_text', 'cleaned_text',
+                       'sentiment_label', 'confidence_score', 'source_platform']
+        _extra_cols  = ['views', 'log_activity', 'user_app']
+        audit_cols   = _base_audit + [c for c in _extra_cols if c in df_filtered.columns]
         
-        df_audit = df_filtered[audit_cols].copy()
-        df_audit.columns = [
-            'ID Konten', 'Tanggal Pembuatan', 'Username', 'Teks Mentah (X/X-like)', 
-            'Teks Baku (EYD AI)', 'Label Sentimen', 'Skor Keyakinan', 'Platform'
-        ]
+        # Pastikan platform_id ada (fallback ke tweet_id untuk data lama)
+        if 'platform_id' not in df_filtered.columns and 'tweet_id' in df_filtered.columns:
+            df_filtered = df_filtered.copy()
+            df_filtered['platform_id'] = df_filtered['tweet_id']
+        
+        df_audit = df_filtered[[c for c in audit_cols if c in df_filtered.columns]].copy()
+        
+        # Buat mapping label kolom yang dinamis
+        _col_label_map = {
+            'platform_id':      'ID Platform',
+            'date':             'Tanggal Pembuatan',
+            'username':         'Username',
+            'raw_text':         'Teks Mentah',
+            'cleaned_text':     'Teks Baku (EYD AI)',
+            'sentiment_label':  'Label Sentimen',
+            'confidence_score': 'Skor Keyakinan',
+            'source_platform':  'Platform',
+            'views':            'Tayangan',
+            'log_activity':     'Log Aktivitas Scraping',
+            'user_app':         'User Aplikasi',
+        }
+        df_audit.columns = [_col_label_map.get(c, c) for c in df_audit.columns]
         
         # Tampilkan tabel interaktif
         st.dataframe(

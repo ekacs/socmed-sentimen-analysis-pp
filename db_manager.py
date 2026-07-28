@@ -44,25 +44,29 @@ def get_placeholder():
 def buat_tabel():
     """
     Membuat skema tabel 'log_cuitan' dan 'system_config' yang kompatibel dengan SQLite dan PostgreSQL.
+    Skema terbaru (v2): mengganti tweet_id → platform_id, menambah views, log_activity, user_app.
     """
     conn = get_connection()
     cursor = conn.cursor()
     
     try:
-        # Skema tabel log_cuitan
+        # Skema tabel log_cuitan (versi 2)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS log_cuitan (
-                tweet_id TEXT PRIMARY KEY,          -- Mencegah duplikasi data tweet secara mutlak
-                date TEXT NOT NULL,                 -- Format tanggal ISO 8601 terstandar
-                username TEXT NOT NULL,             -- Nama akun pembuat cuitan
-                raw_text TEXT NOT NULL,             -- Suara mentah masyarakat (untuk audit trail)
-                cleaned_text TEXT,                  -- Teks hasil standardisasi EYD oleh Gemini API
-                sentiment_label TEXT,               -- Hasil klasifikasi: 'Positif', 'Negatif', atau 'Netral'
-                confidence_score REAL,              -- Tingkat akurasi/keyakinan model klasifikasi (0.0 - 1.0)
-                likes INTEGER DEFAULT 0,            -- Jumlah suka (metrik analitik tambahan)
-                retweets INTEGER DEFAULT 0,         -- Jumlah bagikan (metrik analitik tambahan)
-                status TEXT DEFAULT 'RAW',          -- Status pemrosesan data ('RAW' / 'CLEANED')
-                source_platform TEXT NOT NULL       -- Keterangan sumber: 'Twitter', 'Instagram', 'LinkedIn', 'News'
+                platform_id TEXT PRIMARY KEY,           -- ID unik konten dari platform sumber (pengganti tweet_id lama)
+                date TEXT NOT NULL,                     -- Tanggal pembuatan konten (dari created_at platform)
+                username TEXT NOT NULL,                 -- Nama akun pembuat konten (screen_name untuk Twitter)
+                raw_text TEXT NOT NULL,                 -- Teks mentah asli dari platform
+                cleaned_text TEXT,                      -- Teks hasil standardisasi EYD oleh Gemini API
+                sentiment_label TEXT,                   -- Hasil klasifikasi: 'Positif', 'Negatif', atau 'Netral'
+                confidence_score REAL,                  -- Tingkat akurasi/keyakinan model klasifikasi (0.0 - 1.0)
+                likes INTEGER DEFAULT 0,                -- Jumlah suka/reaksi
+                retweets INTEGER DEFAULT 0,             -- Jumlah bagikan/repost
+                views INTEGER DEFAULT 0,                -- Jumlah tayangan konten (tersedia di Twitter/X)
+                status TEXT DEFAULT 'RAW',              -- Status pemrosesan data ('RAW' / 'CLEANED')
+                source_platform TEXT NOT NULL,          -- Keterangan sumber: 'Twitter / X', 'Instagram', 'LinkedIn', 'News'
+                log_activity TEXT,                      -- Timestamp aktivitas scraping (format: DD-MMMM-YYYY HH:MM:SS)
+                user_app TEXT                           -- Username pengguna aplikasi Streamlit yang memicu scraping
             )
         ''')
         
@@ -90,6 +94,7 @@ def simpan_data_ke_db(data_cuitan):
     """
     Menyimpan data cuitan ke database menggunakan pendekatan UPSERT yang disesuaikan
     dengan tipe database aktif (ON CONFLICT untuk PostgreSQL, INSERT OR IGNORE untuk SQLite).
+    Menggunakan skema v2: platform_id sebagai primary key, dengan field views, log_activity, user_app.
     """
     if not data_cuitan:
         return
@@ -102,24 +107,24 @@ def simpan_data_ke_db(data_cuitan):
         if db_type == "postgresql":
             query = '''
                 INSERT INTO log_cuitan (
-                    tweet_id, date, username, raw_text, cleaned_text, 
-                    sentiment_label, confidence_score, likes, retweets, status,
-                    source_platform
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (tweet_id) DO NOTHING
+                    platform_id, date, username, raw_text, cleaned_text, 
+                    sentiment_label, confidence_score, likes, retweets, views,
+                    status, source_platform, log_activity, user_app
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (platform_id) DO NOTHING
             '''
         else:
             query = '''
                 INSERT OR IGNORE INTO log_cuitan (
-                    tweet_id, date, username, raw_text, cleaned_text, 
-                    sentiment_label, confidence_score, likes, retweets, status,
-                    source_platform
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    platform_id, date, username, raw_text, cleaned_text, 
+                    sentiment_label, confidence_score, likes, retweets, views,
+                    status, source_platform, log_activity, user_app
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             '''
             
         data_tuple = [
             (
-                d['tweet_id'], 
+                d['platform_id'], 
                 d['date'], 
                 d['username'], 
                 d['raw_text'], 
@@ -128,8 +133,11 @@ def simpan_data_ke_db(data_cuitan):
                 d.get('confidence_score', 0.0),
                 d.get('likes', 0),
                 d.get('retweets', 0),
+                d.get('views', 0),
                 d.get('status', 'RAW'),
-                d.get('source_platform', 'Twitter')
+                d.get('source_platform', 'Twitter / X'),
+                d.get('log_activity', None),
+                d.get('user_app', None)
             )
             for d in data_cuitan
         ]
@@ -185,12 +193,13 @@ def baca_data_untuk_streamlit():
 
 def ambil_cuitan_mentah():
     """
-    Mengambil tweet mentah (status = 'RAW') dari database untuk diproses di pipeline AI.
+    Mengambil konten mentah (status = 'RAW') dari database untuk diproses di pipeline AI.
+    Mengembalikan (platform_id, raw_text) untuk setiap baris RAW.
     """
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT tweet_id, raw_text FROM log_cuitan WHERE status = 'RAW'")
+        cursor.execute("SELECT platform_id, raw_text FROM log_cuitan WHERE status = 'RAW'")
         rows = cursor.fetchall()
         return rows
     except Exception as e:
@@ -199,9 +208,10 @@ def ambil_cuitan_mentah():
     finally:
         conn.close()
 
-def perbarui_cuitan_setelah_proses(tweet_id, cleaned_text, sentiment_label, confidence_score):
+def perbarui_cuitan_setelah_proses(platform_id, cleaned_text, sentiment_label, confidence_score):
     """
     Memperbarui baris data cuitan setelah dibersihkan oleh Gemini dan diprediksi oleh SVM.
+    Menggunakan platform_id sebagai identifier (pengganti tweet_id lama).
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -212,19 +222,19 @@ def perbarui_cuitan_setelah_proses(tweet_id, cleaned_text, sentiment_label, conf
             query = f'''
                 UPDATE log_cuitan
                 SET cleaned_text = {placeholder}, sentiment_label = {placeholder}, confidence_score = {placeholder}, status = 'CLEANED'
-                WHERE tweet_id = {placeholder}
+                WHERE platform_id = {placeholder}
             '''
-            cursor.execute(query, (cleaned_text, sentiment_label, confidence_score, tweet_id))
+            cursor.execute(query, (cleaned_text, sentiment_label, confidence_score, platform_id))
         else:
             query = f'''
                 UPDATE log_cuitan
                 SET cleaned_text = {placeholder}, status = 'CLEANED'
-                WHERE tweet_id = {placeholder}
+                WHERE platform_id = {placeholder}
             '''
-            cursor.execute(query, (cleaned_text, tweet_id))
+            cursor.execute(query, (cleaned_text, platform_id))
         conn.commit()
     except Exception as e:
-        print(f"[ERROR] Gagal memperbarui status data cuitan {tweet_id}: {e}")
+        print(f"[ERROR] Gagal memperbarui status data cuitan {platform_id}: {e}")
     finally:
         conn.close()
 
@@ -270,4 +280,3 @@ def set_scraping_mode(mode):
         print(f"[ERROR] Gagal memperbarui scraping mode: {e}")
     finally:
         conn.close()
-

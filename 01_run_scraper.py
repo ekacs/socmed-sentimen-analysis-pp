@@ -11,6 +11,22 @@ from config_parser import load_config, build_twitter_query
 # Impor fungsi basis data
 from db_manager import simpan_data_ke_db, buat_tabel, get_scraping_mode
 
+# Mapping nama bulan Indonesia untuk format log_activity
+_BULAN_ID = {
+    1: 'Januari', 2: 'Februari', 3: 'Maret', 4: 'April',
+    5: 'Mei', 6: 'Juni', 7: 'Juli', 8: 'Agustus',
+    9: 'September', 10: 'Oktober', 11: 'November', 12: 'Desember'
+}
+
+def format_log_activity(dt: datetime = None) -> str:
+    """
+    Menghasilkan string timestamp format DD-MMMM-YYYY HH:MM:SS dengan nama bulan Indonesia.
+    Contoh: '28-Juli-2026 23:44:54'
+    """
+    if dt is None:
+        dt = datetime.now()
+    return f"{dt.day:02d}-{_BULAN_ID[dt.month]}-{dt.year} {dt.hour:02d}:{dt.minute:02d}:{dt.second:02d}"
+
 # Memuat file .env — override=False agar env var sistem (GitHub Actions) tidak tertimpa
 load_dotenv(override=False)
 
@@ -25,7 +41,7 @@ def get_apify_client():
         return None
     return ApifyClient(token)
 
-def scrape_twitter(client, general_cfg):
+def scrape_twitter(client, general_cfg, log_activity: str = "", user_app: str = "local_user"):
     """
     Menggunakan aktor Twitter scraper (ID: ghSpYIW3L1RvT57NT)
     untuk menarik cuitan dari Twitter (X).
@@ -68,7 +84,9 @@ def scrape_twitter(client, general_cfg):
     run_input = {
         "searchTerms": search_terms,
         "sort": "Latest",
-        "maxItems": int(max_tweets),
+        "max_posts": int(max_tweets),       # Field wajib aktor ghSpYIW3L1RvT57NT (versi terbaru)
+        "maxItems": int(max_tweets),         # Fallback kompatibilitas versi lama
+        "tweetsPerQuery": int(max_tweets),   # Alias tambahan beberapa versi aktor
         "twitterHandles": twitter_handles,
         "startUrls": twitter_start_urls,
         "includeSearchTerms": False
@@ -81,16 +99,21 @@ def scrape_twitter(client, general_cfg):
         results = []
         for item in client.dataset(dataset_id).iterate_items():
             author = item.get("author") if isinstance(item.get("author"), dict) else {}
+            user_info = item.get("user_info") if isinstance(item.get("user_info"), dict) else {}
             
-            # 1. tweet_id: diekstrak dari field 'author/url' (atau item 'url' / 'id')
-            tweet_id = author.get("url") or item.get("url") or item.get("id") or item.get("id_str")
-            if not tweet_id and item.get("url"):
-                tweet_id = str(item.get("url")).rstrip("/").split("/")[-1]
-            if not tweet_id:
+            # 1. platform_id: diambil dari field 'tweet_id' item (ID asli tweet dari platform)
+            platform_id = (
+                item.get("tweet_id")
+                or item.get("id")
+                or item.get("id_str")
+                or item.get("url")
+            )
+            if not platform_id:
                 continue
+            platform_id = str(platform_id)
                 
-            # 2. date: diekstrak dari field 'createdAt'
-            raw_date = item.get("createdAt") or item.get("created_at") or item.get("date")
+            # 2. date: diambil dari field 'created_at' (sesuai spesifikasi)
+            raw_date = item.get("created_at") or item.get("createdAt") or item.get("date")
             if raw_date:
                 try:
                     if isinstance(raw_date, (int, float)):
@@ -102,28 +125,48 @@ def scrape_twitter(client, general_cfg):
             else:
                 date_str = datetime.utcnow().isoformat() + "Z"
                 
-            # 3. username: diekstrak dari field 'author/userName'
-            username = author.get("userName") or author.get("username") or item.get("username") or "unknown"
+            # 3. username: diambil dari field 'user_info/screen_name' (sesuai spesifikasi)
+            username = (
+                user_info.get("screen_name")
+                or author.get("userName")
+                or author.get("username")
+                or item.get("username")
+                or "unknown"
+            )
             if not username.startswith("@"):
                 username = f"@{username}"
                 
-            # 4. raw_text: diekstrak dari field 'text'
+            # 4. raw_text: diambil dari field 'text' (sesuai spesifikasi)
             raw_text = item.get("text") or item.get("fullText") or item.get("full_text") or ""
             
-            # 5. likes: diekstrak dari field 'likeCount'
-            likes = item.get("likeCount") if item.get("likeCount") is not None else (item.get("favorite_count") or item.get("likes") or 0)
+            # 5. likes: diambil dari field 'likes' langsung (sesuai spesifikasi)
+            likes = (
+                item.get("likes")
+                if item.get("likes") is not None
+                else (item.get("likeCount") or item.get("favorite_count") or 0)
+            )
             
-            # 6. retweets: diekstrak dari field 'retweetCount'
-            retweets = item.get("retweetCount") if item.get("retweetCount") is not None else (item.get("retweet_count") or item.get("retweets") or 0)
+            # 6. retweets: diambil dari field 'retweets' langsung (sesuai spesifikasi)
+            retweets = (
+                item.get("retweets")
+                if item.get("retweets") is not None
+                else (item.get("retweetCount") or item.get("retweet_count") or 0)
+            )
+            
+            # 7. views: diambil dari field 'views' (tersedia di Twitter/X)
+            views = item.get("views") or item.get("viewCount") or 0
             
             results.append({
-                "tweet_id": str(tweet_id),
+                "platform_id": platform_id,
                 "date": date_str,
                 "username": username,
                 "raw_text": raw_text,
                 "likes": int(likes or 0),
                 "retweets": int(retweets or 0),
-                "source_platform": "Twitter"
+                "views": int(views or 0),
+                "source_platform": "Twitter / X",
+                "log_activity": log_activity,
+                "user_app": user_app
             })
             
         return results
@@ -132,7 +175,7 @@ def scrape_twitter(client, general_cfg):
         print(f"[ERROR] Kesalahan saat memanggil Aktor Twitter Apify (ghSpYIW3L1RvT57NT): {e}")
         return []
 
-def scrape_instagram(client, general_cfg):
+def scrape_instagram(client, general_cfg, log_activity: str = "", user_app: str = "local_user"):
     """
     Menggunakan aktor 'apify/instagram-scraper' untuk menarik postingan/komentar Instagram.
     """
@@ -172,13 +215,16 @@ def scrape_instagram(client, general_cfg):
                 username = f"@{username}"
                 
             results.append({
-                "tweet_id": f"IG_POST_{post_id}",
+                "platform_id": f"IG_POST_{post_id}",
                 "date": str(raw_date) if raw_date else datetime.utcnow().isoformat() + "Z",
                 "username": username,
                 "raw_text": item.get("caption") or "No Caption",
                 "likes": int(item.get("likesCount", 0) or 0),
                 "retweets": 0,
-                "source_platform": "Instagram"
+                "views": 0,
+                "source_platform": "Instagram",
+                "log_activity": log_activity,
+                "user_app": user_app
             })
             
             # Tarik komentar terbaru jika ada
@@ -191,13 +237,16 @@ def scrape_instagram(client, general_cfg):
                 if not comm_user.startswith("@"):
                     comm_user = f"@{comm_user}"
                 results.append({
-                    "tweet_id": f"IG_COMM_{comm_id}",
+                    "platform_id": f"IG_COMM_{comm_id}",
                     "date": comment.get("createdAt") or str(raw_date),
                     "username": comm_user,
                     "raw_text": comment.get("text") or "",
                     "likes": 0,
                     "retweets": 0,
-                    "source_platform": "Instagram"
+                    "views": 0,
+                    "source_platform": "Instagram",
+                    "log_activity": log_activity,
+                    "user_app": user_app
                 })
                 
         return results
@@ -205,7 +254,7 @@ def scrape_instagram(client, general_cfg):
         print(f"[ERROR] Kesalahan saat memanggil Aktor Instagram Apify: {e}")
         return []
 
-def scrape_linkedin(client, general_cfg):
+def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str = "local_user"):
     """
     Menggunakan aktor OFFICIAL 'harvestapi/linkedin-profile-posts' untuk mengambil data postingan LinkedIn
     (pribadi / perusahaan / post URLs / activity URN).
@@ -333,13 +382,16 @@ def scrape_linkedin(client, general_cfg):
             )
             
             results.append({
-                "tweet_id": f"LI_POST_{str(post_id)}",
+                "platform_id": f"LI_POST_{str(post_id)}",
                 "date": date_str,
                 "username": str(username),
                 "raw_text": str(raw_text),
                 "likes": int(likes or 0),
                 "retweets": int(retweets or 0),
-                "source_platform": "LinkedIn"
+                "views": 0,
+                "source_platform": "LinkedIn",
+                "log_activity": log_activity,
+                "user_app": user_app
             })
             
             # --- Opsional: tarik KOMENTAR (postNestedComments=False → cuma komentar level 1) ---
@@ -360,13 +412,16 @@ def scrape_linkedin(client, general_cfg):
                     c_date = c.get("postedAt") or c.get("createdAt") or date_str
                     c_text = c.get("text") or c.get("message") or ""
                     results.append({
-                        "tweet_id": f"LI_COMM_{c_id}",
+                        "platform_id": f"LI_COMM_{c_id}",
                         "date": str(c_date),
                         "username": str(c_name),
                         "raw_text": str(c_text),
                         "likes": int(c.get("numLikes") or c.get("likesCount") or 0),
                         "retweets": 0,
-                        "source_platform": "LinkedIn"
+                        "views": 0,
+                        "source_platform": "LinkedIn",
+                        "log_activity": log_activity,
+                        "user_app": user_app
                     })
                     
         return results
@@ -374,7 +429,7 @@ def scrape_linkedin(client, general_cfg):
         print(f"[ERROR] Kesalahan saat memanggil Aktor LinkedIn Apify (harvestapi/linkedin-profile-posts): {e}")
         return []
 
-def scrape_news_portal(client, general_cfg):
+def scrape_news_portal(client, general_cfg, log_activity: str = "", user_app: str = "local_user"):
     """
     Menggunakan aktor OFFICIAL 'apify/website-content-crawler' (Playwright Adaptive) untuk menarik
     konten berita. Aktor ini MERENDER JAVASCRIPT sehingga halaman portal berita modern yang
@@ -556,13 +611,16 @@ def scrape_news_portal(client, general_cfg):
             raw_text_payload = f"JUDUL: {display_title} | ISI: {body_text}"
             
             results.append({
-                "tweet_id": f"NEWS_{url_hash}",
+                "platform_id": f"NEWS_{url_hash}",
                 "date": str(date_raw) if date_raw else datetime.utcnow().isoformat() + "Z",
                 "username": domain_name,
                 "raw_text": raw_text_payload,
                 "likes": 0,
                 "retweets": 0,
-                "source_platform": "News"
+                "views": 0,
+                "source_platform": "News",
+                "log_activity": log_activity,
+                "user_app": user_app
             })
             
         return results
@@ -609,6 +667,14 @@ def main():
     client = get_apify_client()
     if not client:
         sys.exit(1)
+    
+    # 3b. Generate log_activity — satu timestamp untuk seluruh sesi scraping ini
+    sesi_mulai = datetime.now()
+    log_activity = format_log_activity(sesi_mulai)
+    print(f"[INFO] Sesi scraping dimulai: {log_activity}")
+    
+    # 3c. User app — belum ada sistem login, gunakan default hostname atau env var
+    user_app = os.environ.get("STREAMLIT_USER_APP", "local_user")
         
     # 4. Iterasi scraping untuk SETIAP platform yang dipilih (multi-platform sekaligus)
     all_results = []
@@ -618,13 +684,13 @@ def main():
         print(f"{'='*60}")
         
         if source_type.startswith("twitter"):
-            partial = scrape_twitter(client, general_cfg)
+            partial = scrape_twitter(client, general_cfg, log_activity=log_activity, user_app=user_app)
         elif source_type == "instagram":
-            partial = scrape_instagram(client, general_cfg)
+            partial = scrape_instagram(client, general_cfg, log_activity=log_activity, user_app=user_app)
         elif source_type == "linkedin":
-            partial = scrape_linkedin(client, general_cfg)
+            partial = scrape_linkedin(client, general_cfg, log_activity=log_activity, user_app=user_app)
         elif source_type in ["portal_berita", "news_portal", "news"]:
-            partial = scrape_news_portal(client, general_cfg)
+            partial = scrape_news_portal(client, general_cfg, log_activity=log_activity, user_app=user_app)
         else:
             print(f"[WARNING] Tipe sumber '{source_type}' tidak dikenal. Dilewati.")
             continue

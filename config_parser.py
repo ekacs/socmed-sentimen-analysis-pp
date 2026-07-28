@@ -39,7 +39,8 @@ def build_twitter_query(config):
             else:
                 kw_parts.append(k)
         if kw_parts:
-            parts.append(f"({' OR '.join(kw_parts)})")
+            # Bungkus dengan kurung HANYA jika lebih dari 1 elemen (OR group)
+            parts.append(f"({' OR '.join(kw_parts)})" if len(kw_parts) > 1 else kw_parts[0])
             
     # 2. Proses hashtag
     if hashtags:
@@ -53,7 +54,8 @@ def build_twitter_query(config):
                 h = f"#{h}"
             hash_parts.append(h)
         if hash_parts:
-            parts.append(f"({' OR '.join(hash_parts)})")
+            # Bungkus dengan kurung HANYA jika lebih dari 1 elemen (OR group)
+            parts.append(f"({' OR '.join(hash_parts)})" if len(hash_parts) > 1 else hash_parts[0])
             
     # 3. Proses profil penulis (usernames)
     if profiles:
@@ -67,7 +69,8 @@ def build_twitter_query(config):
                 p = p[1:]
             prof_parts.append(f"from:{p}")
         if prof_parts:
-            parts.append(f"({' OR '.join(prof_parts)})")
+            # Bungkus dengan kurung HANYA jika lebih dari 1 elemen (OR group)
+            parts.append(f"({' OR '.join(prof_parts)})" if len(prof_parts) > 1 else prof_parts[0])
             
     # Jika tidak ada parameter yang terisi, gunakan kueri default
     if not parts:
