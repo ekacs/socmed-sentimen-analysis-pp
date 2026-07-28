@@ -71,13 +71,10 @@ def build_twitter_query(config):
             
     # Jika tidak ada parameter yang terisi, gunakan kueri default
     if not parts:
-        return 'IKN OR "Ibu Kota Baru" lang:id'
+        return 'IKN OR "Ibu Kota Baru"'
         
     # Gabungkan semua komponen utama dengan operator OR
     query = " OR ".join(parts)
-    
-    # Tambahkan pembatasan bahasa Indonesia secara default
-    query += " lang:id"
     return query
 
 def get_source_types(config):
