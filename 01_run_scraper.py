@@ -81,16 +81,36 @@ def scrape_twitter(client, general_cfg, log_activity: str = "", user_app: str = 
         print("[WARNING] Tidak ada kueri pencarian, handle, atau URL Twitter yang valid. Proses Twitter dibatalkan.")
         return []
         
-    run_input = {
-        "searchTerms": search_terms,
-        "sort": "Latest",
-        "max_posts": int(max_tweets),       # Field wajib aktor ghSpYIW3L1RvT57NT (versi terbaru)
-        "maxItems": int(max_tweets),         # Fallback kompatibilitas versi lama
-        "tweetsPerQuery": int(max_tweets),   # Alias tambahan beberapa versi aktor
-        "twitterHandles": twitter_handles,
-        "startUrls": twitter_start_urls,
-        "includeSearchTerms": False
-    }
+    # --- Bangun run_input sesuai mode ---
+    # PENTING: Actor ghSpYIW3L1RvT57NT tidak bisa menggabungkan searchTerms + startUrls/twitterHandles
+    # secara bersamaan tanpa konflik. Prioritas: jika ada search query → gunakan mode SEARCH only.
+    # Jika tidak ada search query → gunakan mode PROFILE (twitterHandles + startUrls).
+    if search_terms:
+        # Mode SEARCH: kirim hanya searchTerms, abaikan handles/urls
+        # (profil sudah masuk ke dalam query via "from:username")
+        run_input = {
+            "searchTerms": search_terms,
+            "sort": "Latest",
+            "max_posts": int(max_tweets),       # Field wajib aktor (versi terbaru)
+            "maxItems": int(max_tweets),         # Fallback kompatibilitas versi lama
+            "tweetsPerQuery": int(max_tweets),   # Alias tambahan beberapa versi aktor
+            "includeSearchTerms": False
+        }
+        print(f"[INFO] Mode: SEARCH | searchTerms: {search_terms}")
+    else:
+        # Mode PROFILE: tidak ada search query, scrape langsung dari profil/URL
+        # startUrls harus berformat list of {"url": "..."} objects
+        formatted_start_urls = [{"url": u} if isinstance(u, str) else u for u in twitter_start_urls]
+        run_input = {
+            "twitterHandles": twitter_handles,
+            "startUrls": formatted_start_urls,
+            "sort": "Latest",
+            "max_posts": int(max_tweets),
+            "maxItems": int(max_tweets),
+            "tweetsPerQuery": int(max_tweets),
+            "includeSearchTerms": False
+        }
+        print(f"[INFO] Mode: PROFILE | handles: {twitter_handles}")
     
     try:
         run = client.actor("ghSpYIW3L1RvT57NT").call(run_input=run_input)

@@ -1615,86 +1615,113 @@ with tab3:
         save_btn = st.form_submit_button("💾 Simpan Konfigurasi Target")
         
         if save_btn:
+            # ── Validasi 1: Platform wajib dipilih ──
             if not selected_platforms:
                 st.error("❌ Gagal menyimpan: Pilih setidaknya SATU platform sasaran terlebih dahulu.")
             else:
-                # Rangkai array source_types untuk disimpan
-                source_types_to_save = []
-                for sp in selected_platforms:
-                    code = rev_mapping.get(sp)
-                    if code and code not in source_types_to_save:
-                        source_types_to_save.append(code)
-                if not source_types_to_save:
-                    source_types_to_save = ["twitter_"]
+                # ── Validasi 2: Tanggal WAJIB dan logis ──
+                validation_errors = []
                 
-                # Susun general config (selalu simpan SEMUA field per-platform agar konsisten)
-                general_obj = {
-                    "start_date": start_date_input.strftime("%Y-%m-%d"),
-                    "end_date": end_date_input.strftime("%Y-%m-%d"),
-                    "keywords": [k.strip() for k in keywords_input.split(",") if k.strip()],
-                    "profiles": [p.strip() for p in profiles_input.split(",") if p.strip()],
-                    "hashtags": [h.strip() for h in hashtags_input.split(",") if h.strip()],
-                    # max_results tetap disimpan sebagai legacy / aggregate fallback
-                    "max_results": fallback_max if isinstance(fallback_max, int) else 100
-                }
+                if not start_date_input:
+                    validation_errors.append("📅 **Tanggal Mulai Pencarian** wajib diisi.")
+                if not end_date_input:
+                    validation_errors.append("📅 **Tanggal Akhir Pencarian** wajib diisi.")
+                if start_date_input and end_date_input and start_date_input > end_date_input:
+                    validation_errors.append("📅 **Tanggal Mulai** tidak boleh lebih besar dari **Tanggal Akhir**.")
                 
-                # Simpan batas per platform (gunakan nilai UI jika platform dipilih,
-                # jika tidak dipilih: pertahankan nilai lama jika ada, atau isi default)
-                if max_twitter is not None:
-                    general_obj["max_results_twitter"] = int(max_twitter)
+                # ── Validasi 3: Minimal satu dari keywords / profiles / hashtags terisi ──
+                parsed_keywords = [k.strip() for k in keywords_input.split(",") if k.strip()]
+                parsed_profiles = [p.strip() for p in profiles_input.split(",") if p.strip()]
+                parsed_hashtags = [h.strip() for h in hashtags_input.split(",") if h.strip()]
+                
+                if not parsed_keywords and not parsed_profiles and not parsed_hashtags:
+                    validation_errors.append(
+                        "🔍 Wajib mengisi **minimal salah satu** dari: "
+                        "Target Kata Kunci, Target Profil Akun, atau Target Tagar/Hashtag."
+                    )
+                
+                if validation_errors:
+                    st.error("❌ Konfigurasi tidak dapat disimpan. Perbaiki kesalahan berikut:")
+                    for err in validation_errors:
+                        st.markdown(f"- {err}")
                 else:
-                    general_obj["max_results_twitter"] = get_platform_default("max_results_twitter", 500)
-                
-                if max_instagram is not None:
-                    general_obj["max_results_instagram"] = int(max_instagram)
-                else:
-                    general_obj["max_results_instagram"] = get_platform_default("max_results_instagram", 100)
-                
-                if max_linkedin is not None:
-                    general_obj["max_results_linkedin"] = int(max_linkedin)
-                else:
-                    general_obj["max_results_linkedin"] = get_platform_default("max_results_linkedin", 100)
-                
-                if max_news is not None:
-                    general_obj["max_results_news"] = int(max_news)
-                else:
-                    general_obj["max_results_news"] = get_platform_default("max_results_news", 50)
-                
-                # Simpan news_portal_urls (baik Portal Berita dipilih atau tidak, agar konsisten)
-                if "news_portals_input" in locals() and news_portals_input is not None:
-                    parsed_urls = []
-                    for u in [x.strip() for x in news_portals_input.split(",") if x.strip()]:
-                        # Pastikan minimal punya format domain, tambah https jika tidak ada skema
-                        if u and not u.startswith("http"):
-                            u = "https://" + u.lstrip("/")
-                        if u:
-                            parsed_urls.append(u.rstrip("/"))
-                    # Jika hasilnya kosong, pakai default kompas.com agar tidak error
-                    if not parsed_urls:
-                        parsed_urls = ["https://www.kompas.com"]
-                    general_obj["news_portal_urls"] = parsed_urls
-                else:
-                    # Portal Berita tidak dipilih, pertahankan nilai lama atau default
-                    old_news_urls = general_cfg.get("news_portal_urls")
-                    if isinstance(old_news_urls, list) and old_news_urls:
-                        general_obj["news_portal_urls"] = old_news_urls
-                    else:
-                        general_obj["news_portal_urls"] = ["https://www.kompas.com"]
-                
-                new_config = {
-                    "source_types": source_types_to_save,
-                    "config": {
-                        "general": general_obj
+                    # Rangkai array source_types untuk disimpan
+                    source_types_to_save = []
+                    for sp in selected_platforms:
+                        code = rev_mapping.get(sp)
+                        if code and code not in source_types_to_save:
+                            source_types_to_save.append(code)
+                    if not source_types_to_save:
+                        source_types_to_save = ["twitter_"]
+                    
+                    # Susun general config (selalu simpan SEMUA field per-platform agar konsisten)
+                    general_obj = {
+                        "start_date": start_date_input.strftime("%Y-%m-%d"),
+                        "end_date": end_date_input.strftime("%Y-%m-%d"),
+                        "keywords": [k.strip() for k in keywords_input.split(",") if k.strip()],
+                        "profiles": [p.strip() for p in profiles_input.split(",") if p.strip()],
+                        "hashtags": [h.strip() for h in hashtags_input.split(",") if h.strip()],
+                        # max_results tetap disimpan sebagai legacy / aggregate fallback
+                        "max_results": fallback_max if isinstance(fallback_max, int) else 100
                     }
-                }
-                
-                try:
-                    with open(CONFIG_FILE, 'w') as f:
-                        json.dump(new_config, f, indent=4)
-                    label_simpan = ", ".join(selected_platforms)
-                    st.success(f"✅ Konfigurasi target berhasil disimpan! Platform aktif: {label_simpan}")
-                except Exception as e:
-                    st.error(f"[ERROR] Gagal menyimpan konfigurasi: {e}")
+                    
+                    # Simpan batas per platform (gunakan nilai UI jika platform dipilih,
+                    # jika tidak dipilih: pertahankan nilai lama jika ada, atau isi default)
+                    if max_twitter is not None:
+                        general_obj["max_results_twitter"] = int(max_twitter)
+                    else:
+                        general_obj["max_results_twitter"] = get_platform_default("max_results_twitter", 500)
+                    
+                    if max_instagram is not None:
+                        general_obj["max_results_instagram"] = int(max_instagram)
+                    else:
+                        general_obj["max_results_instagram"] = get_platform_default("max_results_instagram", 100)
+                    
+                    if max_linkedin is not None:
+                        general_obj["max_results_linkedin"] = int(max_linkedin)
+                    else:
+                        general_obj["max_results_linkedin"] = get_platform_default("max_results_linkedin", 100)
+                    
+                    if max_news is not None:
+                        general_obj["max_results_news"] = int(max_news)
+                    else:
+                        general_obj["max_results_news"] = get_platform_default("max_results_news", 50)
+                    
+                    # Simpan news_portal_urls (baik Portal Berita dipilih atau tidak, agar konsisten)
+                    if "news_portals_input" in locals() and news_portals_input is not None:
+                        parsed_urls = []
+                        for u in [x.strip() for x in news_portals_input.split(",") if x.strip()]:
+                            # Pastikan minimal punya format domain, tambah https jika tidak ada skema
+                            if u and not u.startswith("http"):
+                                u = "https://" + u.lstrip("/")
+                            if u:
+                                parsed_urls.append(u.rstrip("/"))
+                        # Jika hasilnya kosong, pakai default kompas.com agar tidak error
+                        if not parsed_urls:
+                            parsed_urls = ["https://www.kompas.com"]
+                        general_obj["news_portal_urls"] = parsed_urls
+                    else:
+                        # Portal Berita tidak dipilih, pertahankan nilai lama atau default
+                        old_news_urls = general_cfg.get("news_portal_urls")
+                        if isinstance(old_news_urls, list) and old_news_urls:
+                            general_obj["news_portal_urls"] = old_news_urls
+                        else:
+                            general_obj["news_portal_urls"] = ["https://www.kompas.com"]
+                    
+                    new_config = {
+                        "source_types": source_types_to_save,
+                        "config": {
+                            "general": general_obj
+                        }
+                    }
+                    
+                    try:
+                        with open(CONFIG_FILE, 'w') as f:
+                            json.dump(new_config, f, indent=4)
+                        label_simpan = ", ".join(selected_platforms)
+                        st.success(f"✅ Konfigurasi target berhasil disimpan! Platform aktif: {label_simpan}")
+                    except Exception as e:
+                        st.error(f"[ERROR] Gagal menyimpan konfigurasi: {e}")
                 
     st.divider()
     
