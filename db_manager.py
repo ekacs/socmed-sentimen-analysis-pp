@@ -77,6 +77,40 @@ def buat_tabel():
                 config_value TEXT NOT NULL
             )
         ''')
+
+        # Auto-migrasi jika tabel log_cuitan lama (v1) masih menggunakan tweet_id
+        db_type = get_db_type()
+        try:
+            if db_type == "postgresql":
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name='log_cuitan';
+                """)
+                columns = [row[0] for row in cursor.fetchall()]
+                if columns:
+                    if 'tweet_id' in columns and 'platform_id' not in columns:
+                        cursor.execute("ALTER TABLE log_cuitan RENAME COLUMN tweet_id TO platform_id;")
+                    if 'views' not in columns:
+                        cursor.execute("ALTER TABLE log_cuitan ADD COLUMN views INTEGER DEFAULT 0;")
+                    if 'log_activity' not in columns:
+                        cursor.execute("ALTER TABLE log_cuitan ADD COLUMN log_activity TEXT;")
+                    if 'user_app' not in columns:
+                        cursor.execute("ALTER TABLE log_cuitan ADD COLUMN user_app TEXT;")
+            else:
+                cursor.execute("PRAGMA table_info(log_cuitan);")
+                columns = [row[1] for row in cursor.fetchall()]
+                if columns:
+                    if 'tweet_id' in columns and 'platform_id' not in columns:
+                        cursor.execute("ALTER TABLE log_cuitan RENAME COLUMN tweet_id TO platform_id;")
+                    if 'views' not in columns:
+                        cursor.execute("ALTER TABLE log_cuitan ADD COLUMN views INTEGER DEFAULT 0;")
+                    if 'log_activity' not in columns:
+                        cursor.execute("ALTER TABLE log_cuitan ADD COLUMN log_activity TEXT;")
+                    if 'user_app' not in columns:
+                        cursor.execute("ALTER TABLE log_cuitan ADD COLUMN user_app TEXT;")
+        except Exception as mig_err:
+            print(f"[WARNING] Migrasi skema otomatis log_cuitan: {mig_err}")
         
         # Cek dan seed nilai default jika kosong
         cursor.execute("SELECT COUNT(*) FROM system_config WHERE config_key = 'scraping_mode'")
