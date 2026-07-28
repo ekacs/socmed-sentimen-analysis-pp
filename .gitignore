@@ -46,5 +46,5 @@ desktop.ini
 test_supabase_connection.py
 
 # ─── folder kertas kerja ──────────────────────
-catatan_pengerjaan
-revisi_dokumen
+catatan_pengerjaan/
+revisi_dokumen/
