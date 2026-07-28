@@ -13,7 +13,7 @@ def get_db_type():
     Menentukan tipe database yang digunakan berdasarkan ketersediaan DATABASE_URL.
     """
     db_url = os.getenv("DATABASE_URL", "")
-    if db_url and "postgresql://" in db_url and "YOUR_DATABASE_URL" not in db_url:
+    if db_url and ("postgresql://" in db_url or "postgres://" in db_url) and "YOUR_DATABASE_URL" not in db_url:
         return "postgresql"
     return "sqlite"
 
@@ -22,13 +22,15 @@ def get_connection():
     Mendapatkan koneksi database yang sesuai (sqlite3 atau psycopg2).
     """
     db_type = get_db_type()
-    db_url = os.getenv("DATABASE_URL")
+    db_url = os.getenv("DATABASE_URL", "")
     
     if db_type == "postgresql":
         import psycopg2
         # Menghapus bracket literal jika ada di placeholder kata sandi
         if "[" in db_url and "]" in db_url:
             db_url = db_url.replace("[", "").replace("]", "")
+        if db_url.startswith("postgres://"):
+            db_url = "postgresql://" + db_url[len("postgres://"):]
         return psycopg2.connect(db_url)
     else:
         return sqlite3.connect(DB_FILE)
@@ -143,35 +145,43 @@ def simpan_data_ke_db(data_cuitan):
 def baca_data_untuk_streamlit():
     """
     Mengambil seluruh data dari basis data untuk disajikan di dasbor Streamlit.
-    Menggunakan SQLAlchemy untuk PostgreSQL agar kompatibel dengan Pandas.
+    Menggunakan SQLAlchemy untuk PostgreSQL agar kompatibel dengan Pandas,
+    dengan fallback otomatis ke SQLite jika PostgreSQL tidak mengembalikan data / terkendala.
     """
     db_type = get_db_type()
-    db_url = os.getenv("DATABASE_URL")
+    db_url = os.getenv("DATABASE_URL", "")
+    df = pd.DataFrame()
     
-    if db_type == "postgresql":
-        # Menghapus bracket literal jika ada di placeholder kata sandi
+    if db_type == "postgresql" and db_url:
         if "[" in db_url and "]" in db_url:
             db_url = db_url.replace("[", "").replace("]", "")
         
+        sqlalchemy_url = db_url
+        if sqlalchemy_url.startswith("postgres://"):
+            sqlalchemy_url = "postgresql://" + sqlalchemy_url[len("postgres://"):]
+            
         from sqlalchemy import create_engine
         try:
-            engine = create_engine(db_url)
+            engine = create_engine(sqlalchemy_url)
             df = pd.read_sql_query("SELECT * FROM log_cuitan ORDER BY date DESC", engine)
-            return df
+            if not df.empty:
+                return df
+            print("[INFO] PostgreSQL Supabase terhubung tetapi belum memiliki data (0 baris). Memeriksa SQLite lokal...")
         except Exception as e:
             print(f"[ERROR] Gagal memuat data dari PostgreSQL via SQLAlchemy: {e}")
-            return pd.DataFrame()
-    else:
-        if not os.path.exists(DB_FILE):
-            return pd.DataFrame()
+
+    if os.path.exists(DB_FILE):
         try:
             conn = sqlite3.connect(DB_FILE)
-            df = pd.read_sql_query("SELECT * FROM log_cuitan ORDER BY date DESC", conn)
+            df_sqlite = pd.read_sql_query("SELECT * FROM log_cuitan ORDER BY date DESC", conn)
             conn.close()
-            return df
+            if not df_sqlite.empty:
+                print(f"[INFO] Menggunakan data dari SQLite lokal ({len(df_sqlite)} baris).")
+                return df_sqlite
         except Exception as e:
             print(f"[ERROR] Gagal memuat data dari SQLite: {e}")
-            return pd.DataFrame()
+            
+    return df
 
 def ambil_cuitan_mentah():
     """

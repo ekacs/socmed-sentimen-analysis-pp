@@ -27,7 +27,7 @@ def get_apify_client():
 
 def scrape_twitter(client, general_cfg):
     """
-    Menggunakan aktor 'apidojo/twitter-scraper-lite' (ID: nfp1fpt5gUlBwPcor)
+    Menggunakan aktor Twitter scraper (ID: ghSpYIW3L1RvT57NT)
     untuk menarik cuitan dari Twitter (X).
     """
     print("[INFO] Memulai penarikan data dari Twitter (X)...")
@@ -42,7 +42,7 @@ def scrape_twitter(client, general_cfg):
     
     print(f"[INFO] Menggunakan kueri Twitter: '{query_string}'")
     print(f"[INFO] Batas maksimal cuitan Twitter (X): {max_tweets}")
-    print(f"[INFO] Sortir: Latest | Aktor: nfp1fpt5gUlBwPcor (apidojo/twitter-scraper-lite)")
+    print(f"[INFO] Sortir: Latest | Aktor: ghSpYIW3L1RvT57NT")
     
     # --- Ekstrak Twitter Handles & Start URLs dari profiles field jika ada ---
     raw_profiles = general_cfg.get("profiles", []) or []
@@ -75,7 +75,7 @@ def scrape_twitter(client, general_cfg):
     }
     
     try:
-        run = client.actor("nfp1fpt5gUlBwPcor").call(run_input=run_input)
+        run = client.actor("ghSpYIW3L1RvT57NT").call(run_input=run_input)
         dataset_id = run["defaultDatasetId"]
         
         results = []
@@ -129,7 +129,7 @@ def scrape_twitter(client, general_cfg):
         return results
         
     except Exception as e:
-        print(f"[ERROR] Kesalahan saat memanggil Aktor Twitter Apify (nfp1fpt5gUlBwPcor): {e}")
+        print(f"[ERROR] Kesalahan saat memanggil Aktor Twitter Apify (ghSpYIW3L1RvT57NT): {e}")
         return []
 
 def scrape_instagram(client, general_cfg):

@@ -719,12 +719,17 @@ if new_mode != mode_sekarang:
 # Akses Database
 st.sidebar.divider()
 st.sidebar.markdown("### 🗄️ Akses Database Awan")
-st.sidebar.link_button(
-    "🌐 Buka Tabel Supabase",
-    get_supabase_dashboard_url(),
-    use_container_width=True,
-    help="Buka editor tabel PostgreSQL Supabase secara instan."
-)
+col_db1, col_db2 = st.sidebar.columns([1, 1])
+with col_db1:
+    st.link_button(
+        "🌐 Supabase",
+        get_supabase_dashboard_url(),
+        use_container_width=True,
+        help="Buka editor tabel PostgreSQL Supabase secara instan."
+    )
+with col_db2:
+    if st.button("🔄 Muat Ulang", use_container_width=True, help="Muat ulang data dari basis data (Supabase/SQLite).", key="btn_reload_db_sidebar"):
+        st.rerun()
 
 st.sidebar.divider()
 st.sidebar.header("📁 Filter Analisis Global")
@@ -761,18 +766,23 @@ if not df_all.empty:
 if not df_all.empty and 'date' in df_all.columns:
     try:
         df_all['date_parsed'] = pd.to_datetime(df_all['date'], errors='coerce').dt.date
-        df_all['date_parsed'] = df_all['date_parsed'].fillna(datetime.date.today())
-        min_date = df_all['date_parsed'].min()
-        max_date = df_all['date_parsed'].max()
-        if min_date == max_date:
-            min_date = max_date - datetime.timedelta(days=7)
+        valid_dates = df_all['date_parsed'].dropna()
+        if not valid_dates.empty:
+            min_date = valid_dates.min()
+            max_date = valid_dates.max()
+            if min_date == max_date:
+                min_date = max_date - datetime.timedelta(days=30)
+        else:
+            df_all['date_parsed'] = datetime.date.today()
+            min_date = datetime.date.today() - datetime.timedelta(days=30)
+            max_date = datetime.date.today()
     except Exception:
         df_all['date_parsed'] = datetime.date.today()
-        min_date = datetime.date.today() - datetime.timedelta(days=7)
+        min_date = datetime.date.today() - datetime.timedelta(days=30)
         max_date = datetime.date.today()
 else:
     df_all['date_parsed'] = datetime.date.today()
-    min_date = datetime.date.today() - datetime.timedelta(days=7)
+    min_date = datetime.date.today() - datetime.timedelta(days=30)
     max_date = datetime.date.today()
 
 date_range = st.sidebar.date_input(
@@ -799,7 +809,10 @@ tab3, tab1, tab2 = st.tabs(["⚙️ Pengaturan Target", "📊 Analitik Sentimen"
 # =====================================================================
 with tab1:
     if df_filtered.empty:
-        st.warning("⚠️ Tidak ada data yang cocok dengan kriteria filter saat ini.")
+        if not df_all.empty:
+            st.warning("⚠️ **Data tersimpan di basis data, tetapi tidak ada yang cocok dengan kriteria filter saat ini.**\n\nSilakan periksa pilihan **Platform** atau **Rentang Waktu** di sidebar sebelah kiri.")
+        else:
+            st.warning("⚠️ Tidak ada data yang cocok dengan kriteria filter saat ini.")
     else:
         # Perhitungan Metrik Dinamis
         total_volume = len(df_filtered)
@@ -1387,7 +1400,10 @@ with tab2:
         )
     
     if df_filtered.empty:
-        st.info("Belum ada data untuk diaudit.")
+        if not df_all.empty:
+            st.warning("⚠️ **Data tersimpan di basis data, tetapi tidak ada yang cocok dengan kriteria filter saat ini.**\n\nSilakan periksa pilihan **Platform** atau **Rentang Waktu** di sidebar sebelah kiri.")
+        else:
+            st.info("Belum ada data untuk diaudit.")
     else:
         # Persiapkan data audit
         audit_cols = [
