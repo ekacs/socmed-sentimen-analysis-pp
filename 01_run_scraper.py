@@ -27,13 +27,14 @@ def get_apify_client():
 
 def scrape_twitter(client, general_cfg):
     """
-    Menggunakan aktor 'apidojo/tweet-scraper' untuk menarik cuitan dari Twitter (X).
+    Menggunakan aktor 'apidojo/twitter-scraper-lite' (ID: nfp1fpt5gUlBwPcor)
+    untuk menarik cuitan dari Twitter (X).
     """
     print("[INFO] Memulai penarikan data dari Twitter (X)...")
     
     # Rangkai kueri pencarian tingkat lanjut
     query_string = build_twitter_query({"config": {"general": general_cfg}})
-    # Prioritas: field spesifik twitter > general max_results > default 100
+    # Prioritas: field spesifik twitter > general max_results > default 500
     max_tweets = general_cfg.get("max_results_twitter")
     if max_tweets is None:
         max_tweets = general_cfg.get("max_results", 500)
@@ -41,10 +42,9 @@ def scrape_twitter(client, general_cfg):
     
     print(f"[INFO] Menggunakan kueri Twitter: '{query_string}'")
     print(f"[INFO] Batas maksimal cuitan Twitter (X): {max_tweets}")
-    print(f"[INFO] Sortir: Terbaru (Latest) | Bahasa Filter: Indonesia (id)")
+    print(f"[INFO] Sortir: Latest | Aktor: nfp1fpt5gUlBwPcor (apidojo/twitter-scraper-lite)")
     
-    # --- Ekstrak Twitter Handles dari profiles field jika ada --- 
-    # (sesuai official spec apidojo/tweet-scraper field twitterHandles & startUrls)
+    # --- Ekstrak Twitter Handles & Start URLs dari profiles field jika ada ---
     raw_profiles = general_cfg.get("profiles", []) or []
     twitter_handles = []
     twitter_start_urls = []
@@ -55,48 +55,46 @@ def scrape_twitter(client, general_cfg):
         if p.startswith("http"):
             twitter_start_urls.append(p)
         else:
-            # Bersihkan @ jika disertakan user
             clean_handle = p.lstrip("@")
             twitter_handles.append(clean_handle)
             twitter_start_urls.append(f"https://twitter.com/{clean_handle}")
+            
+    search_terms = [query_string] if query_string else []
     
+    if not search_terms and not twitter_handles and not twitter_start_urls:
+        print("[WARNING] Tidak ada kueri pencarian, handle, atau URL Twitter yang valid. Proses Twitter dibatalkan.")
+        return []
+        
     run_input = {
-        "searchTerms": [query_string],
-        "maxItems": int(max_tweets),
+        "searchTerms": search_terms,
         "sort": "Latest",
-        "tweetLanguage": "id",
-        "includeSearchTerms": False,
-        "onlyImage": False,
-        "onlyQuote": False,
-        "onlyTwitterBlue": False,
-        "onlyVerifiedUsers": False,
-        "onlyVideo": False,
-        # Extended fields (sesuai official JSON form)
+        "maxItems": int(max_tweets),
         "twitterHandles": twitter_handles,
         "startUrls": twitter_start_urls,
-        "customMapFunction": "(object) => { return {...object} }"
+        "includeSearchTerms": False
     }
     
     try:
-        run = client.actor("apidojo/tweet-scraper").call(run_input=run_input)
+        run = client.actor("nfp1fpt5gUlBwPcor").call(run_input=run_input)
         dataset_id = run["defaultDatasetId"]
         
         results = []
         for item in client.dataset(dataset_id).iterate_items():
-            # Ekstraksi tweet_id
-            tweet_id = item.get("id") or item.get("id_str")
+            author = item.get("author") if isinstance(item.get("author"), dict) else {}
+            
+            # 1. tweet_id: diekstrak dari field 'author/url' (atau item 'url' / 'id')
+            tweet_id = author.get("url") or item.get("url") or item.get("id") or item.get("id_str")
+            if not tweet_id and item.get("url"):
+                tweet_id = str(item.get("url")).rstrip("/").split("/")[-1]
             if not tweet_id:
                 continue
                 
-            # Pemetaan tanggal
+            # 2. date: diekstrak dari field 'createdAt'
             raw_date = item.get("createdAt") or item.get("created_at") or item.get("date")
             if raw_date:
-                # Upayakan standarisasi ke format ISO 8601
                 try:
-                    # Contoh format Twitter: "Mon Jul 13 06:45:00 +0000 2026" atau ISO string
-                    # Jika berupa angka timestamp (ms)
                     if isinstance(raw_date, (int, float)):
-                        date_str = datetime.fromtimestamp(raw_date / 1000.0).isoformat() + "Z"
+                        date_str = datetime.fromtimestamp(raw_date if raw_date < 1e11 else raw_date / 1000.0).isoformat() + "Z"
                     else:
                         date_str = str(raw_date)
                 except Exception:
@@ -104,30 +102,34 @@ def scrape_twitter(client, general_cfg):
             else:
                 date_str = datetime.utcnow().isoformat() + "Z"
                 
-            # Pemetaan profil
-            user_info = item.get("twitterUser") or item.get("user") or {}
-            username = user_info.get("username") or user_info.get("screen_name") or item.get("username") or "unknown"
+            # 3. username: diekstrak dari field 'author/userName'
+            username = author.get("userName") or author.get("username") or item.get("username") or "unknown"
             if not username.startswith("@"):
                 username = f"@{username}"
                 
-            raw_text = item.get("fullText") or item.get("text") or ""
-            likes = item.get("likeCount") or item.get("favoriteCount") or item.get("likes") or 0
-            retweets = item.get("retweetCount") or item.get("retweet_count") or item.get("retweets") or 0
+            # 4. raw_text: diekstrak dari field 'text'
+            raw_text = item.get("text") or item.get("fullText") or item.get("full_text") or ""
+            
+            # 5. likes: diekstrak dari field 'likeCount'
+            likes = item.get("likeCount") if item.get("likeCount") is not None else (item.get("favorite_count") or item.get("likes") or 0)
+            
+            # 6. retweets: diekstrak dari field 'retweetCount'
+            retweets = item.get("retweetCount") if item.get("retweetCount") is not None else (item.get("retweet_count") or item.get("retweets") or 0)
             
             results.append({
                 "tweet_id": str(tweet_id),
                 "date": date_str,
                 "username": username,
                 "raw_text": raw_text,
-                "likes": int(likes),
-                "retweets": int(retweets),
+                "likes": int(likes or 0),
+                "retweets": int(retweets or 0),
                 "source_platform": "Twitter"
             })
             
         return results
         
     except Exception as e:
-        print(f"[ERROR] Kesalahan saat memanggil Aktor Twitter Apify: {e}")
+        print(f"[ERROR] Kesalahan saat memanggil Aktor Twitter Apify (nfp1fpt5gUlBwPcor): {e}")
         return []
 
 def scrape_instagram(client, general_cfg):
