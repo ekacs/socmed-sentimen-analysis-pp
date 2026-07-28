@@ -58,7 +58,7 @@ def scrape_twitter(client, general_cfg, log_activity: str = "", user_app: str = 
     
     print(f"[INFO] Menggunakan kueri Twitter: '{query_string}'")
     print(f"[INFO] Batas maksimal cuitan Twitter (X): {max_tweets}")
-    print(f"[INFO] Sortir: Latest | Aktor: ghSpYIW3L1RvT57NT")
+    print(f"[INFO] Sortir: Top | Aktor: ghSpYIW3L1RvT57NT")
     
     # --- Ekstrak Twitter Handles & Start URLs dari profiles field jika ada ---
     raw_profiles = general_cfg.get("profiles", []) or []
@@ -86,31 +86,37 @@ def scrape_twitter(client, general_cfg, log_activity: str = "", user_app: str = 
     # secara bersamaan tanpa konflik. Prioritas: jika ada search query → gunakan mode SEARCH only.
     # Jika tidak ada search query → gunakan mode PROFILE (twitterHandles + startUrls).
     if search_terms:
-        # Mode SEARCH: kirim hanya searchTerms, abaikan handles/urls
-        # (profil sudah masuk ke dalam query via "from:username")
+        # Mode SEARCH: Aktor ghSpYIW3L1RvT57NT menggunakan field 'query' (string), 'search_type' ("Top"), dan 'max_posts' (int)
         run_input = {
+            "query": query_string,
+            "search_type": "Top",
+            "searchType": "Top",
+            "max_posts": int(max_tweets),
+            # Key kompatibilitas fallback jika versi aktor berubah
             "searchTerms": search_terms,
-            "sort": "Latest",
-            "max_posts": int(max_tweets),       # Field wajib aktor (versi terbaru)
-            "maxItems": int(max_tweets),         # Fallback kompatibilitas versi lama
-            "tweetsPerQuery": int(max_tweets),   # Alias tambahan beberapa versi aktor
-            "includeSearchTerms": False
+            "sort": "Top",
+            "searchMode": "top",
+            "maxItems": int(max_tweets),
+            "tweetsPerQuery": int(max_tweets)
         }
-        print(f"[INFO] Mode: SEARCH | searchTerms: {search_terms}")
+        print(f"[INFO] Mode: SEARCH | query: '{query_string}' | search_type: Top | max_posts: {max_tweets}")
     else:
-        # Mode PROFILE: tidak ada search query, scrape langsung dari profil/URL
-        # startUrls harus berformat list of {"url": "..."} objects
+        # Mode PROFILE: tidak ada search query, scrape langsung dari username / profil
+        first_handle = twitter_handles[0] if twitter_handles else ""
         formatted_start_urls = [{"url": u} if isinstance(u, str) else u for u in twitter_start_urls]
         run_input = {
+            "username": first_handle,
+            "query": f"from:{first_handle}" if first_handle else "",
+            "search_type": "Top",
+            "searchType": "Top",
+            "max_posts": int(max_tweets),
+            # Key kompatibilitas fallback
             "twitterHandles": twitter_handles,
             "startUrls": formatted_start_urls,
-            "sort": "Latest",
-            "max_posts": int(max_tweets),
-            "maxItems": int(max_tweets),
-            "tweetsPerQuery": int(max_tweets),
-            "includeSearchTerms": False
+            "sort": "Top",
+            "maxItems": int(max_tweets)
         }
-        print(f"[INFO] Mode: PROFILE | handles: {twitter_handles}")
+        print(f"[INFO] Mode: PROFILE | username: '{first_handle}' | max_posts: {max_tweets}")
     
     try:
         run = client.actor("ghSpYIW3L1RvT57NT").call(run_input=run_input)
