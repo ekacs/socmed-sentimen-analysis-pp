@@ -69,7 +69,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Styling CSS tambahan agar tabel dan chart saat di-maximize (fullscreen) memenuhi 100% lebar layar
+# Styling CSS tambahan agar tabel dan chart saat di-maximize (fullscreen) memenuhi 100% lebar & tinggi layar
 st.markdown("""
 <style>
 div[data-testid="stDataFrame"] {
@@ -80,6 +80,13 @@ div[data-testid="stDataFrame"] > div {
 }
 .element-container:has(iframe) {
     width: 100% !important;
+}
+/* Paksa tinggi tabel 100% saat mode Fullscreen/Maximize aktif */
+div[data-st-fullscreen="true"] div[data-testid="stDataFrame"],
+div[data-st-fullscreen="true"] div[data-testid="stDataFrame"] > div,
+div[data-st-fullscreen="true"] div[data-testid="stDataFrame"] [role="grid"] {
+    height: 85vh !important;
+    max-height: 85vh !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -934,7 +941,7 @@ with tab_review:
         st.dataframe(
             df_disp,
             use_container_width=True,
-            height=450,
+            height=550,
             column_config={
                 "Teks Mentah": st.column_config.TextColumn("Teks Mentah", width="large"),
                 "Teks Baku (EYD)": st.column_config.TextColumn("Teks Baku (EYD)", width="large"),
