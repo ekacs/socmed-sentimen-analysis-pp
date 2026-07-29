@@ -405,8 +405,9 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
         max_results = general_cfg.get("max_results", 100)
     max_results = int(max_results)
     
-    max_comments = min(5, max_results) if max_results > 0 else 0
-    max_reactions = min(5, max_results) if max_results > 0 else 0
+    # Untuk kecepatan maksimal, scraping komentar & reaksi ditingkat mendalam di-disable secara default
+    max_comments = 0
+    max_reactions = 0
     
     clean_keywords = [str(k).strip() for k in keywords if str(k).strip()]
     if not clean_keywords:
@@ -420,10 +421,10 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
         "searchTerms": clean_keywords,
         "maxPosts": int(max_results),
         "maxItems": int(max_results),
-        "scrapeComments": bool(max_comments > 0),
-        "maxComments": int(max_comments),
-        "scrapeReactions": bool(max_reactions > 0),
-        "maxReactions": int(max_reactions)
+        "scrapeComments": False,
+        "maxComments": 0,
+        "scrapeReactions": False,
+        "maxReactions": 0
     }
     
     try:
