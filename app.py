@@ -251,6 +251,50 @@ def extract_top_keywords(df, num_words=5):
     top_common = counter.most_common(num_words)
     return ", ".join([f"{w[0]} ({w[1]})" for w in top_common]) if top_common else "Tidak ada kata kunci dominan"
 
+def get_top_keywords_df(df, top_n=10):
+    text_list = []
+    if df is None or df.empty:
+        return pd.DataFrame(columns=['Kata Kunci', 'Frekuensi'])
+        
+    for _, row in df.iterrows():
+        val_cleaned = row.get('cleaned_text')
+        val_raw = row.get('raw_text')
+        t = ""
+        if pd.notna(val_cleaned) and val_cleaned is not None:
+            t = str(val_cleaned).strip()
+        elif pd.notna(val_raw) and val_raw is not None:
+            t = str(val_raw).strip()
+            
+        if t and t.lower() != 'nan':
+            text_list.append(t.lower())
+            
+    stopwords = {
+        'dan', 'di', 'ke', 'dari', 'ini', 'itu', 'yang', 'saya', 'kamu', 'dia', 'kami', 'kita', 'mereka', 
+        'adalah', 'ada', 'dengan', 'untuk', 'pada', 'atau', 'juga', 'sudah', 'telah', 'bisa', 'dapat', 'akan', 
+        'ingin', 'hari', 'nih', 'dah', 'sangat', 'sekali', 'saja', 'karena', 'tapi', 'namun', 'krl', 'commuter', 
+        'line', 'mrt', 'lrt', 'transjakarta', 'bus', 'kereta', 'ikn', 'ibu', 'kota', 'yang', 'untuk', 'pada', 
+        'semua', 'ada', 'banyak', 'sudah', 'telah', 'bisa', 'dapat', 'tidak', 'gak', 'enggak', 'pun', 'lah',
+        'kok', 'sih', 'ya', 'aja', 'dgn', 'yg', 'utk', 'klo', 'kalo', 'lu', 'gw', 'gua', 'buat', 'bgt'
+    }
+    
+    words = []
+    for text in text_list:
+        for char in ".,!?;:()[]{}'\"-@#/*":
+            text = text.replace(char, " ")
+        for word in text.split():
+            word = word.strip()
+            if word and word not in stopwords and len(word) > 2:
+                words.append(word)
+                
+    counter = collections.Counter(words)
+    top_common = counter.most_common(top_n)
+    if not top_common:
+        return pd.DataFrame(columns=['Kata Kunci', 'Frekuensi'])
+    
+    df_res = pd.DataFrame(top_common, columns=['Kata Kunci', 'Frekuensi'])
+    df_res = df_res.sort_values(by='Frekuensi', ascending=True)
+    return df_res
+
 # Dashboard Header
 st.title("🏛️ Pusat Analisis Sentimen Kebijakan Publik")
 st.markdown("Dasbor eksekutif berbasis AI untuk memantau sentimen publik terhadap kebijakan publik.")
@@ -772,37 +816,87 @@ with tab_review:
     st.divider()
     st.markdown("### 📊 Ringkasan Visualisasi Hasil Review Data")
     
-    total_raw_live = len(df_live_full)
-    total_acc = len(df_reviewed_final)
-    total_rej = total_raw_live - total_acc
+    total_volume_rev = len(df_reviewed_final)
+    unique_users_rev = df_reviewed_final['username'].nunique() if 'username' in df_reviewed_final.columns and not df_reviewed_final.empty else 0
     
-    cr1, cr2, cr3 = st.columns(3)
-    with cr1: st.metric("📦 Total Live Data", f"{total_raw_live:,}")
-    with cr2: st.metric("✅ Data Diterima (Review)", f"{total_acc:,}")
-    with cr3: st.metric("❌ Data Ditolak/Dieliminasi", f"{total_rej:,}", delta=f"-{total_rej}" if total_rej else None, delta_color="inverse")
+    pos_cnt_r = int((df_reviewed_final['sentiment_label'] == 'Positif').sum()) if 'sentiment_label' in df_reviewed_final.columns else 0
+    neg_cnt_r = int((df_reviewed_final['sentiment_label'] == 'Negatif').sum()) if 'sentiment_label' in df_reviewed_final.columns else 0
+    neu_cnt_r = int((df_reviewed_final['sentiment_label'] == 'Netral').sum()) if 'sentiment_label' in df_reviewed_final.columns else 0
+    
+    tot_sent_r = pos_cnt_r + neg_cnt_r + neu_cnt_r
+    pct_pos_r = (pos_cnt_r / tot_sent_r * 100) if tot_sent_r > 0 else 0.0
+    pct_neg_r = (neg_cnt_r / tot_sent_r * 100) if tot_sent_r > 0 else 0.0
+    pct_neu_r = (neu_cnt_r / tot_sent_r * 100) if tot_sent_r > 0 else 0.0
+
+    # 5 KPI Metric Cards
+    cr1, cr2, cr3, cr4, cr5 = st.columns(5)
+    with cr1: st.metric("📦 Total Mention", f"{total_volume_rev:,}")
+    with cr2: st.metric("👥 Akun Unik", f"{unique_users_rev:,}")
+    with cr3: st.metric("🟢 Sentimen Positif", f"{pct_pos_r:.1f}%", delta=f"{pos_cnt_r:,} data")
+    with cr4: st.metric("🔴 Sentimen Negatif", f"{pct_neg_r:.1f}%", delta=f"{neg_cnt_r:,} data", delta_color="inverse")
+    with cr5: st.metric("🔵 Sentimen Netral", f"{pct_neu_r:.1f}%", delta=f"{neu_cnt_r:,} data", delta_color="off")
 
     if not df_reviewed_final.empty:
-        c_rev_chart1, c_rev_chart2 = st.columns([1, 1])
-        with c_rev_chart1:
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_c1, col_c2, col_c3 = st.columns([4, 3, 3])
+        
+        # Grafik 1: Tren Sentimen Harian
+        with col_c1:
+            st.markdown("**📈 Tren Sentimen Publik Harian**")
+            if 'date' in df_reviewed_final.columns and not df_reviewed_final.empty:
+                try:
+                    df_rev_copy = df_reviewed_final.copy()
+                    df_rev_copy['date_parsed'] = pd.to_datetime(df_rev_copy['date'], errors='coerce').dt.date
+                    df_trend = df_rev_copy.groupby(['date_parsed', 'sentiment_label']).size().reset_index(name='count')
+                    fig_tr = px.line(
+                        df_trend, x='date_parsed', y='count', color='sentiment_label',
+                        color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'},
+                        line_shape='spline', height=260
+                    )
+                    fig_tr.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+                    st.plotly_chart(fig_tr, use_container_width=True)
+                except Exception:
+                    st.info("Format tanggal belum dapat diproses untuk grafik tren.")
+            else:
+                st.info("Data tanggal tidak tersedia.")
+
+        # Grafik 2: Komposisi Sentimen (Donut Chart)
+        with col_c2:
+            st.markdown("**🍩 Komposisi Sentimen**")
             sent_rev_counts = df_reviewed_final['sentiment_label'].value_counts().reset_index()
             sent_rev_counts.columns = ['Sentimen', 'Jumlah']
             fig_rev_pie = px.pie(
                 sent_rev_counts, names='Sentimen', values='Jumlah', hole=0.4,
                 color='Sentimen', color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'}
             )
-            fig_rev_pie.update_layout(title="Distribusi Sentimen Data Diterima", height=280)
+            fig_rev_pie.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=260)
             st.plotly_chart(fig_rev_pie, use_container_width=True)
-            
-        with c_rev_chart2:
-            c_tbl_lbl, c_tbl_btn = st.columns([3, 1])
-            with c_tbl_lbl:
-                st.markdown("**Tabel Live Interaktif (klasifikasi sentimen):**")
-            with c_tbl_btn:
-                if st.button("🔄 Segarkan", key="btn_refresh_live_table", use_container_width=True, help="Muat ulang data terbaru dari database"):
-                    st.rerun()
-            df_disp = df_reviewed_final[[c for c in _all_cols_needed if c in df_reviewed_final.columns]].copy()
-            df_disp.rename(columns=col_rename_map, inplace=True)
-            st.dataframe(df_disp, use_container_width=True, height=280)
+
+        # Grafik 3: Top Kata Kunci / Tagar (Horizontal Bar Chart)
+        with col_c3:
+            st.markdown("**🏷️ Top 10 Kata Kunci / Tagar**")
+            df_top_kw = get_top_keywords_df(df_reviewed_final, top_n=10)
+            if not df_top_kw.empty:
+                fig_kw = px.bar(
+                    df_top_kw, x='Frekuensi', y='Kata Kunci', orientation='h',
+                    color_discrete_sequence=['#4B6CB7'], height=260
+                )
+                fig_kw.update_layout(margin=dict(l=10, r=10, t=10, b=10), yaxis=dict(autorange="reversed"))
+                st.plotly_chart(fig_kw, use_container_width=True)
+            else:
+                st.info("Belum ada kata kunci dominan.")
+
+        # Tabel Feed Live Interaktif (Baris Bawah)
+        st.markdown("<br>", unsafe_allow_html=True)
+        c_tbl_lbl, c_tbl_btn = st.columns([3, 1])
+        with c_tbl_lbl:
+            st.markdown("**📋 Tabel Live Interaktif (13 Kolom Lengkap):**")
+        with c_tbl_btn:
+            if st.button("🔄 Segarkan", key="btn_refresh_live_table", use_container_width=True, help="Muat ulang data terbaru dari database"):
+                st.rerun()
+        df_disp = df_reviewed_final[[c for c in _all_cols_needed if c in df_reviewed_final.columns]].copy()
+        df_disp.rename(columns=col_rename_map, inplace=True)
+        st.dataframe(df_disp, use_container_width=True, height=320)
 
 # =====================================================================
 # TAB 4: VISUALISASI & ANALISIS DASHBOARD
@@ -915,39 +1009,55 @@ with tab_viz:
     tot_retweets_v = int(df_viz_filtered['retweets'].sum() if 'retweets' in df_viz_filtered.columns else 0)
     tot_engagement_v = tot_likes_v + tot_retweets_v
 
-    mv1, mv2, mv3 = st.columns(3)
-    with mv1:
-        st.markdown(f'<div class="metric-card"><div class="metric-value">{total_volume_viz:,}</div><div class="metric-label">Total Volume Data (Cleaned: {total_cleaned_viz:,})</div></div>', unsafe_allow_html=True)
-    with mv2:
-        st.markdown(f'<div class="metric-card"><div class="metric-value">{dominant_viz}</div><div class="metric-label">Sentimen Dominan</div></div>', unsafe_allow_html=True)
-    with mv3:
-        st.markdown(f'<div class="metric-card"><div class="metric-value">{tot_engagement_v:,}</div><div class="metric-label">Total Engagement (Likes + Shares)</div></div>', unsafe_allow_html=True)
+    unique_users_v = df_viz_filtered['username'].nunique() if 'username' in df_viz_filtered.columns and not df_viz_filtered.empty else 0
+
+    mv1, mv2, mv3, mv4, mv5 = st.columns(5)
+    with mv1: st.metric("📦 Total Mention", f"{total_volume_viz:,}")
+    with mv2: st.metric("👥 Akun Unik", f"{unique_users_v:,}")
+    with mv3: st.metric("🟢 Sentimen Positif", f"{persen_pos_v:.1f}%", delta=f"{pos_cnt_v:,} data")
+    with mv4: st.metric("🔴 Sentimen Negatif", f"{persen_neg_v:.1f}%", delta=f"{neg_cnt_v:,} data", delta_color="inverse")
+    with mv5: st.metric("🔵 Sentimen Netral", f"{persen_neu_v:.1f}%", delta=f"{neu_cnt_v:,} data", delta_color="off")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
     # 6.2 Visualisasi Grafik & Narasi AI (NLG)
-    col_chart_l, col_chart_r = st.columns([7, 3])
+    col_chart_l, col_chart_m, col_chart_r = st.columns([4, 3, 3])
     with col_chart_l:
-        st.subheader("📈 Tren Sentimen Publik Harian")
+        st.markdown("**📈 Tren Sentimen Publik Harian**")
         if 'date_parsed' in df_viz_cleaned.columns and not df_viz_cleaned.empty:
             df_tr = df_viz_cleaned.groupby(['date_parsed', 'sentiment_label']).size().reset_index(name='count')
             fig_tr = px.line(df_tr, x='date_parsed', y='count', color='sentiment_label',
                              color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'},
-                             line_shape='spline', height=300)
+                             line_shape='spline', height=260)
+            fig_tr.update_layout(margin=dict(l=10, r=10, t=10, b=10))
             st.plotly_chart(fig_tr, use_container_width=True)
         else:
             st.info("Belum ada data sentimen terklasifikasi untuk membentuk grafik tren.")
             
-    with col_chart_r:
-        st.subheader("📊 Distribusi Sentimen")
+    with col_chart_m:
+        st.markdown("**🍩 Komposisi Sentimen**")
         if total_labelled_viz > 0:
             df_p = pd.DataFrame({'Sentimen': ['Positif', 'Netral', 'Negatif'], 'Jumlah': [pos_cnt_v, neu_cnt_v, neg_cnt_v]})
             fig_p = px.pie(df_p, names='Sentimen', values='Jumlah', hole=0.4,
                            color='Sentimen', color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'},
                            height=260)
+            fig_p.update_layout(margin=dict(l=10, r=10, t=10, b=10))
             st.plotly_chart(fig_p, use_container_width=True)
         else:
             st.info("Belum ada data sentimen terklasifikasi.")
+
+    with col_chart_r:
+        st.markdown("**🏷️ Top 10 Kata Kunci / Tagar**")
+        df_top_kw_viz = get_top_keywords_df(df_viz_cleaned, top_n=10)
+        if not df_top_kw_viz.empty:
+            fig_kw_v = px.bar(
+                df_top_kw_viz, x='Frekuensi', y='Kata Kunci', orientation='h',
+                color_discrete_sequence=['#4B6CB7'], height=260
+            )
+            fig_kw_v.update_layout(margin=dict(l=10, r=10, t=10, b=10), yaxis=dict(autorange="reversed"))
+            st.plotly_chart(fig_kw_v, use_container_width=True)
+        else:
+            st.info("Belum ada kata kunci dominan.")
 
     st.divider()
 
