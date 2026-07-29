@@ -6,6 +6,11 @@ from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from apify_client import ApifyClient
 
+# Impor fungsi pembaca konfigurasi
+from config_parser import load_config, build_twitter_query
+# Impor fungsi basis data
+from db_manager import simpan_data_ke_db, buat_tabel, get_scraping_mode, simpan_keysearch_history
+
 WIB_TZ = timezone(timedelta(hours=7))
 
 def parse_to_wib_iso(raw_date=None) -> str:
