@@ -814,7 +814,7 @@ with tab_viz:
     df_base_viz = st.session_state.get('df_reviewed_final', df_all).copy()
     
     # 6.1 Pengaturan Analisis
-    st.markdown("### ⚙️ 6.1 Pengaturan Parameter Analisis")
+    st.markdown("### ⚙️ Pengaturan Parameter Analisis")
     
     try:
         if hasattr(db_manager, 'ambil_keysearch_history'):
@@ -952,7 +952,7 @@ with tab_viz:
     st.divider()
 
     # 6.2 Narasi AI (NLG)
-    st.subheader("📝 6.2 Ringkasan Eksekutif Narasi AI (NLG)")
+    st.subheader("📝 Ringkasan Eksekutif Narasi AI (NLG)")
     st.markdown("Penulisan narasi otomatis berbasis AI minimal 250 kata dengan syarat minimal 100 baris data CLEANED.")
     st.caption("ℹ️ *Catatan Konteks Sentimen: Sentimen positif bukan berarti menandakan emosi yang positif namun bisa juga diartikan pembenaran atas suatu peristiwa dan sebaliknya.*")
 
@@ -998,14 +998,14 @@ with tab_viz:
 
     # 6.3 Print Hasil Analisis (PDF Export)
     st.divider()
-    st.markdown("### 📄 6.3 Print & Export Laporan PDF Resmi")
+    st.markdown("### 📄 Export Laporan PDF")
     st.markdown("Cetak laporan PDF lengkap yang mencakup Informasi Data Scraping (6.1), Visualisasi Review Data (5.2), dan Narasi Eksekutif AI (6.2).")
 
     if not PDF_LIBS_OK:
         st.warning(f"⚠️ Library PDF belum lengkap. Install via: `pip install reportlab matplotlib`\nDetail: {PDF_IMPORT_ERROR_MSG}")
     else:
         _pdf_report_buf = None
-        if st.button("📥 Susun & Download Laporan PDF Resmi", type="primary", key="btn_build_pdf_tab4"):
+        if st.button("📥 Susun & Download Laporan PDF ", type="primary", key="btn_build_pdf_tab4"):
             with st.spinner("Menyusun PDF Laporan Eksekutif + Grafik Visual..."):
                 pdf_metrics = {
                     "total_volume": total_volume_viz,
