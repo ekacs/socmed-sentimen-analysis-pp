@@ -93,6 +93,86 @@ def clean_text_with_gemini(client, raw_text):
             
         except Exception as e:
             if attempt == 2:
+DB_FILE = 'sentimen_kebijakan.db'
+MODEL_PATH = 'models/svm_model.pkl'
+VEC_PATH = 'models/tfidf_vectorizer.pkl'
+
+def get_gemini_client():
+    """
+    Menginisialisasi klien Gemini SDK resmi secara aman.
+    """
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key or api_key == "YOUR_GEMINI_API_KEY_HERE":
+        print("[WARNING] Kunci API Gemini ('GEMINI_API_KEY') tidak dikonfigurasi di file .env.")
+        print("[WARNING] Prapemrosesan AI (Gemini) akan dinonaktifkan (teks asli akan disalin ke cleaned_text).")
+        return None
+    try:
+        return genai.Client(api_key=api_key)
+    except Exception as e:
+        print(f"[ERROR] Gagal menginisialisasi Gemini Client: {e}")
+        return None
+
+def load_svm_model():
+    """
+    Memuat model SVM dan TF-IDF Vectorizer jika tersedia.
+    """
+    if os.path.exists(MODEL_PATH) and os.path.exists(VEC_PATH):
+        try:
+            model = joblib.load(MODEL_PATH)
+            vectorizer = joblib.load(VEC_PATH)
+            return model, vectorizer
+        except Exception as e:
+            print(f"[ERROR] Gagal memuat model SVM: {e}")
+            return None, None
+    else:
+        print("[WARNING] Berkas model SVM ('models/svm_model.pkl') tidak ditemukan.")
+        print("[WARNING] Prediksi sentimen otomatis dilewati. Silakan jalankan '02_train_model.py' terlebih dahulu.")
+        return None, None
+
+def clean_text_with_gemini(client, raw_text):
+    """
+    Menggunakan Gemini 2.5 Flash untuk membersihkan bahasa tidak baku/gaul menjadi bahasa baku EYD.
+    """
+    if not client:
+        # Fallback jika API key tidak tersedia
+        return raw_text
+        
+    system_prompt = (
+        "Tugas Anda adalah menstandardisasi teks media sosial berbahasa Indonesia berikut menjadi "
+        "bahasa Indonesia baku yang sesuai dengan Ejaan yang Disempurnakan (EYD).\n"
+        "Aturan:\n"
+        "1. Perbaiki salah ketik (typo), singkatan, dan bahasa gaul (slang).\n"
+        "2. Pertahankan makna asli, emosi, dan sentimen dari teks tersebut.\n"
+        "3. DILARANG KERAS memberikan komentar, analisis, atau kalimat tambahan apa pun.\n"
+        "4. Cukup kembalikan teks hasil standardisasi murni secara langsung."
+    )
+    
+    # Coba memanggil API Gemini dengan mekanisme retry (3x percobaan)
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model='gemini-3.1-flash-lite',
+                contents=raw_text,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    temperature=0.1,
+                    max_output_tokens=300
+                )
+            )
+            cleaned = response.text.strip()
+            
+            # Bersihkan pembungkus blok markdown jika ada
+            if cleaned.startswith("```") and cleaned.endswith("```"):
+                cleaned = cleaned.strip("`").strip()
+                if cleaned.startswith("text\n"):
+                    cleaned = cleaned[5:].strip()
+                    
+            # Hapus tanda kutip luar pembungkus teks jika ada
+            cleaned = cleaned.strip('"\'')
+            return cleaned
+            
+        except Exception as e:
+            if attempt == 2:
                 print(f"[ERROR] Gagal permanen setelah 3x percobaan menghubungi Gemini API untuk teks '{raw_text[:30]}...': {e}")
                 return raw_text
             # Exponential backoff: tunggu sebentar sebelum mencoba lagi
@@ -100,36 +180,97 @@ def clean_text_with_gemini(client, raw_text):
             
     return raw_text
 
-def process_single_row(item, gemini_client, model, vectorizer):
-    platform_id, raw_text = item
-    try:
-        # Langkah A: Pembersihan Bahasa via AI
-        cleaned_text = clean_text_with_gemini(gemini_client, raw_text)
-        
-        # Langkah B: Prediksi Sentimen via SVM
-        sentiment_label = None
-        confidence_score = 0.0
-        
-        if model and vectorizer:
-            try:
-                vec_text = vectorizer.transform([cleaned_text])
-                sentiment_label = model.predict(vec_text)[0]
-                probs = model.predict_proba(vec_text)[0]
-                confidence_score = float(np.max(probs))
-            except Exception as e:
-                print(f"  [ERROR][{platform_id}]: Gagal inferensi SVM: {e}")
-                
-        # Langkah C: Perbarui baris di Database
-        db_manager.perbarui_cuitan_setelah_proses(platform_id, cleaned_text, sentiment_label, confidence_score)
-        print(f"[OK][{platform_id}] Sentimen: {sentiment_label} ({confidence_score:.0%}) | Baku: {cleaned_text[:40]}...")
-        return True
-    except Exception as e:
-        print(f"[ERROR][{platform_id}]: Gagal memproses baris: {e}")
-        return False
+def clean_batch_with_gemini(client, batch_items):
+    """
+    Mengirimkan batch 25 teks sekaligus ke Gemini API dalam 1 panggil JSON prompt.
+    batch_items: list of (platform_id, raw_text)
+    Returns: dict mapping platform_id -> cleaned_text
+    """
+    if not client:
+        return {pid: raw for pid, raw in batch_items}
+
+    payload = [{"id": idx, "text": raw} for idx, (pid, raw) in enumerate(batch_items)]
+    payload_str = json.dumps(payload, ensure_ascii=False)
+
+    system_prompt = (
+        "Anda adalah asisten tata bahasa Indonesia baku (EYD).\n"
+        "Input berupa array JSON bertipe [{\"id\": int, \"text\": string}].\n"
+        "Tugas Anda: perbaiki typo, singkatan, dan slang dari tiap teks menjadi bahasa Indonesia baku (EYD) "
+        "tanpa mengubah makna asli.\n"
+        "OUTPUT HARUS HANYA berupa array JSON murni bertipe [{\"id\": int, \"cleaned\": string}].\n"
+        "Jangan ubah nilai 'id'. DILARANG KERAS menambah teks/komentar di luar JSON."
+    )
+
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model='gemini-3.1-flash-lite',
+                contents=payload_str,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    temperature=0.1,
+                    max_output_tokens=4000
+                )
+            )
+            raw_resp = response.text.strip()
+            if raw_resp.startswith("```"):
+                raw_resp = raw_resp.strip("`").strip()
+                if raw_resp.startswith("json\n"):
+                    raw_resp = raw_resp[5:].strip()
+
+            parsed = json.loads(raw_resp)
+            id_to_cleaned = {}
+            for item in parsed:
+                if isinstance(item, dict) and "id" in item and "cleaned" in item:
+                    id_to_cleaned[item["id"]] = str(item["cleaned"]).strip('"\'')
+
+            result = {}
+            for idx, (pid, raw) in enumerate(batch_items):
+                result[pid] = id_to_cleaned.get(idx, raw)
+            return result
+        except Exception as e:
+            if attempt == 2:
+                print(f"[WARNING] Batch cleaning fallback ke teks asli: {e}")
+                return {pid: raw for pid, raw in batch_items}
+            time.sleep(1.5 * (attempt + 1))
+
+    return {pid: raw for pid, raw in batch_items}
+
+def process_batch(batch_items, gemini_client, model, vectorizer):
+    """
+    Memproses 1 batch data (misal 20-25 baris) sekaligus.
+    """
+    cleaned_dict = clean_batch_with_gemini(gemini_client, batch_items)
+    
+    pids = [pid for pid, _ in batch_items]
+    cleaned_texts = [cleaned_dict.get(pid, raw) for pid, raw in batch_items]
+    
+    sentiment_labels = [None] * len(batch_items)
+    confidence_scores = [0.0] * len(batch_items)
+    
+    if model and vectorizer:
+        try:
+            vec_texts = vectorizer.transform(cleaned_texts)
+            preds = model.predict(vec_texts)
+            probs = model.predict_proba(vec_texts)
+            for i in range(len(batch_items)):
+                sentiment_labels[i] = preds[i]
+                confidence_scores[i] = float(np.max(probs[i]))
+        except Exception as e:
+            print(f"[ERROR] Inferensi SVM batch gagal: {e}")
+            
+    success_count = 0
+    for i, pid in enumerate(pids):
+        try:
+            db_manager.perbarui_cuitan_setelah_proses(pid, cleaned_texts[i], sentiment_labels[i], confidence_scores[i])
+            success_count += 1
+        except Exception as e:
+            print(f"[ERROR] Gagal update DB platform_id {pid}: {e}")
+            
+    return success_count
 
 def process_pipeline():
     # 0. Deduplikasi Data RAW sebelum pemrosesan AI & ML
-    # Menghapus duplikat (username + raw_text sama), mempertahankan date (created_at) paling awal
     deleted_dups = db_manager.hapus_duplikasi_data_raw()
     if deleted_dups > 0:
         print(f"[INFO] Prapemrosesan: {deleted_dups} data duplikat RAW berhasil dibersihkan.")
@@ -144,24 +285,27 @@ def process_pipeline():
         print("[HINT] Jalankan dulu Langkah 1: Penarikan Data (Scraper) untuk mendapatkan data RAW baru.")
         sys.exit(2)
         
-    print(f"[INFO] Memulai pemrosesan paralel (Multithreading 10 worker) untuk {len(rows)} data cuitan mentah baru...")
-    print(f"[INFO] Model SVM: {'TERSEDIA' if (model and vectorizer) else 'TIDAK DITEMUKAN (prediksi sentimen dilewati)'}")
-    print(f"[INFO] Gemini Client: {'TERSEDIA' if gemini_client else 'TIDAK ADA API KEY (EYD cleanup otomatis = copy teks asli)'}")
+    batch_size = 25
+    batches = [rows[i:i + batch_size] for i in range(0, len(rows), batch_size)]
+    
+    print(f"[INFO] Memulai pemrosesan Ultra-Fast Batching ({len(batches)} batch @ {batch_size} data/batch) untuk {len(rows)} data RAW...")
+    print(f"[INFO] Model SVM: {'TERSEDIA' if (model and vectorizer) else 'TIDAK DITEMUKAN'}")
+    print(f"[INFO] Gemini Client: {'TERSEDIA' if gemini_client else 'TIDAK ADA API KEY (copy teks asli)'}")
     
     success_count = 0
-    max_workers = 10 if gemini_client else 20
+    max_workers = 5
     
-    # 4. Paralelisasi eksekusi per baris menggunakan ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [
-            executor.submit(process_single_row, item, gemini_client, model, vectorizer)
-            for item in rows
+            executor.submit(process_batch, batch, gemini_client, model, vectorizer)
+            for batch in batches
         ]
         for future in as_completed(futures):
-            if future.result():
-                success_count += 1
+            try:
+                success_count += future.result()
+            except Exception as e:
+                print(f"[ERROR] Batch execution failed: {e}")
                 
-    # --- Ringkasan akhir dengan tag untuk parsing di UI ---
     failed_count = len(rows) - success_count
     print("")
     print("=" * 60)
@@ -171,17 +315,17 @@ def process_pipeline():
     if model and vectorizer:
         print(f"[SUMMARY][LABEL]   : Label sentimen (SVM) diberikan = YES")
     else:
-        print(f"[SUMMARY][LABEL]   : Label sentimen (SVM) diberikan = NO (model tidak ada)")
+        print(f"[SUMMARY][LABEL]   : Label sentimen (SVM) diberikan = NO")
     if gemini_client:
-        print(f"[SUMMARY][EYD]     : Standardisasi EYD (Gemini)  = YES")
+        print(f"[SUMMARY][EYD]     : Standardisasi EYD (Gemini Batch) = YES")
     else:
-        print(f"[SUMMARY][EYD]     : Standardisasi EYD (Gemini)  = NO (teks asli disalin langsung)")
+        print(f"[SUMMARY][EYD]     : Standardisasi EYD (Gemini Batch) = NO")
     print("=" * 60)
     
     if success_count == 0 and len(rows) > 0:
         print("[EXIT_CODE=1] Semua baris GAGAL diproses!")
         sys.exit(1)
-    print(f"[SUCCESS] Pipa data selesai! Berhasil memproses {success_count} dari {len(rows)} data (Multithreading).")
+    print(f"[SUCCESS] Pipa data selesai! Berhasil memproses {success_count} dari {len(rows)} data dalam {len(batches)} batch.")
     sys.exit(0)
 
 if __name__ == "__main__":
