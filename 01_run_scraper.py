@@ -415,18 +415,12 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
         
     print(f"[INFO] Kata Kunci LinkedIn: {clean_keywords} | maxPosts: {max_results}")
     
-    search_phrase = " ".join(clean_keywords)
     run_input = {
         "searchTerms": clean_keywords,
-        "queries": clean_keywords,
-        "query": clean_keywords[0] if clean_keywords else search_phrase,
-        "searchQuery": search_phrase,
-        "search": search_phrase,
         "maxPosts": int(max_results),
-        "limit": int(max_results),
         "scrapeComments": bool(max_comments > 0),
-        "scrapeReactions": bool(max_reactions > 0),
         "maxComments": int(max_comments),
+        "scrapeReactions": bool(max_reactions > 0),
         "maxReactions": int(max_reactions)
     }
     
