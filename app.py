@@ -836,6 +836,26 @@ with tab_review:
     with cr4: st.metric("🔴 Sentimen Negatif", f"{pct_neg_r:.1f}%", delta=f"{neg_cnt_r:,} data", delta_color="inverse")
     with cr5: st.metric("🔵 Sentimen Netral", f"{pct_neu_r:.1f}%", delta=f"{neu_cnt_r:,} data", delta_color="off")
 
+    # Distribusi Data per Platform Sumber (dengan Logo/Icon)
+    if 'source_platform' in df_reviewed_final.columns and not df_reviewed_final.empty:
+        tw_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Twitter', case=False, na=False).sum())
+        ig_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Instagram', case=False, na=False).sum())
+        li_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('LinkedIn', case=False, na=False).sum())
+        news_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('News|Portal', case=False, na=False).sum())
+        tot_p_r = total_volume_rev if total_volume_rev > 0 else 1
+        
+        tw_pct_r = tw_cnt_r / tot_p_r * 100
+        ig_pct_r = ig_cnt_r / tot_p_r * 100
+        li_pct_r = li_cnt_r / tot_p_r * 100
+        news_pct_r = news_cnt_r / tot_p_r * 100
+        
+        st.markdown("<div style='margin-top: 10px; margin-bottom: 2px; font-weight: 600; font-size: 0.9em; color: #444;'>🌐 Distribusi Volume Data per Platform:</div>", unsafe_allow_html=True)
+        cp1, cp2, cp3, cp4 = st.columns(4)
+        with cp1: st.metric("𝕏 Twitter / X", f"{tw_pct_r:.1f}%", delta=f"{tw_cnt_r:,} data", delta_color="off")
+        with cp2: st.metric("📸 Instagram", f"{ig_pct_r:.1f}%", delta=f"{ig_cnt_r:,} data", delta_color="off")
+        with cp3: st.metric("💼 LinkedIn", f"{li_pct_r:.1f}%", delta=f"{li_cnt_r:,} data", delta_color="off")
+        with cp4: st.metric("📰 Portal Berita", f"{news_pct_r:.1f}%", delta=f"{news_cnt_r:,} data", delta_color="off")
+
     if not df_reviewed_final.empty:
         st.markdown("<br>", unsafe_allow_html=True)
         col_c1, col_c2, col_c3 = st.columns([4, 3, 3])
@@ -1017,6 +1037,26 @@ with tab_viz:
     with mv3: st.metric("🟢 Sentimen Positif", f"{persen_pos_v:.1f}%", delta=f"{pos_cnt_v:,} data")
     with mv4: st.metric("🔴 Sentimen Negatif", f"{persen_neg_v:.1f}%", delta=f"{neg_cnt_v:,} data", delta_color="inverse")
     with mv5: st.metric("🔵 Sentimen Netral", f"{persen_neu_v:.1f}%", delta=f"{neu_cnt_v:,} data", delta_color="off")
+
+    # Distribusi Data per Platform Sumber (dengan Logo/Icon)
+    if 'source_platform' in df_viz_filtered.columns and not df_viz_filtered.empty:
+        tw_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Twitter', case=False, na=False).sum())
+        ig_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Instagram', case=False, na=False).sum())
+        li_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('LinkedIn', case=False, na=False).sum())
+        news_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('News|Portal', case=False, na=False).sum())
+        tot_p_v = total_volume_viz if total_volume_viz > 0 else 1
+        
+        tw_pct_v = tw_cnt_v / tot_p_v * 100
+        ig_pct_v = ig_cnt_v / tot_p_v * 100
+        li_pct_v = li_cnt_v / tot_p_v * 100
+        news_pct_v = news_cnt_v / tot_p_v * 100
+        
+        st.markdown("<div style='margin-top: 10px; margin-bottom: 2px; font-weight: 600; font-size: 0.9em; color: #444;'>🌐 Distribusi Volume Data per Platform:</div>", unsafe_allow_html=True)
+        cp1, cp2, cp3, cp4 = st.columns(4)
+        with cp1: st.metric("𝕏 Twitter / X", f"{tw_pct_v:.1f}%", delta=f"{tw_cnt_v:,} data", delta_color="off")
+        with cp2: st.metric("📸 Instagram", f"{ig_pct_v:.1f}%", delta=f"{ig_cnt_v:,} data", delta_color="off")
+        with cp3: st.metric("💼 LinkedIn", f"{li_pct_v:.1f}%", delta=f"{li_cnt_v:,} data", delta_color="off")
+        with cp4: st.metric("📰 Portal Berita", f"{news_pct_v:.1f}%", delta=f"{news_cnt_v:,} data", delta_color="off")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
