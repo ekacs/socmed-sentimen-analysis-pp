@@ -99,20 +99,12 @@ def clean_text_with_gemini(client, raw_text):
     return raw_text
 
 def process_pipeline():
-    # 0. Cek Mode Scraping (Manual vs Otomatis)
-    # KETIKA DIPANGGIL via UI Streamlit (manual trigger button), kita abaikan flag mode
-    # manual ini (karena user eksplisit klik tombol Run). Hanya hormati mode manual JIKA
-    # dipanggil dari cron/CI — deteksi via environment variable agar tidak bingung.
-    called_from_cron = (os.environ.get("GITHUB_ACTIONS") == "true") or (os.environ.get("PIPELINE_CRON_RUN") == "1")
-    if called_from_cron:
-        try:
-            mode = db_manager.get_scraping_mode()
-        except AttributeError:
-            mode = "auto"
-        if mode == 'manual':
-            print("[INFO] Dipanggil dari cron, tapi mode scraping=MANUAL → skip (exit code 2).")
-            sys.exit(2)
-        
+    # 0. Deduplikasi Data RAW sebelum pemrosesan AI & ML
+    # Menghapus duplikat (username + raw_text sama), mempertahankan date (created_at) paling awal
+    deleted_dups = db_manager.hapus_duplikasi_data_raw()
+    if deleted_dups > 0:
+        print(f"[INFO] Prapemrosesan: {deleted_dups} data duplikat RAW berhasil dibersihkan.")
+
     # 1. Inisialisasi Klien Gemini & Muat Model SVM
     gemini_client = get_gemini_client()
     model, vectorizer = load_svm_model()

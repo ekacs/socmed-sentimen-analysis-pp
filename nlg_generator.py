@@ -21,13 +21,12 @@ def generate_executive_summary(
     berdasarkan metrik agregat yang dihitung secara dinamis dari database.
     """
     # 1. Validasi Jumlah Data Minimum
-    if total_data < 500:
+    if total_data < 100:
         return (
-            f"### ⚠️ Volume Data Tidak Mencukupi (Minimal 500 Data)\n\n"
-            f"Jumlah data saat ini hanya **{total_data}** data. "
-            f"Dibutuhkan minimal **500 data** untuk menyusun Ringkasan Eksekutif berbasis AI "
-            f"agar hasil analisis sentimen publik bersifat representatif dan valid.\n\n"
-            f"**Rekomendasi:** Silakan lakukan penarikan data baru atau sesuaikan filter rentang waktu Anda."
+            f"### ⚠️ Volume Data Tidak Mencukupi (Minimal 100 Data)\n\n"
+            f"Data tidak cukup untuk menghasilkan narasi analisis. Minimal dibutuhkan 100 baris data yang relevan. "
+            f"(Saat ini hanya tersedia **{total_data}** data CLEANED yang lolos filter).\n\n"
+            f"**Rekomendasi:** Silakan lakukan penarikan data baru atau sesuaikan filter kriteria analisis Anda."
         )
 
     # 2. Validasi Kunci API Gemini secara aman
@@ -59,10 +58,11 @@ def generate_executive_summary(
         - Contoh suara langsung masyarakat: {contoh_cuitan}.
 
         ATURAN PENULISAN MUTLAK:
-        1. Panjang teks MINIMAL 200 kata.
+        1. Panjang teks MINIMAL 250 kata.
         2. Gunakan gaya bahasa birokrasi pemerintahan (formal, objektif, taktis, dan bebas dari emosi subjektif).
-        3. DILARANG KERAS berasumsi atau berhalusinasi di luar data statistik di atas. Jika data terbatas, deskripsikan keterbatasan tersebut secara profesional apa adanya.
-        4. Struktur Laporan harus terdiri dari 3 bagian dengan sub-heading bertanda markdown:
+        3. Catatan Penting Konteks Sentimen: Sentimen positif bukan berarti menandakan emosi yang positif namun bisa juga diartikan pembenaran atas suatu peristiwa dan sebaliknya.
+        4. DILARANG KERAS berasumsi atau berhalusinasi di luar data statistik di atas. Jika data terbatas untuk ditarik kesimpulan yang memadai, berikan informasi secara profesional bahwa data yang diterima masih belum cukup untuk ditarik kesimpulan yang memadai.
+        5. Struktur Laporan harus terdiri dari 3 bagian dengan sub-heading bertanda markdown:
            ### [Situasi Saat Ini]
            (Uraikan volume percakapan dan dominasi sentimen publik secara komparatif)
            
@@ -72,7 +72,7 @@ def generate_executive_summary(
            ### [Rekomendasi Kebijakan]
            (Sajikan 2-3 butir rekomendasi taktis-realistis yang ditujukan bagi pimpinan/manajemen)
            
-        5. DILARANG KERAS menuliskan judul laporan formal (seperti "LAPORAN RINGKASAN EKSEKUTIF: ..."), salam pembuka, perihal, rincian penerima (seperti "Kepada: Yth..."), atau penutup surat formal di awal maupun di akhir output. Hasil generasi harus langsung diawali dengan sub-heading pertama: "### [Situasi Saat Ini]".
+        6. DILARANG KERAS menuliskan judul laporan formal (seperti "LAPORAN RINGKASAN EKSEKUTIF: ..."), salam pembuka, perihal, rincian penerima (seperti "Kepada: Yth..."), atau penutup surat formal di awal maupun di akhir output. Hasil generasi harus langsung diawali dengan sub-heading pertama: "### [Situasi Saat Ini]".
 
         Tuliskan laporan analisis Anda sekarang:
         """

@@ -9,7 +9,7 @@ from apify_client import ApifyClient
 # Impor fungsi pembaca konfigurasi
 from config_parser import load_config, build_twitter_query
 # Impor fungsi basis data
-from db_manager import simpan_data_ke_db, buat_tabel, get_scraping_mode
+from db_manager import simpan_data_ke_db, buat_tabel, get_scraping_mode, simpan_keysearch_history
 
 # Mapping nama bulan Indonesia untuk format log_activity
 _BULAN_ID = {
@@ -688,6 +688,16 @@ def main():
         sys.exit(1)
     
     general_cfg = config.get("config", {}).get("general", {})
+    
+    # Simpan riwayat keysearch ke database
+    try:
+        simpan_keysearch_history(
+            general_cfg.get("keywords", []),
+            general_cfg.get("profiles", []),
+            general_cfg.get("hashtags", [])
+        )
+    except Exception as _e_hist:
+        pass
     
     # 3. Muat Apify Client
     client = get_apify_client()

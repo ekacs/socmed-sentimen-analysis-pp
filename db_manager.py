@@ -78,6 +78,29 @@ def buat_tabel():
             )
         ''')
 
+        # Skema tabel keysearch_history
+        db_type = get_db_type()
+        if db_type == "postgresql":
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS keysearch_history (
+                    id SERIAL PRIMARY KEY,
+                    keywords TEXT,
+                    profiles TEXT,
+                    hashtags TEXT,
+                    created_at TEXT NOT NULL
+                )
+            ''')
+        else:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS keysearch_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    keywords TEXT,
+                    profiles TEXT,
+                    hashtags TEXT,
+                    created_at TEXT NOT NULL
+                )
+            ''')
+
         # Auto-migrasi jika tabel log_cuitan lama (v1) masih menggunakan tweet_id
         db_type = get_db_type()
         try:
@@ -314,3 +337,130 @@ def set_scraping_mode(mode):
         print(f"[ERROR] Gagal memperbarui scraping mode: {e}")
     finally:
         conn.close()
+
+def hitung_total_baris():
+    """
+    Menghitung total baris yang ada di tabel log_cuitan.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT COUNT(*) FROM log_cuitan")
+        row = cursor.fetchone()
+        return row[0] if row else 0
+    except Exception as e:
+        print(f"[ERROR] Gagal menghitung total baris log_cuitan: {e}")
+        return 0
+    finally:
+        conn.close()
+
+def hapus_duplikasi_data_raw():
+    """
+    Menghapus data duplikat (username + raw_text sama) pada status 'RAW'.
+    Mempertahankan baris dengan date (created_at) paling awal.
+    Return: jumlah baris yang dihapus.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    deleted_count = 0
+    try:
+        # Cari grup (username, raw_text) yang memiliki duplikat di status RAW
+        cursor.execute("""
+            SELECT username, raw_text, COUNT(*) 
+            FROM log_cuitan 
+            WHERE status = 'RAW'
+            GROUP BY username, raw_text 
+            HAVING COUNT(*) > 1
+        """)
+        dup_groups = cursor.fetchall()
+        
+        placeholder = get_placeholder()
+        for username, raw_text, _ in dup_groups:
+            # Ambil semua platform_id terurut berdasarkan date ASC
+            cursor.execute(f"""
+                SELECT platform_id 
+                FROM log_cuitan 
+                WHERE username = {placeholder} AND raw_text = {placeholder} AND status = 'RAW'
+                ORDER BY date ASC
+            """, (username, raw_text))
+            rows = cursor.fetchall()
+            if len(rows) > 1:
+                # Simpan platform_id yang paling awal, hapus sisanya
+                ids_to_delete = [r[0] for r in rows[1:]]
+                for del_id in ids_to_delete:
+                    cursor.execute(f"DELETE FROM log_cuitan WHERE platform_id = {placeholder}", (del_id,))
+                    deleted_count += 1
+                    
+        conn.commit()
+        if deleted_count > 0:
+            print(f"[INFO] Deduplikasi data RAW: berhasil menghapus {deleted_count} data duplikat.")
+        return deleted_count
+    except Exception as e:
+        print(f"[ERROR] Gagal menghapus duplikasi data RAW: {e}")
+        return 0
+    finally:
+        conn.close()
+
+def simpan_keysearch_history(keywords, profiles, hashtags):
+    """
+    Menyimpan kombinasi pencarian kata kunci, profil, dan hashtag ke riwayat.
+    """
+    if not (keywords or profiles or hashtags):
+        return
+    conn = get_connection()
+    cursor = conn.cursor()
+    placeholder = get_placeholder()
+    created_at = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        kw_str = ", ".join(keywords) if isinstance(keywords, list) else str(keywords or "")
+        pr_str = ", ".join(profiles) if isinstance(profiles, list) else str(profiles or "")
+        ht_str = ", ".join(hashtags) if isinstance(hashtags, list) else str(hashtags or "")
+        
+        cursor.execute(f"""
+            SELECT COUNT(*) FROM keysearch_history 
+            WHERE keywords = {placeholder} AND profiles = {placeholder} AND hashtags = {placeholder}
+        """, (kw_str, pr_str, ht_str))
+        if cursor.fetchone()[0] == 0:
+            cursor.execute(f"""
+                INSERT INTO keysearch_history (keywords, profiles, hashtags, created_at)
+                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})
+            """, (kw_str, pr_str, ht_str, created_at))
+            conn.commit()
+    except Exception as e:
+        print(f"[ERROR] Gagal menyimpan keysearch_history: {e}")
+    finally:
+        conn.close()
+
+def ambil_keysearch_history():
+    """
+    Mengambil seluruh riwayat keysearch untuk dropdown di UI.
+    Return: list of dict {'id', 'keywords', 'profiles', 'hashtags', 'display_label'}
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id, keywords, profiles, hashtags, created_at FROM keysearch_history ORDER BY id DESC")
+        rows = cursor.fetchall()
+        result = []
+        for r in rows:
+            kw, pr, ht = r[1] or "", r[2] or "", r[3] or ""
+            parts = []
+            if kw: parts.append(f"Keyword: {kw}")
+            if pr: parts.append(f"Profil: {pr}")
+            if ht: parts.append(f"Hashtag: {ht}")
+            label = " | ".join(parts) if parts else "Pencarian Umum"
+            result.append({
+                "id": r[0],
+                "keywords": kw,
+                "profiles": pr,
+                "hashtags": ht,
+                "created_at": r[4],
+                "display_label": label
+            })
+        return result
+    except Exception as e:
+        print(f"[ERROR] Gagal mengambil keysearch_history: {e}")
+        return []
+    finally:
+        conn.close()
+
