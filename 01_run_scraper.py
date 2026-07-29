@@ -234,23 +234,16 @@ def scrape_instagram(client, general_cfg, log_activity: str = "", user_app: str 
     # AKTOR 1: apify/instagram-hashtag-scraper (reGe1ST3OBgYZSsZJ) -> Hashtag / Search
     # -----------------------------------------------------------------
     if has_keywords:
-        print(f"[INFO] >>> Menjalankan Aktor 1: apify/instagram-hashtag-scraper (reGe1ST3OBgYZSsZJ) | Mode: {search_mode}...")
+        print(f"[INFO] >>> Menjalankan Aktor 1: apify/instagram-hashtag-scraper (reGe1ST3OBgYZSsZJ) (keywordSearch=True)...")
         kw_list = keywords if keywords else hashtags
         clean_tags = [str(k).strip().lstrip("#") for k in kw_list if str(k).strip()]
         
-        if search_mode == "hashtags":
-            run_input_kw = {
-                "hashtags": clean_tags,
-                "resultsLimit": max_results,
-                "resultsType": "posts"
-            }
-        else:  # "search" / directUrls
-            run_input_kw = {
-                "hashtags": clean_tags,
-                "directUrls": [f"https://www.instagram.com/explore/tags/{t}/" for t in clean_tags],
-                "resultsLimit": max_results,
-                "resultsType": "posts"
-            }
+        run_input_kw = {
+            "hashtags": clean_tags,
+            "keywordSearch": True,
+            "resultsLimit": max_results,
+            "resultsType": "posts"
+        }
             
         try:
             print(f"[INFO] Memanggil actor apify/instagram-hashtag-scraper (reGe1ST3OBgYZSsZJ) dengan input: {run_input_kw}")

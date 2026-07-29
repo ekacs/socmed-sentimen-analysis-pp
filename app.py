@@ -491,16 +491,6 @@ with tab_scrape:
             ig_max_val = int(instagram_cfg.get("max_results_instagram") or instagram_cfg.get("max_results", 100))
 
             ig_kw_input = st.text_input("Kata Kunci / Hashtag (Instagram):", value=ig_kw_val, key="ig_kw")
-            
-            # Mode Pencarian Kata Kunci / Tagar
-            ig_search_mode_val = instagram_cfg.get("search_mode", "hashtags")
-            ig_search_mode = st.radio(
-                "Mode Pencarian Kata Kunci/Tagar (Aktor: apify/instagram-hashtag-scraper):",
-                options=["hashtags", "search"],
-                index=0 if ig_search_mode_val == "hashtags" else 1,
-                help="Pilih 'hashtags' untuk pencarian tagar presisi, atau 'search' untuk pencarian kueri kata kunci umum.",
-                key="ig_search_mode_radio"
-            )
 
             ig_prof_input = st.text_input("Username Instagram (pisahkan koma):", value=ig_prof_val, key="ig_prof")
 
@@ -528,7 +518,6 @@ with tab_scrape:
                         "keywords": ig_kw_list,
                         "hashtags": [k.lstrip("#") for k in ig_kw_list],
                         "profiles": ig_prof_list,
-                        "search_mode": ig_search_mode,
                         "profile_mode": ig_profile_mode,
                         "max_results": ig_max_input,
                         "max_results_instagram": ig_max_input
