@@ -317,7 +317,14 @@ with tab_scrape:
     st.markdown("Tentukan parameter target penarikan data publik dari Twitter (X), Instagram, LinkedIn, dan Portal Berita.")
     
     # 3.1 Cek Kapasitas Database Supabase
-    total_db_rows = db_manager.hitung_total_baris()
+    try:
+        if hasattr(db_manager, 'hitung_total_baris'):
+            total_db_rows = db_manager.hitung_total_baris()
+        else:
+            total_db_rows = len(df_all) if not df_all.empty else 0
+    except Exception:
+        total_db_rows = len(df_all) if not df_all.empty else 0
+
     db_is_full = total_db_rows >= MAX_SUPABASE_ROWS
     
     c_cap1, c_cap2 = st.columns([3, 1])
@@ -676,8 +683,14 @@ with tab_viz:
     # 6.1 Pengaturan Analisis
     st.markdown("### ⚙️ 6.1 Pengaturan Parameter Analisis")
     
-    hist_records = db_manager.ambil_keysearch_history()
-    hist_labels = [h["display_label"] for h in hist_records]
+    try:
+        if hasattr(db_manager, 'ambil_keysearch_history'):
+            hist_records = db_manager.ambil_keysearch_history()
+        else:
+            hist_records = []
+    except Exception:
+        hist_records = []
+    hist_labels = [h["display_label"] for h in hist_records if isinstance(h, dict) and "display_label" in h]
     
     col_an1, col_an2 = st.columns([2, 1])
     with col_an1:
