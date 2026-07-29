@@ -2,14 +2,42 @@ import os
 import sys
 import json
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from apify_client import ApifyClient
 
-# Impor fungsi pembaca konfigurasi
-from config_parser import load_config, build_twitter_query
-# Impor fungsi basis data
-from db_manager import simpan_data_ke_db, buat_tabel, get_scraping_mode, simpan_keysearch_history
+WIB_TZ = timezone(timedelta(hours=7))
+
+def parse_to_wib_iso(raw_date=None) -> str:
+    """
+    Mengonversi tanggal mentah (ISO UTC, Unix timestamp, string) menjadi string ISO berzona waktu WIB (UTC+7).
+    Contoh: '2026-07-29T22:40:45+07:00'
+    """
+    now_wib = datetime.now(WIB_TZ)
+    if raw_date is None or raw_date == "":
+        return now_wib.isoformat()
+    
+    try:
+        if isinstance(raw_date, (int, float)):
+            dt = datetime.fromtimestamp(raw_date if raw_date < 1e11 else raw_date / 1000.0, tz=timezone.utc)
+            return dt.astimezone(WIB_TZ).isoformat()
+        
+        raw_str = str(raw_date).strip()
+        if not raw_str:
+            return now_wib.isoformat()
+
+        clean_str = raw_str.replace("Z", "+00:00")
+        try:
+            dt = datetime.fromisoformat(clean_str)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(WIB_TZ).isoformat()
+        except ValueError:
+            pass
+
+        return raw_str
+    except Exception:
+        return str(raw_date)
 
 # Mapping nama bulan Indonesia untuk format log_activity
 _BULAN_ID = {
@@ -20,11 +48,15 @@ _BULAN_ID = {
 
 def format_log_activity(dt: datetime = None) -> str:
     """
-    Menghasilkan string timestamp format DD-MMMM-YYYY HH:MM:SS dengan nama bulan Indonesia.
-    Contoh: '28-Juli-2026 23:44:54'
+    Menghasilkan string timestamp WIB (UTC+7) format DD-MMMM-YYYY HH:MM:SS dengan nama bulan Indonesia.
+    Contoh: '29-Juli-2026 22:48:25'
     """
     if dt is None:
-        dt = datetime.now()
+        dt = datetime.now(WIB_TZ)
+    elif dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc).astimezone(WIB_TZ)
+    else:
+        dt = dt.astimezone(WIB_TZ)
     return f"{dt.day:02d}-{_BULAN_ID[dt.month]}-{dt.year} {dt.hour:02d}:{dt.minute:02d}:{dt.second:02d}"
 
 # Memuat file .env — override=False agar env var sistem (GitHub Actions) tidak tertimpa
@@ -79,6 +111,7 @@ def scrape_twitter(client, general_cfg, log_activity: str = "", user_app: str = 
     
     if not search_terms and not twitter_handles and not twitter_start_urls:
         print("[WARNING] Tidak ada kueri pencarian, handle, atau URL Twitter yang valid. Proses Twitter dibatalkan.")
+
         return []
         
     # --- Bangun run_input sesuai mode ---
@@ -138,18 +171,9 @@ def scrape_twitter(client, general_cfg, log_activity: str = "", user_app: str = 
                 continue
             platform_id = str(platform_id)
                 
-            # 2. date: diambil dari field 'created_at' (sesuai spesifikasi)
+            # 2. date: diambil dari field 'created_at' (diubah ke WIB UTC+7)
             raw_date = item.get("created_at") or item.get("createdAt") or item.get("date")
-            if raw_date:
-                try:
-                    if isinstance(raw_date, (int, float)):
-                        date_str = datetime.fromtimestamp(raw_date if raw_date < 1e11 else raw_date / 1000.0).isoformat() + "Z"
-                    else:
-                        date_str = str(raw_date)
-                except Exception:
-                    date_str = str(raw_date)
-            else:
-                date_str = datetime.utcnow().isoformat() + "Z"
+            date_str = parse_to_wib_iso(raw_date)
                 
             # 3. username: diambil dari field 'user_info/screen_name' (sesuai spesifikasi)
             username = (
@@ -266,7 +290,7 @@ def scrape_instagram(client, general_cfg, log_activity: str = "", user_app: str 
                 
                 all_results.append({
                     "platform_id": f"IG_HASHTAG_{post_id}",
-                    "date": str(raw_date) if raw_date else datetime.utcnow().isoformat() + "Z",
+                    "date": parse_to_wib_iso(raw_date),
                     "username": username,
                     "raw_text": item.get("caption") or item.get("text") or "No Caption",
                     "likes": int(item.get("likesCount", 0) or item.get("likes", 0) or 0),
@@ -291,7 +315,7 @@ def scrape_instagram(client, general_cfg, log_activity: str = "", user_app: str 
                             comm_user = f"@{comm_user}"
                         all_results.append({
                             "platform_id": f"IG_COMM_{comm_id}",
-                            "date": comment.get("createdAt") or str(raw_date),
+                            "date": parse_to_wib_iso(comment.get("createdAt") or comment.get("date") or raw_date),
                             "username": comm_user,
                             "raw_text": comment.get("text") or "",
                             "likes": 0,
@@ -339,7 +363,7 @@ def scrape_instagram(client, general_cfg, log_activity: str = "", user_app: str 
                 
                 all_results.append({
                     "platform_id": f"IG_PROFILE_POST_{post_id}",
-                    "date": str(raw_date) if raw_date else datetime.utcnow().isoformat() + "Z",
+                    "date": parse_to_wib_iso(raw_date),
                     "username": username,
                     "raw_text": item.get("caption") or item.get("text") or "No Caption",
                     "likes": int(item.get("likesCount", 0) or item.get("likes", 0) or 0),
@@ -426,14 +450,14 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
             if not post_id:
                 post_id = hashlib.md5(json.dumps(item, default=str).encode()).hexdigest()
             
-            # --- Tanggal ---
+            # --- Tanggal (WIB UTC+7) ---
             posted_at = (
                 item.get("postedAt")
                 or item.get("publishedAt")
                 or item.get("timestamp")
                 or item.get("date")
             )
-            date_str = str(posted_at) if posted_at else datetime.utcnow().isoformat() + "Z"
+            date_str = parse_to_wib_iso(posted_at)
             
             # --- Author ---
             author_obj = item.get("author") if isinstance(item.get("author"), dict) else {}
@@ -509,13 +533,12 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
                         or c.get("authorName")
                         or "LinkedIn Commenter"
                     )
-                    c_date = c.get("postedAt") or c.get("createdAt") or date_str
-                    c_text = c.get("text") or c.get("message") or ""
+                    c_date_raw = c.get("postedAt") or c.get("createdAt") or posted_at
                     results.append({
                         "platform_id": f"LI_COMM_{c_id}",
-                        "date": str(c_date),
+                        "date": parse_to_wib_iso(c_date_raw),
                         "username": str(c_name),
-                        "raw_text": str(c_text),
+                        "raw_text": str(c.get("text") or c.get("message") or ""),
                         "likes": int(c.get("numLikes") or c.get("likesCount") or 0),
                         "retweets": 0,
                         "views": 0,
@@ -712,7 +735,7 @@ def scrape_news_portal(client, general_cfg, log_activity: str = "", user_app: st
             
             results.append({
                 "platform_id": f"NEWS_{url_hash}",
-                "date": str(date_raw) if date_raw else datetime.utcnow().isoformat() + "Z",
+                "date": parse_to_wib_iso(date_raw),
                 "username": domain_name,
                 "raw_text": raw_text_payload,
                 "likes": 0,
