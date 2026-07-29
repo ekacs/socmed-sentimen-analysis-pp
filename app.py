@@ -69,6 +69,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Styling CSS tambahan agar tabel dan chart saat di-maximize (fullscreen) memenuhi 100% lebar layar
+st.markdown("""
+<style>
+div[data-testid="stDataFrame"] {
+    width: 100% !important;
+}
+div[data-testid="stDataFrame"] > div {
+    width: 100% !important;
+}
+.element-container:has(iframe) {
+    width: 100% !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 DB_FILE = 'sentimen_kebijakan.db'
 CONFIG_FILE = 'target_config.json'
 MAX_SUPABASE_ROWS = 666666
@@ -916,7 +931,20 @@ with tab_review:
                 st.rerun()
         df_disp = df_reviewed_final[[c for c in _all_cols_needed if c in df_reviewed_final.columns]].copy()
         df_disp.rename(columns=col_rename_map, inplace=True)
-        st.dataframe(df_disp, use_container_width=True, height=320)
+        st.dataframe(
+            df_disp,
+            use_container_width=True,
+            height=450,
+            column_config={
+                "Teks Mentah": st.column_config.TextColumn("Teks Mentah", width="large"),
+                "Teks Baku (EYD)": st.column_config.TextColumn("Teks Baku (EYD)", width="large"),
+                "ID Platform": st.column_config.TextColumn("ID Platform", width="medium"),
+                "Tanggal Pembuatan": st.column_config.TextColumn("Tanggal Pembuatan", width="medium"),
+                "Username": st.column_config.TextColumn("Username", width="medium"),
+                "Label Sentimen": st.column_config.SelectboxColumn("Label Sentimen", width="small", options=["Positif", "Negatif", "Netral"]),
+                "Platform": st.column_config.TextColumn("Platform", width="small"),
+            }
+        )
 
 # =====================================================================
 # TAB 4: VISUALISASI & ANALISIS DASHBOARD
