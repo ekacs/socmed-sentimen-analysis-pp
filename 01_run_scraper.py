@@ -380,67 +380,48 @@ def scrape_instagram(client, general_cfg, log_activity: str = "", user_app: str 
 
 def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str = "local_user"):
     """
-    Menggunakan aktor OFFICIAL 'harvestapi/linkedin-profile-posts' untuk mengambil data postingan LinkedIn
-    (pribadi / perusahaan / post URLs / activity URN).
-    Sesuai spec: catatan_pengerjaan/25 juli 2026/harvestapi_linkedIn_profile_JSON_form.txt
+    Menggunakan aktor official 'harvestapi/linkedin-post-search' (ID: buIWk2uOUzTmcLsuB)
+    untuk mengambil data postingan LinkedIn berdasarkan Kata Kunci / Search Terms.
     """
-    print("[INFO] Memulai penarikan data dari LinkedIn (Aktor: harvestapi/linkedin-profile-posts)...")
-    profiles = general_cfg.get("profiles", [])
-    # Prioritas: field spesifik linkedin > general max_results > default 5
+    print("[INFO] Memulai penarikan data dari LinkedIn (Aktor: harvestapi/linkedin-post-search | buIWk2uOUzTmcLsuB)...")
+    keywords = general_cfg.get("keywords", []) or []
+    # Prioritas: field spesifik linkedin > general max_results > default 100
     max_results = general_cfg.get("max_results_linkedin")
     if max_results is None:
-        max_results = general_cfg.get("max_results", 5)
+        max_results = general_cfg.get("max_results", 100)
     max_results = int(max_results)
     
-    # maxComments default sedikit (menghemat kredit) karena untuk sentimen yang penting adalah postingan
     max_comments = min(5, max_results) if max_results > 0 else 0
     max_reactions = min(5, max_results) if max_results > 0 else 0
     
-    print(f"[INFO] maxPosts: {max_results} | maxComments: {max_comments} | maxReactions: {max_reactions}")
-    print(f"[INFO] Jumlah target LinkedIn: {len(profiles)} (estimasi {len(profiles) * max_results} posts)")
-    
-    if not profiles:
-        print("[WARNING] Profil target tidak ditemukan di konfigurasi. Proses LinkedIn dibatalkan.")
+    clean_keywords = [str(k).strip() for k in keywords if str(k).strip()]
+    if not clean_keywords:
+        print("[WARNING] Kata kunci LinkedIn tidak ditemukan di konfigurasi. Proses LinkedIn dibatalkan.")
         return []
         
-    # Susun targetUrls (bisa company page, profile, post URL, atau activity URN)
-    target_urls = []
-    for p in profiles:
-        p = str(p).strip()
-        if not p:
-            continue
-        if p.startswith("http"):
-            # Sudah berupa URL penuh (post/activity/company/profile)
-            target_urls.append(p)
-        elif p.startswith("urn:li:"):
-            # Sudah berupa URN activity, wrap ke URL feed/update agar diterima actor
-            target_urls.append(f"https://www.linkedin.com/feed/update/{p}/")
-        else:
-            # Default: dianggap nama company (paling umum untuk kebijakan publik)
-            target_urls.append(f"https://www.linkedin.com/company/{p}")
-            
+    print(f"[INFO] Kata Kunci LinkedIn: {clean_keywords} | maxPosts: {max_results}")
+    
     run_input = {
-        "targetUrls": target_urls,
+        "searchTerms": clean_keywords,
         "maxPosts": int(max_results),
-        "includeQuotePosts": True,
-        "includeReposts": True,
-        "maxComments": int(max_comments),
-        "maxReactions": int(max_reactions),
-        "postNestedComments": False,
-        "postNestedReactions": False,
+        "sortBy": "date",
         "scrapeComments": bool(max_comments > 0),
-        "scrapeReactions": bool(max_reactions > 0)
+        "scrapeReactions": bool(max_reactions > 0),
+        "maxComments": int(max_comments),
+        "maxReactions": int(max_reactions)
     }
     
     try:
-        run = client.actor("harvestapi/linkedin-profile-posts").call(run_input=run_input)
+        print(f"[INFO] Memanggil actor harvestapi/linkedin-post-search dengan input: {run_input}")
+        try:
+            run = client.actor("harvestapi/linkedin-post-search").call(run_input=run_input)
+        except Exception:
+            run = client.actor("buIWk2uOUzTmcLsuB").call(run_input=run_input)
+            
         dataset_id = run["defaultDatasetId"]
         
         results = []
         for item in client.dataset(dataset_id).iterate_items():
-            # Struktur dataset harvestapi/linkedin-profile-posts:
-            # id, urn, url, author, content (text/html), postedAt, reactions.total, repostCount, comments.total, comments.items[]
-            
             post_id = (
                 item.get("id")
                 or item.get("urn")
@@ -467,7 +448,7 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
                 or author_obj.get("companyName")
                 or author_obj.get("title")
                 or item.get("authorName")
-                or item.get("author") if isinstance(item.get("author"), str) else None
+                or (item.get("author") if isinstance(item.get("author"), str) else None)
                 or "LinkedIn User"
             )
             if isinstance(username, str):
@@ -506,7 +487,7 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
             )
             
             results.append({
-                "platform_id": f"LI_POST_{str(post_id)}",
+                "platform_id": f"LI_SEARCH_{str(post_id)}",
                 "date": date_str,
                 "username": str(username),
                 "raw_text": str(raw_text),
@@ -518,7 +499,7 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
                 "user_app": user_app
             })
             
-            # --- Opsional: tarik KOMENTAR (postNestedComments=False → cuma komentar level 1) ---
+            # --- Opsional: Tarik Komentar ---
             comments_obj = item.get("comments") if isinstance(item.get("comments"), dict) else {}
             comment_items = comments_obj.get("items") or comments_obj.get("data") or []
             if isinstance(comment_items, list):
@@ -549,7 +530,8 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
                     
         return results
     except Exception as e:
-        print(f"[ERROR] Kesalahan saat memanggil Aktor LinkedIn Apify (harvestapi/linkedin-profile-posts): {e}")
+        print(f"[ERROR] Kesalahan saat memanggil Aktor LinkedIn Apify (harvestapi/linkedin-post-search): {e}")
+        return []
         return []
 
 def scrape_news_portal(client, general_cfg, log_activity: str = "", user_app: str = "local_user"):

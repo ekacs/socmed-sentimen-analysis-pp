@@ -601,11 +601,9 @@ with tab_scrape:
             li_start_input = st.date_input("Tanggal Posting Terlama (LinkedIn)", value=li_start_val, key="li_start")
 
             li_kw_val = ", ".join(linkedin_cfg.get("keywords", ["kebijakan publik"]))
-            li_prof_val = ", ".join(linkedin_cfg.get("profiles", ["kemenpupr"]))
             li_max_val = int(linkedin_cfg.get("max_results_linkedin") or linkedin_cfg.get("max_results", 100))
 
-            li_kw_input = st.text_input("Kata Kunci (LinkedIn):", value=li_kw_val, key="li_kw")
-            li_prof_input = st.text_input("Username / Perusahaan LinkedIn (pisahkan koma):", value=li_prof_val, key="li_prof")
+            li_kw_input = st.text_input("Kata Kunci / Search Terms (LinkedIn — Aktor: harvestapi/linkedin-post-search):", value=li_kw_val, key="li_kw")
             li_max_input = st.slider("Batas maksimal data yang discrape (LinkedIn):", 5, 500, li_max_val, 5, key="li_max")
 
             btn_save_li = st.form_submit_button("💾 Simpan Konfigurasi LinkedIn")
@@ -613,7 +611,6 @@ with tab_scrape:
                 li_obj = {
                     "start_date": li_start_input.strftime("%Y-%m-%d"),
                     "keywords": [k.strip() for k in li_kw_input.split(",") if k.strip()],
-                    "profiles": [p.strip() for p in li_prof_input.split(",") if p.strip()],
                     "max_results": li_max_input,
                     "max_results_linkedin": li_max_input
                 }
