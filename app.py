@@ -234,80 +234,84 @@ st.markdown("""
 def load_data_from_db():
     return db_manager.baca_data_untuk_streamlit()
 
+# Set Stopwords Lengkap Bahasa Indonesia & Artefak Web / URL Noise
+STOPWORDS_INDONESIA = {
+    # Artefak URL & Web Noise
+    'https', 'http', 'www', 'com', 'org', 'net', 'co', 'id', 'html', 'htm', 'amp', 't', 'bit', 'ly', 'link', 
+    'href', 'url', 'pic', 'twitter', 'instagram', 'linkedin', 'status', 'photo', 'video', 'post', 'posts',
+    'rt', 'via', 'user', 'repor', 'admin', 'page', 'pages', 'site', 'click', 'download', 'share',
+    # Kata Hubung, Kata Tugas, & Stopwords Indonesia
+    'dan', 'di', 'ke', 'dari', 'ini', 'itu', 'yang', 'saya', 'kamu', 'dia', 'kami', 'kita', 'mereka', 
+    'adalah', 'ada', 'dengan', 'untuk', 'pada', 'atau', 'juga', 'sudah', 'telah', 'bisa', 'dapat', 'akan', 
+    'ingin', 'hari', 'nih', 'dah', 'sangat', 'sekali', 'saja', 'karena', 'tapi', 'namun', 'semua', 'banyak', 
+    'tidak', 'gak', 'enggak', 'pun', 'lah', 'kok', 'sih', 'ya', 'aja', 'dgn', 'yg', 'utk', 'klo', 'kalo', 
+    'lu', 'gw', 'gua', 'buat', 'bgt', 'pas', 'jadi', 'bila', 'jika', 'oleh', 'maka', 'lagi', 'deh', 'dong', 
+    'kan', 'kah', 'apa', 'siapa', 'mana', 'kenapa', 'mengapa', 'bagaimana', 'hal', 'secara', 'harus', 
+    'setiap', 'bahkan', 'bukan', 'serta', 'tersebut', 'hanya', 'tahun', 'bikin', 'sama', 'sampai', 'hingga',
+    'tentang', 'terhadap', 'menjadi', 'sebagai', 'secara', 'antara', 'seperti', 'selain', 'secara', 'membuat',
+    'bisa', 'bahkan', 'berada', 'melalui', 'yaitu', 'yakni', 'sehingga', 'sebab', 'kalian'
+}
+
+def clean_and_extract_words(text_list):
+    """
+    Pembersihan mendalam untuk mengekstrak kata kunci bersih:
+    1. Menghapus URL https://... dan http://... secara penuh.
+    2. Menghapus karakter khusus, simbol, dan tanda baca.
+    3. Eliminasi kata-kata noise URL/Web (https, http, www, com, amp, dsb.) dan Stopwords Bahasa Indonesia.
+    4. Mengabaikan kata berbentuk angka murni atau bernilai <= 2 karakter.
+    """
+    words = []
+    for text in text_list:
+        if not text or str(text).lower() == 'nan':
+            continue
+        # 1. Hapus URL lengkap
+        clean_t = re.sub(r'https?://\S+|www\.\S+', '', str(text), flags=re.IGNORECASE)
+        # 2. Hapus karakter non-alphanumeric (hanya pertahankan huruf & spasi)
+        clean_t = re.sub(r'[^a-zA-Z\s]', ' ', clean_t)
+        # 3. Tokenisasi kata
+        for word in clean_t.lower().split():
+            word = word.strip()
+            if (
+                word 
+                and len(word) > 2 
+                and not word.isdigit() 
+                and word not in STOPWORDS_INDONESIA
+            ):
+                words.append(word)
+    return words
+
 def extract_top_keywords(df, num_words=5):
-    text_list = []
     if df is None or df.empty:
         return "Tidak ada kata kunci dominan"
         
+    text_list = []
     for _, row in df.iterrows():
         val_cleaned = row.get('cleaned_text')
         val_raw = row.get('raw_text')
-        t = ""
         if pd.notna(val_cleaned) and val_cleaned is not None:
-            t = str(val_cleaned).strip()
+            text_list.append(str(val_cleaned))
         elif pd.notna(val_raw) and val_raw is not None:
-            t = str(val_raw).strip()
+            text_list.append(str(val_raw))
             
-        if t and t.lower() != 'nan':
-            text_list.append(t.lower())
-            
-    stopwords = {
-        'dan', 'di', 'ke', 'dari', 'ini', 'itu', 'yang', 'saya', 'kamu', 'dia', 'kami', 'kita', 'mereka', 
-        'adalah', 'ada', 'dengan', 'untuk', 'pada', 'atau', 'juga', 'sudah', 'telah', 'bisa', 'dapat', 'akan', 
-        'ingin', 'hari', 'nih', 'dah', 'sangat', 'sekali', 'saja', 'karena', 'tapi', 'namun', 'krl', 'commuter', 
-        'line', 'mrt', 'lrt', 'transjakarta', 'bus', 'kereta', 'ikn', 'ibu', 'kota', 'yang', 'untuk', 'pada', 
-        'semua', 'ada', 'banyak', 'sudah', 'telah', 'bisa', 'dapat', 'tidak', 'gak', 'enggak', 'pun', 'lah',
-        'kok', 'sih', 'ya', 'aja', 'dgn', 'yg', 'utk', 'klo', 'kalo', 'lu', 'gw', 'gua', 'lu', 'buat', 'bgt'
-    }
-    
-    words = []
-    for text in text_list:
-        for char in ".,!?;:()[]{}'\"-@#/*":
-            text = text.replace(char, " ")
-        for word in text.split():
-            word = word.strip()
-            if word and word not in stopwords and len(word) > 2:
-                words.append(word)
-                
+    words = clean_and_extract_words(text_list)
     counter = collections.Counter(words)
     top_common = counter.most_common(num_words)
     return ", ".join([f"{w[0]} ({w[1]})" for w in top_common]) if top_common else "Tidak ada kata kunci dominan"
 
 def get_top_keywords_df(df, top_n=10):
-    text_list = []
     if df is None or df.empty:
         return pd.DataFrame(columns=['Kata Kunci', 'Frekuensi'])
         
+    text_list = []
     for _, row in df.iterrows():
         val_cleaned = row.get('cleaned_text')
         val_raw = row.get('raw_text')
-        t = ""
         if pd.notna(val_cleaned) and val_cleaned is not None:
-            t = str(val_cleaned).strip()
+            text_list.append(str(val_cleaned))
         elif pd.notna(val_raw) and val_raw is not None:
-            t = str(val_raw).strip()
+            text_list.append(str(val_raw))
             
-        if t and t.lower() != 'nan':
-            text_list.append(t.lower())
-            
-    stopwords = {
-        'dan', 'di', 'ke', 'dari', 'ini', 'itu', 'yang', 'saya', 'kamu', 'dia', 'kami', 'kita', 'mereka', 
-        'adalah', 'ada', 'dengan', 'untuk', 'pada', 'atau', 'juga', 'sudah', 'telah', 'bisa', 'dapat', 'akan', 
-        'ingin', 'hari', 'nih', 'dah', 'sangat', 'sekali', 'saja', 'karena', 'tapi', 'namun', 'krl', 'commuter', 
-        'line', 'mrt', 'lrt', 'transjakarta', 'bus', 'kereta', 'ikn', 'ibu', 'kota', 'yang', 'untuk', 'pada', 
-        'semua', 'ada', 'banyak', 'sudah', 'telah', 'bisa', 'dapat', 'tidak', 'gak', 'enggak', 'pun', 'lah',
-        'kok', 'sih', 'ya', 'aja', 'dgn', 'yg', 'utk', 'klo', 'kalo', 'lu', 'gw', 'gua', 'buat', 'bgt'
-    }
-    
-    words = []
-    for text in text_list:
-        for char in ".,!?;:()[]{}'\"-@#/*":
-            text = text.replace(char, " ")
-        for word in text.split():
-            word = word.strip()
-            if word and word not in stopwords and len(word) > 2:
-                words.append(word)
-                
+    words = clean_and_extract_words(text_list)
     counter = collections.Counter(words)
     top_common = counter.most_common(top_n)
     if not top_common:
