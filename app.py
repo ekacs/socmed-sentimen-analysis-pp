@@ -721,12 +721,37 @@ with tab_viz:
     btn_exec_analysis = st.button("🔍 Jalankan Analisis Sekarang", type="primary", key="btn_exec_viz")
     
     df_viz_filtered = df_base_viz.copy()
+
+    # Filter berdasarkan rentang tanggal
     if isinstance(viz_date_range, tuple) and len(viz_date_range) == 2:
         df_viz_filtered = df_viz_filtered[
             (df_viz_filtered['date_parsed'] >= viz_date_range[0]) & 
             (df_viz_filtered['date_parsed'] <= viz_date_range[1])
         ]
-        
+
+    # Filter berdasarkan Riwayat Keysearch / Profil / Hashtag yang dipilih
+    selected_search_terms = []
+    if selected_hist:
+        for h in hist_records:
+            if h.get("display_label") in selected_hist:
+                for field in ["keywords", "profiles", "hashtags"]:
+                    val = h.get(field, "")
+                    if val:
+                        for term in str(val).split(","):
+                            clean_term = term.strip().lower().lstrip("#@")
+                            if clean_term and clean_term not in selected_search_terms:
+                                selected_search_terms.append(clean_term)
+
+    if selected_search_terms and not df_viz_filtered.empty:
+        def _matches_keysearch(row):
+            txt = (str(row.get('cleaned_text') or '') + ' ' + str(row.get('raw_text') or '')).lower()
+            return any(st_term in txt for st_term in selected_search_terms)
+
+        df_filtered_by_key = df_viz_filtered[df_viz_filtered.apply(_matches_keysearch, axis=1)]
+        # Jika hasil filter tidak kosong, gunakan data terfilter
+        if not df_filtered_by_key.empty:
+            df_viz_filtered = df_filtered_by_key
+
     df_viz_cleaned = df_viz_filtered[df_viz_filtered['status'] == 'CLEANED'] if 'status' in df_viz_filtered.columns else df_viz_filtered
 
     st.divider()
@@ -813,15 +838,23 @@ with tab_viz:
         )
         st.session_state['ai_narrative_viz_cache'] = ""
     else:
+        if selected_search_terms:
+            fokus_kebijakan_txt = ", ".join(selected_search_terms)
+        elif selected_hist:
+            fokus_kebijakan_txt = ", ".join(selected_hist)
+        else:
+            fokus_kebijakan_txt = f"isu publik dengan kata kunci ({top_kw_str})"
+
         if st.button("🔄 Perbarui Analisis Narasi (Gemini AI)", type="primary", key="btn_gen_nlg_tab4"):
-            with st.spinner("Menganalisis statistik & menyusun narasi analisis minimal 250 kata..."):
+            with st.spinner(f"Menganalisis isu '{fokus_kebijakan_txt}' & menyusun narasi minimal 250 kata..."):
                 narrative_res = generate_executive_summary(
                     total_data=total_cleaned_viz,
                     persen_negatif=round(persen_neg_v, 1),
                     persen_positif=round(persen_pos_v, 1),
                     persen_netral=round(persen_neu_v, 1),
                     top_keywords=top_kw_str,
-                    contoh_cuitan=contoh_suara
+                    contoh_cuitan=contoh_suara,
+                    kebijakan_fokus=fokus_kebijakan_txt
                 )
                 st.session_state['ai_narrative_viz_cache'] = narrative_res
                 

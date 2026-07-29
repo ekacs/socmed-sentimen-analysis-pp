@@ -14,7 +14,7 @@ def generate_executive_summary(
     persen_netral: float,
     top_keywords: str,
     contoh_cuitan: str,
-    kebijakan_fokus: str = "Layanan Transportasi Publik"
+    kebijakan_fokus: str = "Kebijakan dan Isu Publik"
 ) -> str:
     """
     Menghasilkan laporan ringkasan eksekutif analitis berbasis AI (NLG) 
@@ -48,10 +48,11 @@ def generate_executive_summary(
         
         # 2. Perancangan Prompt Berbasis Data Aktual (Bebas Halusinasi)
         prompt_narasi = f"""
-        Bertindaklah sebagai Analis Kebijakan Publik Senior di Kementerian Perhubungan.
-        Tugas Anda adalah menulis Laporan Ringkasan Eksekutif mengenai sentimen publik terhadap {kebijakan_fokus} selama satu minggu terakhir.
+        Bertindaklah sebagai Analis Kebijakan Publik Senior.
+        Tugas Anda adalah menulis Laporan Ringkasan Eksekutif mengenai sentimen publik terhadap fokus topik/kebijakan berikut: "{kebijakan_fokus}".
 
         Anda WAJIB mendasarkan analisis Anda HANYA pada data statistik aktual berikut:
+        - Fokus Topik / Kebijakan: {kebijakan_fokus}.
         - Total volume percakapan: {total_data} interaksi/cuitan.
         - Distribusi Sentimen: {persen_negatif}% Negatif, {persen_positif}% Positif, dan {persen_netral}% Netral.
         - Isu utama yang dikeluhkan (Top Keywords): {top_keywords}.
@@ -64,13 +65,13 @@ def generate_executive_summary(
         4. DILARANG KERAS berasumsi atau berhalusinasi di luar data statistik di atas. Jika data terbatas untuk ditarik kesimpulan yang memadai, berikan informasi secara profesional bahwa data yang diterima masih belum cukup untuk ditarik kesimpulan yang memadai.
         5. Struktur Laporan harus terdiri dari 3 bagian dengan sub-heading bertanda markdown:
            ### [Situasi Saat Ini]
-           (Uraikan volume percakapan dan dominasi sentimen publik secara komparatif)
+           (Uraikan volume percakapan dan dominasi sentimen publik secara komparatif untuk fokus topik {kebijakan_fokus})
            
            ### [Analisis Permasalahan]
-           (Uraikan akar masalah utama berdasarkan Top Keywords dan kutipan suara masyarakat)
+           (Uraikan akar masalah utama berdasarkan Top Keywords dan kutipan suara masyarakat yang relevan dengan {kebijakan_fokus})
            
            ### [Rekomendasi Kebijakan]
-           (Sajikan 2-3 butir rekomendasi taktis-realistis yang ditujukan bagi pimpinan/manajemen)
+           (Sajikan 2-3 butir rekomendasi taktis-realistis yang ditujukan bagi pimpinan/manajemen terkait {kebijakan_fokus})
            
         6. DILARANG KERAS menuliskan judul laporan formal (seperti "LAPORAN RINGKASAN EKSEKUTIF: ..."), salam pembuka, perihal, rincian penerima (seperti "Kepada: Yth..."), atau penutup surat formal di awal maupun di akhir output. Hasil generasi harus langsung diawali dengan sub-heading pertama: "### [Situasi Saat Ini]".
 
