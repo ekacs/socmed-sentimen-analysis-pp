@@ -968,22 +968,45 @@ with tab_viz:
                         story_p.append(Image(pl_bytes_p, width=16*cm, height=6.5*cm, hAlign='CENTER'))
                     story_p.append(PageBreak())
 
+                    sBodyJustified = ParagraphStyle(
+                        'BodyJustified', 
+                        parent=styles_p['Normal'],
+                        fontName='Helvetica',
+                        fontSize=9.5,
+                        leading=14,
+                        alignment=4, # TA_JUSTIFY (Rata Kiri-Kanan)
+                        spaceAfter=8,
+                        textColor=colors.HexColor('#2d3748')
+                    )
+                    sHeading2Styled = ParagraphStyle(
+                        'Heading2Styled',
+                        parent=styles_p['Heading2'],
+                        fontName='Helvetica-Bold',
+                        fontSize=11,
+                        leading=15,
+                        textColor=colors.HexColor('#1a365d'),
+                        spaceBefore=12,
+                        spaceAfter=4,
+                        keepWithNext=True
+                    )
+
                     story_p.append(Paragraph('BAB IV — RINGKASAN EKSEKUTIF NARASI AI', sH1))
                     narasi_pdf_txt = st.session_state.get('ai_narrative_viz_cache', '')
                     if not narasi_pdf_txt:
-                        story_p.append(Paragraph('_Narasi AI belum di-generate di dashboard. Silakan klik tombol Perbarui Analisis Narasi terlebih dahulu._', sB))
+                        story_p.append(Paragraph('<i>Narasi AI belum di-generate di dashboard. Silakan klik tombol Perbarui Analisis Narasi terlebih dahulu.</i>', sBodyJustified))
                     else:
-                        paras_p = re.split(r"\n{2,}|", narasi_pdf_txt.replace('\r\n', '\n'))
-                        for pg in paras_p:
-                            pg = pg.strip()
-                            if not pg: continue
-                            if re.match(r'^(\d+\.\s+[A-Z]|###\s)', pg):
-                                lns = pg.split('\n', 1)
-                                story_p.append(Paragraph(lns[0].replace('###','').strip(), sH2))
-                                if len(lns) > 1: story_p.append(Paragraph(lns[1].replace('\n', '<br/>'), sB))
+                        raw_blocks = [b.strip() for b in narasi_pdf_txt.replace('\r\n', '\n').split('\n') if b.strip()]
+                        
+                        for block in raw_blocks:
+                            # Format Markdown bold **text** -> <b>text</b>, *text* -> <i>text</i>
+                            formatted_block = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', block)
+                            formatted_block = re.sub(r'\*(.*?)\*', r'<i>\1</i>', formatted_block)
+                            
+                            if formatted_block.startswith('###') or formatted_block.startswith('##'):
+                                clean_h = formatted_block.lstrip('#').strip()
+                                story_p.append(Paragraph(clean_h, sHeading2Styled))
                             else:
-                                story_p.append(Paragraph(pg.replace('\n', '<br/>'), sB))
-                            story_p.append(Spacer(1, 0.15*cm))
+                                story_p.append(Paragraph(formatted_block, sBodyJustified))
 
                     doc_p.build(story_p, onFirstPage=_pn, onLaterPages=_pn)
                     buf_p.seek(0)
