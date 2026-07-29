@@ -1,7 +1,7 @@
-
 import os
 import sys
 import time
+import json
 import numpy as np
 import joblib
 from dotenv import load_dotenv
@@ -48,137 +48,6 @@ def load_svm_model():
         print("[WARNING] Berkas model SVM ('models/svm_model.pkl') tidak ditemukan.")
         print("[WARNING] Prediksi sentimen otomatis dilewati. Silakan jalankan '02_train_model.py' terlebih dahulu.")
         return None, None
-
-def clean_text_with_gemini(client, raw_text):
-    """
-    Menggunakan Gemini 2.5 Flash untuk membersihkan bahasa tidak baku/gaul menjadi bahasa baku EYD.
-    """
-    if not client:
-        # Fallback jika API key tidak tersedia
-        return raw_text
-        
-    system_prompt = (
-        "Tugas Anda adalah menstandardisasi teks media sosial berbahasa Indonesia berikut menjadi "
-        "bahasa Indonesia baku yang sesuai dengan Ejaan yang Disempurnakan (EYD).\n"
-        "Aturan:\n"
-        "1. Perbaiki salah ketik (typo), singkatan, dan bahasa gaul (slang).\n"
-        "2. Pertahankan makna asli, emosi, dan sentimen dari teks tersebut.\n"
-        "3. DILARANG KERAS memberikan komentar, analisis, atau kalimat tambahan apa pun.\n"
-        "4. Cukup kembalikan teks hasil standardisasi murni secara langsung."
-    )
-    
-    # Coba memanggil API Gemini dengan mekanisme retry (3x percobaan)
-    for attempt in range(3):
-        try:
-            response = client.models.generate_content(
-                model='gemini-3.1-flash-lite',
-                contents=raw_text,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_prompt,
-                    temperature=0.1,
-                    max_output_tokens=300
-                )
-            )
-            cleaned = response.text.strip()
-            
-            # Bersihkan pembungkus blok markdown jika ada
-            if cleaned.startswith("```") and cleaned.endswith("```"):
-                cleaned = cleaned.strip("`").strip()
-                if cleaned.startswith("text\n"):
-                    cleaned = cleaned[5:].strip()
-                    
-            # Hapus tanda kutip luar pembungkus teks jika ada
-            cleaned = cleaned.strip('"\'')
-            return cleaned
-            
-        except Exception as e:
-            if attempt == 2:
-DB_FILE = 'sentimen_kebijakan.db'
-MODEL_PATH = 'models/svm_model.pkl'
-VEC_PATH = 'models/tfidf_vectorizer.pkl'
-
-def get_gemini_client():
-    """
-    Menginisialisasi klien Gemini SDK resmi secara aman.
-    """
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key or api_key == "YOUR_GEMINI_API_KEY_HERE":
-        print("[WARNING] Kunci API Gemini ('GEMINI_API_KEY') tidak dikonfigurasi di file .env.")
-        print("[WARNING] Prapemrosesan AI (Gemini) akan dinonaktifkan (teks asli akan disalin ke cleaned_text).")
-        return None
-    try:
-        return genai.Client(api_key=api_key)
-    except Exception as e:
-        print(f"[ERROR] Gagal menginisialisasi Gemini Client: {e}")
-        return None
-
-def load_svm_model():
-    """
-    Memuat model SVM dan TF-IDF Vectorizer jika tersedia.
-    """
-    if os.path.exists(MODEL_PATH) and os.path.exists(VEC_PATH):
-        try:
-            model = joblib.load(MODEL_PATH)
-            vectorizer = joblib.load(VEC_PATH)
-            return model, vectorizer
-        except Exception as e:
-            print(f"[ERROR] Gagal memuat model SVM: {e}")
-            return None, None
-    else:
-        print("[WARNING] Berkas model SVM ('models/svm_model.pkl') tidak ditemukan.")
-        print("[WARNING] Prediksi sentimen otomatis dilewati. Silakan jalankan '02_train_model.py' terlebih dahulu.")
-        return None, None
-
-def clean_text_with_gemini(client, raw_text):
-    """
-    Menggunakan Gemini 2.5 Flash untuk membersihkan bahasa tidak baku/gaul menjadi bahasa baku EYD.
-    """
-    if not client:
-        # Fallback jika API key tidak tersedia
-        return raw_text
-        
-    system_prompt = (
-        "Tugas Anda adalah menstandardisasi teks media sosial berbahasa Indonesia berikut menjadi "
-        "bahasa Indonesia baku yang sesuai dengan Ejaan yang Disempurnakan (EYD).\n"
-        "Aturan:\n"
-        "1. Perbaiki salah ketik (typo), singkatan, dan bahasa gaul (slang).\n"
-        "2. Pertahankan makna asli, emosi, dan sentimen dari teks tersebut.\n"
-        "3. DILARANG KERAS memberikan komentar, analisis, atau kalimat tambahan apa pun.\n"
-        "4. Cukup kembalikan teks hasil standardisasi murni secara langsung."
-    )
-    
-    # Coba memanggil API Gemini dengan mekanisme retry (3x percobaan)
-    for attempt in range(3):
-        try:
-            response = client.models.generate_content(
-                model='gemini-3.1-flash-lite',
-                contents=raw_text,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_prompt,
-                    temperature=0.1,
-                    max_output_tokens=300
-                )
-            )
-            cleaned = response.text.strip()
-            
-            # Bersihkan pembungkus blok markdown jika ada
-            if cleaned.startswith("```") and cleaned.endswith("```"):
-                cleaned = cleaned.strip("`").strip()
-                if cleaned.startswith("text\n"):
-                    cleaned = cleaned[5:].strip()
-                    
-            # Hapus tanda kutip luar pembungkus teks jika ada
-            cleaned = cleaned.strip('"\'')
-            return cleaned
-            
-        except Exception as e:
-            if attempt == 2:
-                print(f"[ERROR] Gagal permanen setelah 3x percobaan menghubungi Gemini API untuk teks '{raw_text[:30]}...': {e}")
-                return raw_text
-            # Exponential backoff: tunggu sebentar sebelum mencoba lagi
-            time.sleep(2 * (attempt + 1))
-            
-    return raw_text
 
 def clean_batch_with_gemini(client, batch_items):
     """
