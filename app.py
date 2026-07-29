@@ -495,7 +495,7 @@ with tab_scrape:
             # Mode Pencarian Kata Kunci / Tagar
             ig_search_mode_val = instagram_cfg.get("search_mode", "hashtags")
             ig_search_mode = st.radio(
-                "Mode Pencarian Kata Kunci/Tagar (Aktor: apify/instagram-scraper):",
+                "Mode Pencarian Kata Kunci/Tagar (Aktor: apify/instagram-hashtag-scraper):",
                 options=["hashtags", "search"],
                 index=0 if ig_search_mode_val == "hashtags" else 1,
                 help="Pilih 'hashtags' untuk pencarian tagar presisi, atau 'search' untuk pencarian kueri kata kunci umum.",

@@ -231,10 +231,10 @@ def scrape_instagram(client, general_cfg, log_activity: str = "", user_app: str 
     all_results = []
 
     # -----------------------------------------------------------------
-    # AKTOR 1: apify/instagram-scraper (reGe1ST3OBgYZSsZJ) -> Hashtag / Search
+    # AKTOR 1: apify/instagram-hashtag-scraper (reGe1ST3OBgYZSsZJ) -> Hashtag / Search
     # -----------------------------------------------------------------
     if has_keywords:
-        print(f"[INFO] >>> Menjalankan Aktor 1: apify/instagram-scraper (reGe1ST3OBgYZSsZJ) | Mode: {search_mode}...")
+        print(f"[INFO] >>> Menjalankan Aktor 1: apify/instagram-hashtag-scraper (reGe1ST3OBgYZSsZJ) | Mode: {search_mode}...")
         kw_list = keywords if keywords else hashtags
         clean_tags = [str(k).strip().lstrip("#") for k in kw_list if str(k).strip()]
         
@@ -244,17 +244,22 @@ def scrape_instagram(client, general_cfg, log_activity: str = "", user_app: str 
                 "resultsLimit": max_results,
                 "resultsType": "posts"
             }
-        else:  # "search"
+        else:  # "search" / directUrls
             run_input_kw = {
-                "search": " ".join(clean_tags),
-                "searchType": "hashtag" if clean_tags else "user",
+                "hashtags": clean_tags,
+                "directUrls": [f"https://www.instagram.com/explore/tags/{t}/" for t in clean_tags],
                 "resultsLimit": max_results,
                 "resultsType": "posts"
             }
             
         try:
-            print(f"[INFO] Memanggil actor apify/instagram-scraper dengan input: {run_input_kw}")
-            run1 = client.actor("apify/instagram-scraper").call(run_input=run_input_kw)
+            print(f"[INFO] Memanggil actor apify/instagram-hashtag-scraper (reGe1ST3OBgYZSsZJ) dengan input: {run_input_kw}")
+            # Coba panggil via slug 'apify/instagram-hashtag-scraper', fallback ke ID 'reGe1ST3OBgYZSsZJ'
+            try:
+                run1 = client.actor("apify/instagram-hashtag-scraper").call(run_input=run_input_kw)
+            except Exception:
+                run1 = client.actor("reGe1ST3OBgYZSsZJ").call(run_input=run_input_kw)
+                
             ds_id1 = run1["defaultDatasetId"]
             
             for item in client.dataset(ds_id1).iterate_items():
