@@ -1,9 +1,11 @@
+
 import os
 import sys
 import time
 import numpy as np
 import joblib
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from google import genai
 from google.genai import types
 import db_manager
@@ -98,6 +100,33 @@ def clean_text_with_gemini(client, raw_text):
             
     return raw_text
 
+def process_single_row(item, gemini_client, model, vectorizer):
+    platform_id, raw_text = item
+    try:
+        # Langkah A: Pembersihan Bahasa via AI
+        cleaned_text = clean_text_with_gemini(gemini_client, raw_text)
+        
+        # Langkah B: Prediksi Sentimen via SVM
+        sentiment_label = None
+        confidence_score = 0.0
+        
+        if model and vectorizer:
+            try:
+                vec_text = vectorizer.transform([cleaned_text])
+                sentiment_label = model.predict(vec_text)[0]
+                probs = model.predict_proba(vec_text)[0]
+                confidence_score = float(np.max(probs))
+            except Exception as e:
+                print(f"  [ERROR][{platform_id}]: Gagal inferensi SVM: {e}")
+                
+        # Langkah C: Perbarui baris di Database
+        db_manager.perbarui_cuitan_setelah_proses(platform_id, cleaned_text, sentiment_label, confidence_score)
+        print(f"[OK][{platform_id}] Sentimen: {sentiment_label} ({confidence_score:.0%}) | Baku: {cleaned_text[:40]}...")
+        return True
+    except Exception as e:
+        print(f"[ERROR][{platform_id}]: Gagal memproses baris: {e}")
+        return False
+
 def process_pipeline():
     # 0. Deduplikasi Data RAW sebelum pemrosesan AI & ML
     # Menghapus duplikat (username + raw_text sama), mempertahankan date (created_at) paling awal
@@ -115,44 +144,23 @@ def process_pipeline():
         print("[HINT] Jalankan dulu Langkah 1: Penarikan Data (Scraper) untuk mendapatkan data RAW baru.")
         sys.exit(2)
         
-    print(f"[INFO] Memulai pemrosesan untuk {len(rows)} data cuitan mentah baru...")
+    print(f"[INFO] Memulai pemrosesan paralel (Multithreading 10 worker) untuk {len(rows)} data cuitan mentah baru...")
     print(f"[INFO] Model SVM: {'TERSEDIA' if (model and vectorizer) else 'TIDAK DITEMUKAN (prediksi sentimen dilewati)'}")
     print(f"[INFO] Gemini Client: {'TERSEDIA' if gemini_client else 'TIDAK ADA API KEY (EYD cleanup otomatis = copy teks asli)'}")
     
     success_count = 0
+    max_workers = 10 if gemini_client else 20
     
-    # 4. Iterasi dan proses setiap baris
-    for platform_id, raw_text in rows:
-        print(f"[INFO] Memproses Platform ID: {platform_id}")
-        
-        # Langkah A: Pembersihan Bahasa via AI
-        cleaned_text = clean_text_with_gemini(gemini_client, raw_text)
-        print(f"  [RAW] : {raw_text}")
-        print(f"  [BAKU]: {cleaned_text}")
-        
-        # Langkah B: Prediksi Sentimen via SVM
-        sentiment_label = None
-        confidence_score = 0.0
-        
-        if model and vectorizer:
-            try:
-                # Transformasi teks
-                vec_text = vectorizer.transform([cleaned_text])
-                # Prediksi label
-                sentiment_label = model.predict(vec_text)[0]
-                # Hitung skor keyakinan (probabilitas maksimum)
-                probs = model.predict_proba(vec_text)[0]
-                confidence_score = float(np.max(probs))
-                print(f"  [SVM] : Sentimen -> {sentiment_label} (Keyakinan: {confidence_score:.2%})")
-            except Exception as e:
-                print(f"  [ERROR]: Gagal melakukan inferensi SVM: {e}")
+    # 4. Paralelisasi eksekusi per baris menggunakan ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(process_single_row, item, gemini_client, model, vectorizer)
+            for item in rows
+        ]
+        for future in as_completed(futures):
+            if future.result():
+                success_count += 1
                 
-        # Langkah C: Perbarui baris di Database
-        try:
-            db_manager.perbarui_cuitan_setelah_proses(platform_id, cleaned_text, sentiment_label, confidence_score)
-            success_count += 1
-        except Exception as e:
-            print(f"  [ERROR]: Gagal memperbarui database: {e}")
     # --- Ringkasan akhir dengan tag untuk parsing di UI ---
     failed_count = len(rows) - success_count
     print("")
@@ -173,7 +181,7 @@ def process_pipeline():
     if success_count == 0 and len(rows) > 0:
         print("[EXIT_CODE=1] Semua baris GAGAL diproses!")
         sys.exit(1)
-    print(f"[SUCCESS] Pipa data selesai! Berhasil memproses {success_count} dari {len(rows)} data.")
+    print(f"[SUCCESS] Pipa data selesai! Berhasil memproses {success_count} dari {len(rows)} data (Multithreading).")
     sys.exit(0)
 
 if __name__ == "__main__":
