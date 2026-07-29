@@ -501,3 +501,36 @@ def ambil_keysearch_history():
     finally:
         conn.close()
 
+def ambil_riwayat_terpisah():
+    """
+    Mengambil daftar unik riwayat kata kunci, hashtag, dan user profile secara terpisah.
+    Returns: dict {'keywords': [...], 'hashtags': [...], 'profiles': [...]}
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    kw_set, ht_set, pr_set = set(), set(), set()
+    try:
+        cursor.execute("SELECT keywords, profiles, hashtags FROM keysearch_history ORDER BY id DESC")
+        rows = cursor.fetchall()
+        for r in rows:
+            kw_raw, pr_raw, ht_raw = r[0] or "", r[1] or "", r[2] or ""
+            for item in kw_raw.split(","):
+                i = item.strip()
+                if i: kw_set.add(i)
+            for item in ht_raw.split(","):
+                i = item.strip()
+                if i: ht_set.add(i)
+            for item in pr_raw.split(","):
+                i = item.strip()
+                if i: pr_set.add(i)
+        return {
+            "keywords": sorted(list(kw_set)),
+            "hashtags": sorted(list(ht_set)),
+            "profiles": sorted(list(pr_set))
+        }
+    except Exception as e:
+        print(f"[ERROR] Gagal mengambil riwayat terpisah: {e}")
+        return {"keywords": [], "hashtags": [], "profiles": []}
+    finally:
+        conn.close()
+

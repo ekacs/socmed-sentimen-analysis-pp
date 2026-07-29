@@ -962,43 +962,65 @@ with tab_viz:
     # 6.1 Pengaturan Analisis
     st.markdown("### ⚙️ Pengaturan Parameter Analisis")
     
+    # Ambil riwayat terpisah untuk kata kunci, hashtag, dan user profile
     try:
-        if hasattr(db_manager, 'ambil_keysearch_history'):
-            hist_records = db_manager.ambil_keysearch_history()
+        if hasattr(db_manager, 'ambil_riwayat_terpisah'):
+            hist_sep = db_manager.ambil_riwayat_terpisah()
         else:
-            hist_records = []
+            hist_sep = {"keywords": [], "hashtags": [], "profiles": []}
     except Exception:
-        hist_records = []
-    hist_labels = [h["display_label"] for h in hist_records if isinstance(h, dict) and "display_label" in h]
-    
-    col_an1, col_an2 = st.columns([2, 1])
-    with col_an1:
-        selected_hist = st.multiselect(
-            "Riwayat Keysearch, User Profile, dan Hashtag Target:",
-            options=hist_labels,
-            default=hist_labels[:1] if hist_labels else None,
-            help="Pilih satu atau lebih riwayat kombinasi pencarian untuk memfilter data analisis."
+        hist_sep = {"keywords": [], "hashtags": [], "profiles": []}
+
+    kw_options = hist_sep.get("keywords", [])
+    ht_options = hist_sep.get("hashtags", [])
+    pr_options = hist_sep.get("profiles", [])
+
+    col_h1, col_h2, col_h3 = st.columns(3)
+    with col_h1:
+        selected_kw = st.multiselect(
+            "🔍 Riwayat Kata Kunci:",
+            options=kw_options,
+            default=kw_options[:1] if kw_options else None,
+            help="Pilih satu atau lebih kata kunci riwayat (opsional)."
         )
-    with col_an2:
-        if not df_base_viz.empty and 'date' in df_base_viz.columns:
-            try:
-                df_base_viz['date_parsed'] = pd.to_datetime(df_base_viz['date'], errors='coerce').dt.date
-                v_dates = df_base_viz['date_parsed'].dropna()
-                min_d = v_dates.min() if not v_dates.empty else datetime.date.today() - datetime.timedelta(days=30)
-                max_d = v_dates.max() if not v_dates.empty else datetime.date.today()
-            except Exception:
-                df_base_viz['date_parsed'] = datetime.date.today()
-                min_d = datetime.date.today() - datetime.timedelta(days=30)
-                max_d = datetime.date.today()
-        else:
+    with col_h2:
+        selected_ht = st.multiselect(
+            "🏷️ Riwayat Tagar / Hashtag:",
+            options=ht_options,
+            default=None,
+            help="Pilih satu atau lebih hashtag riwayat (opsional)."
+        )
+    with col_h3:
+        selected_pr = st.multiselect(
+            "👥 Riwayat User Profile:",
+            options=pr_options,
+            default=None,
+            help="Pilih satu atau lebih username/profil riwayat (opsional)."
+        )
+
+    # Rentang tanggal
+    if not df_base_viz.empty and 'date' in df_base_viz.columns:
+        try:
+            df_base_viz['date_parsed'] = pd.to_datetime(df_base_viz['date'], errors='coerce').dt.date
+            v_dates = df_base_viz['date_parsed'].dropna()
+            min_d = v_dates.min() if not v_dates.empty else datetime.date.today() - datetime.timedelta(days=30)
+            max_d = v_dates.max() if not v_dates.empty else datetime.date.today()
+        except Exception:
             df_base_viz['date_parsed'] = datetime.date.today()
             min_d = datetime.date.today() - datetime.timedelta(days=30)
             max_d = datetime.date.today()
-            
-        viz_date_range = st.date_input("Rentang Periode Data Scraping:", value=(min_d, max_d))
+    else:
+        df_base_viz['date_parsed'] = datetime.date.today()
+        min_d = datetime.date.today() - datetime.timedelta(days=30)
+        max_d = datetime.date.today()
         
-    btn_exec_analysis = st.button("🔍 Jalankan Analisis Sekarang", type="primary", key="btn_exec_viz")
-    
+    col_dt1, col_dt2 = st.columns([2, 1])
+    with col_dt1:
+        viz_date_range = st.date_input("Rentang Periode Data Scraping:", value=(min_d, max_d))
+    with col_dt2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        btn_exec_analysis = st.button("🔍 Jalankan Analisis Sekarang", type="primary", key="btn_exec_viz", use_container_width=True)
+        
     df_viz_filtered = df_base_viz.copy()
 
     # Filter berdasarkan rentang tanggal
@@ -1008,26 +1030,30 @@ with tab_viz:
             (df_viz_filtered['date_parsed'] <= viz_date_range[1])
         ]
 
-    # Filter berdasarkan Riwayat Keysearch / Profil / Hashtag yang dipilih
+    # Gabungkan istilah pencarian dari 3 multiselect (opsional / tidak wajib terisi semua, cukup minimal 1)
     selected_search_terms = []
-    if selected_hist:
-        for h in hist_records:
-            if h.get("display_label") in selected_hist:
-                for field in ["keywords", "profiles", "hashtags"]:
-                    val = h.get(field, "")
-                    if val:
-                        for term in str(val).split(","):
-                            clean_term = term.strip().lower().lstrip("#@")
-                            if clean_term and clean_term not in selected_search_terms:
-                                selected_search_terms.append(clean_term)
+    if selected_kw:
+        for k in selected_kw:
+            ck = str(k).strip().lower().lstrip("#@")
+            if ck and ck not in selected_search_terms:
+                selected_search_terms.append(ck)
+    if selected_ht:
+        for h in selected_ht:
+            ch = str(h).strip().lower().lstrip("#@")
+            if ch and ch not in selected_search_terms:
+                selected_search_terms.append(ch)
+    if selected_pr:
+        for p in selected_pr:
+            cp = str(p).strip().lower().lstrip("#@")
+            if cp and cp not in selected_search_terms:
+                selected_search_terms.append(cp)
 
     if selected_search_terms and not df_viz_filtered.empty:
         def _matches_keysearch(row):
-            txt = (str(row.get('cleaned_text') or '') + ' ' + str(row.get('raw_text') or '')).lower()
+            txt = (str(row.get('cleaned_text') or '') + ' ' + str(row.get('raw_text') or '') + ' ' + str(row.get('username') or '')).lower()
             return any(st_term in txt for st_term in selected_search_terms)
 
         df_filtered_by_key = df_viz_filtered[df_viz_filtered.apply(_matches_keysearch, axis=1)]
-        # Jika hasil filter tidak kosong, gunakan data terfilter
         if not df_filtered_by_key.empty:
             df_viz_filtered = df_filtered_by_key
 
