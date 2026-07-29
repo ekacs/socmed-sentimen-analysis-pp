@@ -649,8 +649,13 @@ with tab_ml:
 # TAB 3: REVIEW DATA
 # =====================================================================
 with tab_review:
-    st.subheader("📋 Tahapan 3: Review Data & Kontrol Kualitas")
-    st.markdown("Transparansi data lengkap dari platform sumber beserta filter batas skor keyakinan (*confidence score*) dan fasilitas ekspor/impor Excel terkoreksi.")
+    c_tab3_h1, c_tab3_h2 = st.columns([4, 1])
+    with c_tab3_h1:
+        st.subheader("📋 Tahapan 3: Review Data & Kontrol Kualitas")
+        st.markdown("Transparansi data lengkap dari platform sumber beserta filter batas skor keyakinan (*confidence score*) dan fasilitas ekspor/impor Excel terkoreksi.")
+    with c_tab3_h2:
+        if st.button("🔄 Muat Ulang Data", key="btn_refresh_tab3_top", use_container_width=True, help="Segarkan seluruh data live dari database"):
+            st.rerun()
     
     # 5.0 Formasi Tabel Live Lengkap (13 Kolom)
     _all_cols_needed = [
@@ -684,7 +689,7 @@ with tab_review:
 
     # 5.1 Kontrol Penerimaan Data & Excel
     st.divider()
-    st.markdown("### ⚙️ 5.1 Pengaturan Koreksi & Ambang Keyakinan Data")
+    st.markdown("### ⚙️ Pengaturan Koreksi & Ambang Keyakinan Data")
     
     mode_review = st.radio(
         "Pilih Metode Review & Filter Data:",
@@ -765,7 +770,7 @@ with tab_review:
 
     # 5.2 Visualisasi Hasil Review Data
     st.divider()
-    st.markdown("### 📊 5.2 Ringkasan Visualisasi Hasil Review Data")
+    st.markdown("### 📊 Ringkasan Visualisasi Hasil Review Data")
     
     total_raw_live = len(df_live_full)
     total_acc = len(df_reviewed_final)
@@ -789,7 +794,12 @@ with tab_review:
             st.plotly_chart(fig_rev_pie, use_container_width=True)
             
         with c_rev_chart2:
-            st.markdown("**Tabel Live Interaktif (13 Kolom Lengkap):**")
+            c_tbl_lbl, c_tbl_btn = st.columns([3, 1])
+            with c_tbl_lbl:
+                st.markdown("**Tabel Live Interaktif (klasifikasi sentimen):**")
+            with c_tbl_btn:
+                if st.button("🔄 Segarkan", key="btn_refresh_live_table", use_container_width=True, help="Muat ulang data terbaru dari database"):
+                    st.rerun()
             df_disp = df_reviewed_final[[c for c in _all_cols_needed if c in df_reviewed_final.columns]].copy()
             df_disp.rename(columns=col_rename_map, inplace=True)
             st.dataframe(df_disp, use_container_width=True, height=280)
