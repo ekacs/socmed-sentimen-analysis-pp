@@ -19,7 +19,8 @@ def build_twitter_query(config):
     Merangkai kata kunci, hashtag, dan profil dari konfigurasi menjadi 
     format kueri pencarian tingkat lanjut Twitter (X) yang valid.
     """
-    general = config.get("config", {}).get("general", {})
+    cfg_all = config.get("config", {})
+    general = cfg_all.get("twitter", cfg_all.get("general", {}))
     keywords = general.get("keywords", [])
     hashtags = general.get("hashtags", [])
     profiles = general.get("profiles", [])

@@ -368,7 +368,13 @@ with tab_scrape:
     else:
         current_config = {}
         
-    general_cfg = current_config.get("config", {}).get("general", {})
+    cfg_all_root = current_config.get("config", {})
+    general_cfg = cfg_all_root.get("general", {})
+    twitter_cfg = cfg_all_root.get("twitter", general_cfg)
+    instagram_cfg = cfg_all_root.get("instagram", general_cfg)
+    linkedin_cfg = cfg_all_root.get("linkedin", general_cfg)
+    news_cfg = cfg_all_root.get("portal_berita", general_cfg)
+
     raw_source_list = current_config.get("source_types")
     if not raw_source_list:
         single = current_config.get("source_type", "twitter_")
@@ -394,73 +400,173 @@ with tab_scrape:
         default=default_selected
     )
 
-    with st.form("form_target_config"):
-        st.write(f"**Konfigurasi Parameter Target Scraping**")
-        col_s1, col_s2 = st.columns(2)
-        with col_s1:
-            default_start = general_cfg.get("start_date", "2026-07-06")
-            try:
-                start_date_input = st.date_input("Tanggal Mulai Target", value=datetime.datetime.strptime(default_start, "%Y-%m-%d").date())
-            except Exception:
-                start_date_input = st.date_input("Tanggal Mulai Target", value=datetime.date.today() - datetime.timedelta(days=7))
-        with col_s2:
-            default_end = general_cfg.get("end_date", "2026-07-13")
-            try:
-                end_date_input = st.date_input("Tanggal Akhir Target", value=datetime.datetime.strptime(default_end, "%Y-%m-%d").date())
-            except Exception:
-                end_date_input = st.date_input("Tanggal Akhir Target", value=datetime.date.today())
-
-        default_keywords = ", ".join(general_cfg.get("keywords", ["mbg"]))
-        default_profiles = ", ".join(general_cfg.get("profiles", ["jokowi", "kemenpupr"]))
-        default_hashtags = ", ".join(general_cfg.get("hashtags", ["#IKNNusantara"]))
-        fallback_max = general_cfg.get("max_results", 100)
-
-        keywords_input = st.text_input("Target Kata Kunci / Search Key (pisahkan dengan koma):", value=default_keywords, help="Dapat menggunakan operator pencarian lanjutan Twitter seperti tabel panduan di atas.")
-        profiles_input = st.text_input("Target Profil Akun (pisahkan dengan koma):", value=default_profiles)
-        hashtags_input = st.text_input("Target Tagar/Hashtag (pisahkan dengan koma):", value=default_hashtags)
-
-        st.markdown("#### 📊 Batas Maksimal Data per Platform")
-        def get_platform_default(field_name: str, fallback_val: int) -> int:
-            val = general_cfg.get(field_name)
-            if val is None: val = fallback_max if fallback_max else fallback_val
-            try: return int(val)
-            except (TypeError, ValueError): return fallback_val
-
-        max_twitter = st.slider("🐦 Twitter (X) — Batas cuitan:", 10, 5000, get_platform_default("max_results_twitter", 500), 10) if "Twitter (X)" in selected_platforms else None
-        max_instagram = st.slider("📸 Instagram — Batas postingan per profil:", 5, 500, get_platform_default("max_results_instagram", 100), 5) if "Instagram" in selected_platforms else None
-        max_linkedin = st.slider("💼 LinkedIn — Batas postingan:", 5, 500, get_platform_default("max_results_linkedin", 100), 5) if "LinkedIn" in selected_platforms else None
+    def save_platform_config(platform_key: str, plat_obj: dict):
+        """Helper untuk menguji & menyimpan konfigurasi per platform ke target_config.json"""
+        if not selected_platforms:
+            st.error("❌ Pilih setidaknya satu platform sasaran pada multiselect di atas.")
+            return False
         
-        max_news = None
-        news_portals_input = None
-        if "Portal Berita" in selected_platforms:
-            max_news = st.slider("📰 Portal Berita — Batas artikel per domain:", 5, 200, get_platform_default("max_results_news", 50), 5)
-            raw_news_urls = general_cfg.get("news_portal_urls", ["https://www.kompas.com/"])
-            default_news_str = ", ".join(raw_news_urls) if isinstance(raw_news_urls, list) else str(raw_news_urls)
-            news_portals_input = st.text_input("📰 URL Portal Berita (pisahkan koma):", value=default_news_str)
+        source_types_to_save = [rev_mapping[sp] for sp in selected_platforms if sp in rev_mapping]
+        
+        # Baca ulang konfigurasi terkini dari berkas
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, 'r') as f:
+                    cfg_store = json.load(f)
+            except Exception:
+                cfg_store = {}
+        else:
+            cfg_store = {}
 
-        btn_save_config = st.form_submit_button("💾 Simpan Konfigurasi Target")
-        if btn_save_config:
-            if not selected_platforms:
-                st.error("❌ Pilih setidaknya satu platform sasaran.")
-            else:
-                source_types_to_save = [rev_mapping[sp] for sp in selected_platforms if sp in rev_mapping]
-                general_obj = {
-                    "start_date": start_date_input.strftime("%Y-%m-%d"),
-                    "end_date": end_date_input.strftime("%Y-%m-%d"),
-                    "keywords": [k.strip() for k in keywords_input.split(",") if k.strip()],
-                    "profiles": [p.strip() for p in profiles_input.split(",") if p.strip()],
-                    "hashtags": [h.strip() for h in hashtags_input.split(",") if h.strip()],
-                    "max_results": fallback_max,
-                    "max_results_twitter": max_twitter or get_platform_default("max_results_twitter", 500),
-                    "max_results_instagram": max_instagram or get_platform_default("max_results_instagram", 100),
-                    "max_results_linkedin": max_linkedin or get_platform_default("max_results_linkedin", 100),
-                    "max_results_news": max_news or get_platform_default("max_results_news", 50),
-                    "news_portal_urls": [u.strip() for u in (news_portals_input or "https://www.kompas.com/").split(",") if u.strip()]
+        if "config" not in cfg_store or not isinstance(cfg_store["config"], dict):
+            cfg_store["config"] = {}
+
+        cfg_store["source_types"] = source_types_to_save
+        cfg_store["config"][platform_key] = plat_obj
+
+        # Update general fallback agar backward-compatible
+        if "general" not in cfg_store["config"]:
+            cfg_store["config"]["general"] = {}
+        cfg_store["config"]["general"].update(plat_obj)
+
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(cfg_store, f, indent=4)
+        return True
+
+    def _parse_date(d_str, fallback_days=7):
+        if d_str:
+            try: return datetime.datetime.strptime(str(d_str), "%Y-%m-%d").date()
+            except Exception: pass
+        return datetime.date.today() - datetime.timedelta(days=fallback_days)
+
+    # -----------------------------------------------------------------
+    # 1. FORM TWITTER (X)
+    # -----------------------------------------------------------------
+    if "Twitter (X)" in selected_platforms:
+        with st.form("form_config_twitter"):
+            st.markdown("### 🐦 Konfigurasi Penarikan Twitter (X)")
+            col_tw1, col_tw2 = st.columns(2)
+            with col_tw1:
+                tw_start_val = _parse_date(twitter_cfg.get("start_date"), 7)
+                tw_start_input = st.date_input("Tanggal Mulai Target (Twitter)", value=tw_start_val, key="tw_start")
+            with col_tw2:
+                tw_end_val = _parse_date(twitter_cfg.get("end_date"), 0)
+                tw_end_input = st.date_input("Tanggal Akhir Target (Twitter)", value=tw_end_val, key="tw_end")
+
+            tw_kw_val = ", ".join(twitter_cfg.get("keywords", ["mbg"]))
+            tw_prof_val = ", ".join(twitter_cfg.get("profiles", ["jokowi", "kemenpupr"]))
+            tw_hash_val = ", ".join(twitter_cfg.get("hashtags", ["#IKNNusantara"]))
+            tw_max_val = int(twitter_cfg.get("max_results_twitter") or twitter_cfg.get("max_results", 500))
+
+            tw_kw_input = st.text_input("Target Kata Kunci / Search Key (Twitter):", value=tw_kw_val, help="Dapat menggunakan operator pencarian lanjutan Twitter seperti tabel panduan di atas.", key="tw_kw")
+            tw_prof_input = st.text_input("Target Profil Akun (Twitter):", value=tw_prof_val, key="tw_prof")
+            tw_hash_input = st.text_input("Target Tagar/Hashtag (Twitter):", value=tw_hash_val, key="tw_hash")
+            tw_max_input = st.slider("Batas maksimal cuitan (Twitter):", 10, 5000, tw_max_val, 10, key="tw_max")
+
+            btn_save_tw = st.form_submit_button("💾 Simpan Konfigurasi Twitter (X)")
+            if btn_save_tw:
+                tw_obj = {
+                    "start_date": tw_start_input.strftime("%Y-%m-%d"),
+                    "end_date": tw_end_input.strftime("%Y-%m-%d"),
+                    "keywords": [k.strip() for k in tw_kw_input.split(",") if k.strip()],
+                    "profiles": [p.strip() for p in tw_prof_input.split(",") if p.strip()],
+                    "hashtags": [h.strip() for h in tw_hash_input.split(",") if h.strip()],
+                    "max_results": tw_max_input,
+                    "max_results_twitter": tw_max_input
                 }
-                new_config = {"source_types": source_types_to_save, "config": {"general": general_obj}}
-                with open(CONFIG_FILE, 'w') as f:
-                    json.dump(new_config, f, indent=4)
-                st.success("✅ Konfigurasi target berhasil disimpan!")
+                if save_platform_config("twitter", tw_obj):
+                    st.success("✅ Konfigurasi Twitter (X) berhasil disimpan!")
+
+    # -----------------------------------------------------------------
+    # 2. FORM INSTAGRAM
+    # -----------------------------------------------------------------
+    if "Instagram" in selected_platforms:
+        with st.form("form_config_instagram"):
+            st.markdown("### 📸 Konfigurasi Penarikan Instagram")
+            ig_start_val = _parse_date(instagram_cfg.get("start_date"), 14)
+            ig_start_input = st.date_input("Tanggal Posting Terlama (Instagram)", value=ig_start_val, key="ig_start")
+
+            ig_kw_val = ", ".join(instagram_cfg.get("keywords", instagram_cfg.get("hashtags", ["#IKNNusantara"])))
+            ig_prof_val = ", ".join(instagram_cfg.get("profiles", ["jokowi"]))
+            ig_max_val = int(instagram_cfg.get("max_results_instagram") or instagram_cfg.get("max_results", 100))
+
+            ig_kw_input = st.text_input("Kata Kunci / Hashtag (Instagram):", value=ig_kw_val, key="ig_kw")
+            ig_prof_input = st.text_input("Username Instagram (pisahkan koma):", value=ig_prof_val, key="ig_prof")
+            ig_max_input = st.slider("Batas maksimal data yang discrape (Instagram):", 5, 500, ig_max_val, 5, key="ig_max")
+
+            btn_save_ig = st.form_submit_button("💾 Simpan Konfigurasi Instagram")
+            if btn_save_ig:
+                ig_kw_list = [k.strip() for k in ig_kw_input.split(",") if k.strip()]
+                ig_obj = {
+                    "start_date": ig_start_input.strftime("%Y-%m-%d"),
+                    "keywords": ig_kw_list,
+                    "hashtags": [k for k in ig_kw_list if k.startswith("#")],
+                    "profiles": [p.strip() for p in ig_prof_input.split(",") if p.strip()],
+                    "max_results": ig_max_input,
+                    "max_results_instagram": ig_max_input
+                }
+                if save_platform_config("instagram", ig_obj):
+                    st.success("✅ Konfigurasi Instagram berhasil disimpan!")
+
+    # -----------------------------------------------------------------
+    # 3. FORM LINKEDIN
+    # -----------------------------------------------------------------
+    if "LinkedIn" in selected_platforms:
+        with st.form("form_config_linkedin"):
+            st.markdown("### 💼 Konfigurasi Penarikan LinkedIn")
+            li_start_val = _parse_date(linkedin_cfg.get("start_date"), 30)
+            li_start_input = st.date_input("Tanggal Posting Terlama (LinkedIn)", value=li_start_val, key="li_start")
+
+            li_kw_val = ", ".join(linkedin_cfg.get("keywords", ["kebijakan publik"]))
+            li_prof_val = ", ".join(linkedin_cfg.get("profiles", ["kemenpupr"]))
+            li_max_val = int(linkedin_cfg.get("max_results_linkedin") or linkedin_cfg.get("max_results", 100))
+
+            li_kw_input = st.text_input("Kata Kunci (LinkedIn):", value=li_kw_val, key="li_kw")
+            li_prof_input = st.text_input("Username / Perusahaan LinkedIn (pisahkan koma):", value=li_prof_val, key="li_prof")
+            li_max_input = st.slider("Batas maksimal data yang discrape (LinkedIn):", 5, 500, li_max_val, 5, key="li_max")
+
+            btn_save_li = st.form_submit_button("💾 Simpan Konfigurasi LinkedIn")
+            if btn_save_li:
+                li_obj = {
+                    "start_date": li_start_input.strftime("%Y-%m-%d"),
+                    "keywords": [k.strip() for k in li_kw_input.split(",") if k.strip()],
+                    "profiles": [p.strip() for p in li_prof_input.split(",") if p.strip()],
+                    "max_results": li_max_input,
+                    "max_results_linkedin": li_max_input
+                }
+                if save_platform_config("linkedin", li_obj):
+                    st.success("✅ Konfigurasi LinkedIn berhasil disimpan!")
+
+    # -----------------------------------------------------------------
+    # 4. FORM PORTAL BERITA
+    # -----------------------------------------------------------------
+    if "Portal Berita" in selected_platforms:
+        with st.form("form_config_news"):
+            st.markdown("### 📰 Konfigurasi Penarikan Portal Berita")
+            news_urls_raw = news_cfg.get("news_portal_urls", ["https://www.kompas.com/"])
+            news_urls_str = ", ".join(news_urls_raw) if isinstance(news_urls_raw, list) else str(news_urls_raw)
+            news_url_input = st.text_input("URL Portal Berita (default: https://www.kompas.com/):", value=news_urls_str, key="news_urls")
+
+            news_start_val = _parse_date(news_cfg.get("start_date"), 30)
+            news_start_input = st.date_input("Tanggal Posting Terlama (Portal Berita)", value=news_start_val, key="news_start")
+
+            news_kw_val = ", ".join(news_cfg.get("keywords", ["kebijakan"]))
+            news_max_val = int(news_cfg.get("max_results_news") or news_cfg.get("max_results", 50))
+
+            news_kw_input = st.text_input("Kata Kunci (Portal Berita):", value=news_kw_val, key="news_kw")
+            news_max_input = st.slider("Batas maksimal data yang discrape (Portal Berita):", 5, 200, news_max_val, 5, key="news_max")
+
+            btn_save_news = st.form_submit_button("💾 Simpan Konfigurasi Portal Berita")
+            if btn_save_news:
+                news_obj = {
+                    "start_date": news_start_input.strftime("%Y-%m-%d"),
+                    "keywords": [k.strip() for k in news_kw_input.split(",") if k.strip()],
+                    "news_portal_urls": [u.strip() for u in news_url_input.split(",") if u.strip()],
+                    "max_results": news_max_input,
+                    "max_results_news": news_max_input
+                }
+                if save_platform_config("portal_berita", news_obj):
+                    st.success("✅ Konfigurasi Portal Berita berhasil disimpan!")
 
     st.divider()
     st.markdown("### 🚀 Eksekusi Penarikan Data")

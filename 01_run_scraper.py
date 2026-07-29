@@ -687,15 +687,19 @@ def main():
         print("[ERROR] Silakan buka dasbor Streamlit > tab Pengaturan Target > pilih minimal 1 platform.")
         sys.exit(1)
     
-    general_cfg = config.get("config", {}).get("general", {})
+    cfg_base = config.get("config", {})
+    general_cfg = cfg_base.get("general", {})
     
-    # Simpan riwayat keysearch ke database
+    # Simpan riwayat keysearch ke database dari seluruh platform aktif
     try:
-        simpan_keysearch_history(
-            general_cfg.get("keywords", []),
-            general_cfg.get("profiles", []),
-            general_cfg.get("hashtags", [])
-        )
+        all_kw, all_prof, all_hash = [], [], []
+        for c_key in ["general", "twitter", "instagram", "linkedin", "portal_berita"]:
+            sub_cfg = cfg_base.get(c_key, {})
+            if isinstance(sub_cfg, dict):
+                all_kw.extend(sub_cfg.get("keywords", []))
+                all_prof.extend(sub_cfg.get("profiles", []))
+                all_hash.extend(sub_cfg.get("hashtags", []))
+        simpan_keysearch_history(all_kw, all_prof, all_hash)
     except Exception as _e_hist:
         pass
     
@@ -720,13 +724,17 @@ def main():
         print(f"{'='*60}")
         
         if source_type.startswith("twitter"):
-            partial = scrape_twitter(client, general_cfg, log_activity=log_activity, user_app=user_app)
+            plat_cfg = cfg_base.get("twitter", general_cfg)
+            partial = scrape_twitter(client, plat_cfg, log_activity=log_activity, user_app=user_app)
         elif source_type == "instagram":
-            partial = scrape_instagram(client, general_cfg, log_activity=log_activity, user_app=user_app)
+            plat_cfg = cfg_base.get("instagram", general_cfg)
+            partial = scrape_instagram(client, plat_cfg, log_activity=log_activity, user_app=user_app)
         elif source_type == "linkedin":
-            partial = scrape_linkedin(client, general_cfg, log_activity=log_activity, user_app=user_app)
+            plat_cfg = cfg_base.get("linkedin", general_cfg)
+            partial = scrape_linkedin(client, plat_cfg, log_activity=log_activity, user_app=user_app)
         elif source_type in ["portal_berita", "news_portal", "news"]:
-            partial = scrape_news_portal(client, general_cfg, log_activity=log_activity, user_app=user_app)
+            plat_cfg = cfg_base.get("portal_berita", general_cfg)
+            partial = scrape_news_portal(client, plat_cfg, log_activity=log_activity, user_app=user_app)
         else:
             print(f"[WARNING] Tipe sumber '{source_type}' tidak dikenal. Dilewati.")
             continue
