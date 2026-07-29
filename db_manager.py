@@ -295,6 +295,43 @@ def perbarui_cuitan_setelah_proses(platform_id, cleaned_text, sentiment_label, c
     finally:
         conn.close()
 
+def perbarui_cuitan_batch(batch_updates):
+    """
+    Ultra-fast Bulk Update: Memperbarui sekumpulan baris cuitan sekaligus dalam 1 koneksi & transaksi SQL.
+    batch_updates: list of tuple (cleaned_text, sentiment_label, confidence_score, platform_id)
+    """
+    if not batch_updates:
+        return
+    conn = get_connection()
+    cursor = conn.cursor()
+    ph = get_placeholder()
+    
+    updates_with_sent = [(c, s, float(score), pid) for c, s, score, pid in batch_updates if s is not None]
+    updates_no_sent = [(c, pid) for c, s, score, pid in batch_updates if s is None]
+    
+    try:
+        if updates_with_sent:
+            query1 = f'''
+                UPDATE log_cuitan
+                SET cleaned_text = {ph}, sentiment_label = {ph}, confidence_score = {ph}, status = 'CLEANED'
+                WHERE platform_id = {ph}
+            '''
+            cursor.executemany(query1, updates_with_sent)
+            
+        if updates_no_sent:
+            query2 = f'''
+                UPDATE log_cuitan
+                SET cleaned_text = {ph}, status = 'CLEANED'
+                WHERE platform_id = {ph}
+            '''
+            cursor.executemany(query2, updates_no_sent)
+            
+        conn.commit()
+    except Exception as e:
+        print(f"[ERROR] Gagal update batch ke database: {e}")
+    finally:
+        conn.close()
+
 def get_scraping_mode():
     """
     Mengambil mode penarikan data ('auto' atau 'manual') dari tabel system_config.

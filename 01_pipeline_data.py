@@ -107,7 +107,7 @@ def clean_batch_with_gemini(client, batch_items):
 
 def process_batch(batch_items, gemini_client, model, vectorizer):
     """
-    Memproses 1 batch data (misal 20-25 baris) sekaligus.
+    Memproses 1 batch data (50 baris) secara ultra-cepat dengan Gemini AI & SVM.
     """
     cleaned_dict = clean_batch_with_gemini(gemini_client, batch_items)
     
@@ -128,15 +128,16 @@ def process_batch(batch_items, gemini_client, model, vectorizer):
         except Exception as e:
             print(f"[ERROR] Inferensi SVM batch gagal: {e}")
             
-    success_count = 0
-    for i, pid in enumerate(pids):
-        try:
-            db_manager.perbarui_cuitan_setelah_proses(pid, cleaned_texts[i], sentiment_labels[i], confidence_scores[i])
-            success_count += 1
-        except Exception as e:
-            print(f"[ERROR] Gagal update DB platform_id {pid}: {e}")
-            
-    return success_count
+    batch_updates = [
+        (cleaned_texts[i], sentiment_labels[i], confidence_scores[i], pids[i])
+        for i in range(len(pids))
+    ]
+    try:
+        db_manager.perbarui_cuitan_batch(batch_updates)
+        return len(batch_updates)
+    except Exception as e:
+        print(f"[ERROR] Bulk update DB batch gagal: {e}")
+        return 0
 
 def process_pipeline():
     # 0. Deduplikasi Data RAW sebelum pemrosesan AI & ML
@@ -154,15 +155,15 @@ def process_pipeline():
         print("[HINT] Jalankan dulu Langkah 1: Penarikan Data (Scraper) untuk mendapatkan data RAW baru.")
         sys.exit(2)
         
-    batch_size = 25
+    batch_size = 50
     batches = [rows[i:i + batch_size] for i in range(0, len(rows), batch_size)]
     
-    print(f"[INFO] Memulai pemrosesan Ultra-Fast Batching ({len(batches)} batch @ {batch_size} data/batch) untuk {len(rows)} data RAW...")
+    print(f"[INFO] Memulai pemrosesan High-Speed Parallel Batching ({len(batches)} batch @ {batch_size} data/batch) untuk {len(rows)} data RAW...")
     print(f"[INFO] Model SVM: {'TERSEDIA' if (model and vectorizer) else 'TIDAK DITEMUKAN'}")
     print(f"[INFO] Gemini Client: {'TERSEDIA' if gemini_client else 'TIDAK ADA API KEY (copy teks asli)'}")
     
     success_count = 0
-    max_workers = 5
+    max_workers = 10
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [
