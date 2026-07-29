@@ -5,11 +5,20 @@ import hashlib
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from apify_client import ApifyClient
+from apify_client.errors import ApifyApiError
 
 # Impor fungsi pembaca konfigurasi
 from config_parser import load_config, build_twitter_query
 # Impor fungsi basis data
 from db_manager import simpan_data_ke_db, buat_tabel, get_scraping_mode, simpan_keysearch_history
+
+def handle_apify_error(platform_name: str, e: Exception):
+    err_str = str(e)
+    if "402" in err_str or "payment" in err_str.lower():
+        print(f"[ERROR] ❌ Saldo / Credit Token Apify (APIFY_API_TOKEN) telah HABIS atau pembayaran diperlukan (HTTP 402 Payment Required).")
+        print(f"[ERROR] 👉 Silakan lakukan top up credit pada akun Apify Anda atau perbarui APIFY_API_TOKEN di file .env!")
+    else:
+        print(f"[ERROR] ❌ Kesalahan saat memanggil Aktor {platform_name} Apify: {e}")
 
 WIB_TZ = timezone(timedelta(hours=7))
 
@@ -535,8 +544,7 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
                     
         return results
     except Exception as e:
-        print(f"[ERROR] Kesalahan saat memanggil Aktor LinkedIn Apify (harvestapi/linkedin-post-search): {e}")
-        return []
+        handle_apify_error("LinkedIn (harvestapi/linkedin-post-search)", e)
         return []
 
 def scrape_news_portal(client, general_cfg, log_activity: str = "", user_app: str = "local_user"):
