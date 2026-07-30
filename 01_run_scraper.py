@@ -424,7 +424,8 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
         "scrapeComments": False,
         "maxComments": 0,
         "scrapeReactions": False,
-        "maxReactions": 0
+        "maxReactions": 0,
+        "profileScraperMode": "short"
     }
     
     try:
