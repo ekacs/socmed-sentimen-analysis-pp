@@ -1196,7 +1196,7 @@ with tab_viz:
         selected_kw = st.multiselect(
             "🔍 Riwayat Kata Kunci:",
             options=kw_options,
-            default=None,
+            default=["ALL (Semua Data)"],
             help="Pilih kata kunci riwayat atau 'ALL (Semua Data)'."
         )
     with col_h2:
@@ -1256,6 +1256,9 @@ with tab_viz:
         st.markdown("<br>", unsafe_allow_html=True)
         btn_exec_analysis = st.button("🔍 Jalankan Analisis Sekarang", type="primary", key="btn_exec_viz", use_container_width=True)
 
+    df_viz_filtered = df_base_viz.copy()
+    selected_search_terms = []
+
     if not is_target_valid:
         st.divider()
         st.warning(
@@ -1264,8 +1267,6 @@ with tab_viz:
             "analisis komprehensif yang merepresentasikan seluruh data."
         )
     else:
-        df_viz_filtered = df_base_viz.copy()
-
         # Filter berdasarkan rentang tanggal
         if isinstance(viz_date_range, tuple) and len(viz_date_range) == 2:
             date_mask = (
@@ -1275,7 +1276,6 @@ with tab_viz:
             df_viz_filtered = df_viz_filtered[date_mask]
 
         # Gabungkan istilah pencarian spesifik jika 'ALL' tidak dipilih sendiri
-        selected_search_terms = []
         if has_specific_selected and not is_all_selected:
             for k in specific_kw:
                 ck = str(k).strip().lower().lstrip("#@")
