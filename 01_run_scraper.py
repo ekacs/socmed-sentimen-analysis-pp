@@ -755,7 +755,8 @@ def scrape_news_portal(client, general_cfg, log_activity: str = "", user_app: st
 def scrape_website_content(client, website_cfg: dict, log_activity: str = "", user_app: str = "local_user"):
     """
     Menggunakan aktor OFFICIAL 'apify/website-content-crawler' untuk menarik
-    konten dari situs web / dokumen publik umum berdasarkan Target URL (Start URLs) dan Kata Kunci / Searchbar.
+    konten dari situs web / dokumen publik umum dengan fokus murni pada JUDUL & ISI TEKS BERITA
+    serta pencarian terarah untuk efisiensi waktu maksimal.
     """
     print("[INFO] Memulai penarikan data dari Website / Dokumen Publik (Aktor: apify/website-content-crawler)...")
     
@@ -764,19 +765,61 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
     if isinstance(raw_urls, str):
         raw_urls = [raw_urls]
     
+    keywords = website_cfg.get("keywords", [])
+    if isinstance(keywords, str):
+        keywords = [keywords]
+    keywords = [str(k).strip() for k in keywords if str(k).strip()]
+
+    # Mapping portal/domain populer ke endpoint URL pencarian langsung
+    SEARCH_URL_MAP = [
+        ("kompas.com",          "https://search.kompas.com/search/?q={kw}"),
+        ("cnnindonesia.com",    "https://www.cnnindonesia.com/search/?query={kw}"),
+        ("katadata.co.id",      "https://katadata.co.id/search?q={kw}"),
+        ("detik.com",           "https://www.detik.com/search/searchall?query={kw}"),
+        ("tribunnews.com",      "https://www.tribunnews.com/search?q={kw}"),
+        ("liputan6.com",        "https://www.liputan6.com/search?q={kw}"),
+        ("merdeka.com",         "https://www.merdeka.com/search/?q={kw}"),
+        ("tempo.co",            "https://www.tempo.co/search?q={kw}"),
+        ("republika.co.id",     "https://www.republika.co.id/search?q={kw}"),
+        ("suara.com",           "https://www.suara.com/search?q={kw}"),
+        ("antaranews.com",      "https://www.antaranews.com/search?q={kw}"),
+    ]
+
     start_urls = []
     for u in raw_urls:
         if isinstance(u, str) and u.strip():
             url_str = u.strip()
             if not url_str.startswith("http"):
                 url_str = "https://" + url_str.lstrip("/")
-            start_urls.append({"url": url_str})
             
-    keywords = website_cfg.get("keywords", [])
-    if isinstance(keywords, str):
-        keywords = [keywords]
-    keywords = [str(k).strip() for k in keywords if str(k).strip()]
-    
+            # Jika ada kata kunci dan URL berupa domain/homepage, buat URL pencarian terarah agar ultra-cepat
+            try:
+                from urllib.parse import urlparse as _up
+                parsed_u = _up(url_str)
+                hostname = (parsed_u.hostname or "").lower()
+                path = parsed_u.path.strip("/")
+            except Exception:
+                hostname, path = "", ""
+
+            if keywords and (not path or path == ""):
+                added_search_url = False
+                for domain_needle, search_template in SEARCH_URL_MAP:
+                    if domain_needle in hostname:
+                        for kw in keywords:
+                            k_encoded = kw.replace(" ", "%20")
+                            start_urls.append({"url": search_template.format(kw=k_encoded)})
+                        added_search_url = True
+                        break
+                if not added_search_url:
+                    # Fallback generik search endpoint jika domain tidak dikenal
+                    scheme = parsed_u.scheme or "https"
+                    netloc = parsed_u.netloc or hostname
+                    for kw in keywords:
+                        k_encoded = kw.replace(" ", "%20")
+                        start_urls.append({"url": f"{scheme}://{netloc}/search?q={k_encoded}"})
+            else:
+                start_urls.append({"url": url_str})
+
     if not start_urls:
         print("[WARNING] Tidak ada Target URL (Start URLs) website yang valid diisi. Penarikan website dibatalkan.")
         return []
@@ -799,14 +842,17 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
     if start_date_str or end_date_str:
         print(f"[INFO] Rentang Tanggal Target Website: {start_date_str or 'Awal'} s.d. {end_date_str or 'Kini'}")
     print(f"[INFO] Batas Kedalaman (Max Depth): {max_depth} | Max Pages: {max_results} | Engine: {crawler_type}")
+    print(f"[INFO] Optimasi Konten: Focus Mozilla Readability (Judul & Teks Berita Murni) | Media Blocked")
     
-    # 3. Parameter input resmi apify/website-content-crawler
+    # 3. Parameter input resmi apify/website-content-crawler difokuskan pada Judul & Isi Teks Berita
     run_input = {
         "startUrls": start_urls,
         "crawlerType": crawler_type,
         "maxCrawlDepth": max_depth,
         "maxPagesPerCrawl": max_results,
-        "blockMedia": True,
+        "htmlTransformer": "readableText", # Ekstraksi berfokus pada Judul & Teks Utama (Mozilla Readability)
+        "readableTextCharThreshold": 100,  # Membuang elemen pendek yang bukan bagian dari artikel
+        "blockMedia": True,                # Blokir gambar/video agar scraping ultra-cepat
         "saveMarkdown": True,
         "saveHtml": False,
         "saveFiles": False,
@@ -814,15 +860,17 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
         "storeSkippedUrls": False,
         "useSitemaps": False,
         "useLlmsTxt": False,
-        "expandIframes": True,
+        "expandIframes": False,
         "removeCookieWarnings": True,
-        "aggressivePrune": False,
+        "aggressivePrune": True,           # Membuang menu/header berulang untuk efisiensi
         "ignoreCanonicalUrl": False,
         "ignoreHttpsErrors": False,
         "keepUrlFragments": False,
         "debugLog": False,
         "debugMode": False,
         "respectRobotsTxtFile": True,
+        # Bersihkan seluruh elemen pengganggu agar hanya menyisakan Judul & Teks Berita Murni
+        "removeElementsCssSelector": "nav, footer, header, sidebar, script, style, noscript, svg, img, form, iframe, .ad, .advertisement, .modal, .cookie, [role=\"navigation\"],[role=\"banner\"],[role=\"dialog\"],[role=\"alertdialog\"]",
         "proxyConfiguration": {
             "useApifyProxy": True
         }
