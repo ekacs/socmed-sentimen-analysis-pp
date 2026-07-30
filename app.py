@@ -364,8 +364,8 @@ def get_top_keywords_df(df, top_n=10):
     return df_res
 
 # Dashboard Header
-st.title("🏛️ Pusat Analisis Sentimen Kebijakan Publik")
-st.markdown("Dasbor eksekutif berbasis AI untuk memantau sentimen publik terhadap kebijakan publik.")
+st.title("🏛️ Aplikasi Analisis Sentimen Publik")
+st.markdown("Dasbor eksekutif berbasis AI untuk merangkum sentimen publik sebagai bahan pertimbangan kebijakan.")
 st.divider()
 
 # Load All Data
