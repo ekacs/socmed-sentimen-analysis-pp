@@ -1037,7 +1037,7 @@ with tab_review:
 
     # 5 KPI Metric Cards
     cr1, cr2, cr3, cr4, cr5 = st.columns(5)
-    with cr1: st.metric("📦 Total Mention", f"{total_volume_rev:,}")
+    with cr1: st.metric("📦 Total Data", f"{total_volume_rev:,}")
     with cr2: st.metric("👥 Akun Unik", f"{unique_users_rev:,}")
     with cr3: st.metric("🟢 Sentimen Positif", f"{pct_pos_r:.1f}%", delta=f"{pos_cnt_r:,} data")
     with cr4: st.metric("🔴 Sentimen Negatif", f"{pct_neg_r:.1f}%", delta=f"{neg_cnt_r:,} data", delta_color="inverse")
@@ -1196,7 +1196,7 @@ with tab_viz:
         selected_kw = st.multiselect(
             "🔍 Riwayat Kata Kunci:",
             options=kw_options,
-            default=kw_options[:1] if kw_options else None,
+            default=None,
             help="Pilih satu atau lebih kata kunci riwayat (opsional)."
         )
     with col_h2:
@@ -1283,18 +1283,21 @@ with tab_viz:
     st.divider()
 
     total_volume_viz = len(df_viz_filtered)
-    total_cleaned_viz = len(df_viz_cleaned)
-    sentiment_counts_viz = df_viz_cleaned['sentiment_label'].value_counts() if not df_viz_cleaned.empty else pd.Series()
-    total_labelled_viz = df_viz_cleaned['sentiment_label'].notna().sum() if not df_viz_cleaned.empty else 0
+    total_cleaned_viz = len(df_viz_cleaned) if not df_viz_cleaned.empty else total_volume_viz
+    
+    # Hitung sentimen langsung dari df_viz_filtered agar konsisten 100% dengan Tab 3 Review Data
+    sentiment_target_df = df_viz_filtered if 'sentiment_label' in df_viz_filtered.columns else df_viz_cleaned
+    total_labelled_viz = sentiment_target_df['sentiment_label'].notna().sum() if not sentiment_target_df.empty else 0
+    sentiment_counts_viz = sentiment_target_df['sentiment_label'].value_counts() if not sentiment_target_df.empty else pd.Series()
     
     if total_labelled_viz > 0:
-        persen_pos_v = (df_viz_cleaned['sentiment_label'] == 'Positif').sum() / total_labelled_viz * 100
-        persen_neu_v = (df_viz_cleaned['sentiment_label'] == 'Netral').sum() / total_labelled_viz * 100
-        persen_neg_v = (df_viz_cleaned['sentiment_label'] == 'Negatif').sum() / total_labelled_viz * 100
+        persen_pos_v = (sentiment_target_df['sentiment_label'] == 'Positif').sum() / total_labelled_viz * 100
+        persen_neu_v = (sentiment_target_df['sentiment_label'] == 'Netral').sum() / total_labelled_viz * 100
+        persen_neg_v = (sentiment_target_df['sentiment_label'] == 'Negatif').sum() / total_labelled_viz * 100
         
-        pos_cnt_v = int((df_viz_cleaned['sentiment_label'] == 'Positif').sum())
-        neu_cnt_v = int((df_viz_cleaned['sentiment_label'] == 'Netral').sum())
-        neg_cnt_v = int((df_viz_cleaned['sentiment_label'] == 'Negatif').sum())
+        pos_cnt_v = int((sentiment_target_df['sentiment_label'] == 'Positif').sum())
+        neu_cnt_v = int((sentiment_target_df['sentiment_label'] == 'Netral').sum())
+        neg_cnt_v = int((sentiment_target_df['sentiment_label'] == 'Negatif').sum())
         
         max_idx_v = sentiment_counts_viz.idxmax()
         max_val_v = sentiment_counts_viz.max() / total_labelled_viz * 100
@@ -1311,7 +1314,7 @@ with tab_viz:
     unique_users_v = df_viz_filtered['username'].nunique() if 'username' in df_viz_filtered.columns and not df_viz_filtered.empty else 0
 
     mv1, mv2, mv3, mv4, mv5 = st.columns(5)
-    with mv1: st.metric("📦 Total Mention", f"{total_volume_viz:,}")
+    with mv1: st.metric("📦 Total Data", f"{total_volume_viz:,}")
     with mv2: st.metric("👥 Akun Unik", f"{unique_users_v:,}")
     with mv3: st.metric("🟢 Sentimen Positif", f"{persen_pos_v:.1f}%", delta=f"{pos_cnt_v:,} data")
     with mv4: st.metric("🔴 Sentimen Negatif", f"{persen_neg_v:.1f}%", delta=f"{neg_cnt_v:,} data", delta_color="inverse")
