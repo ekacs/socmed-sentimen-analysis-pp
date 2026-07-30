@@ -830,13 +830,43 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
         max_results = website_cfg.get("max_results", 50)
     max_results = int(max_results)
     
-    max_depth = int(website_cfg.get("max_depth", 1))
+    user_depth = int(website_cfg.get("max_depth", 1))
+    # Jika menggunakan URL pencarian/domain, pastikan maxCrawlDepth minimal 2 agar crawler dapat melompat dari halaman pencarian (depth 0/1) ke artikel di sub-domain (depth 1/2)
+    max_depth = max(user_depth, 2) if keywords else user_depth
     crawler_type = website_cfg.get("crawler_type", "playwright:adaptive")
     
     start_date_str = website_cfg.get("start_date")
     end_date_str = website_cfg.get("end_date")
     
-    print(f"[INFO] Target URL ({len(start_urls)}): {[s['url'] for s in start_urls]}")
+    # Rancang includeUrlGlobs secara dinamis untuk mengizinkan penjelajahan lintas sub-domain (misal: nasional.kompas.com, regional.kompas.com, dll.)
+    include_globs = []
+    for su in start_urls:
+        u_val = su.get("url", "")
+        try:
+            from urllib.parse import urlparse as _up
+            parsed_su = _up(u_val)
+            h = (parsed_su.hostname or "").lower()
+            parts = h.split(".")
+            if len(parts) >= 2:
+                root_dom = ".".join(parts[-2:])
+            else:
+                root_dom = h
+            if root_dom:
+                include_globs.extend([
+                    f"https://*.{root_dom}/**",
+                    f"http://*.{root_dom}/**",
+                    f"https://{root_dom}/**",
+                    f"http://{root_dom}/**"
+                ])
+        except Exception:
+            pass
+
+    if not include_globs:
+        include_globs = ["https://**", "http://**"]
+    include_globs = list(dict.fromkeys(include_globs))
+
+    print(f"[INFO] Target Start URL ({len(start_urls)}): {[s['url'] for s in start_urls]}")
+    print(f"[INFO] Pola Jangkauan URL (includeUrlGlobs): {include_globs}")
     if keywords:
         print(f"[INFO] Kata Kunci / Searchbar dasar pencarian ({len(keywords)}): {keywords}")
     if start_date_str or end_date_str:
@@ -844,9 +874,10 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
     print(f"[INFO] Batas Kedalaman (Max Depth): {max_depth} | Max Pages: {max_results} | Engine: {crawler_type}")
     print(f"[INFO] Optimasi Konten: Focus Mozilla Readability (Judul & Teks Berita Murni) | Media Blocked")
     
-    # 3. Parameter input resmi apify/website-content-crawler difokuskan pada Judul & Isi Teks Berita
+    # 3. Parameter input resmi apify/website-content-crawler
     run_input = {
         "startUrls": start_urls,
+        "includeUrlGlobs": [{"glob": g} for g in include_globs],
         "crawlerType": crawler_type,
         "maxCrawlDepth": max_depth,
         "maxPagesPerCrawl": max_results,
@@ -886,6 +917,14 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
             if not url:
                 continue
                 
+            # Skip jika URL adalah halaman index/pencarian itu sendiri (bukan halaman artikel berita asli)
+            url_lower = str(url).lower()
+            if any(p in url_lower for p in ["/search/?", "/search?", "search.kompas.com/search", "searchall?"]):
+                # Jika halaman pencarian memuat artikel berita asli, tetap lanjut, namun jika hanya listing search skip
+                title_tmp = str(item.get("title") or "").lower()
+                if "pencarian" in title_tmp or "search" in title_tmp:
+                    continue
+
             title = (
                 item.get("title")
                 or (item.get("metadata") or {}).get("title") if isinstance(item.get("metadata"), dict) else None
