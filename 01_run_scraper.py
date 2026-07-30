@@ -790,9 +790,14 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
     max_depth = int(website_cfg.get("max_depth", 1))
     crawler_type = website_cfg.get("crawler_type", "playwright:adaptive")
     
+    start_date_str = website_cfg.get("start_date")
+    end_date_str = website_cfg.get("end_date")
+    
     print(f"[INFO] Target URL ({len(start_urls)}): {[s['url'] for s in start_urls]}")
     if keywords:
         print(f"[INFO] Kata Kunci / Searchbar dasar pencarian ({len(keywords)}): {keywords}")
+    if start_date_str or end_date_str:
+        print(f"[INFO] Rentang Tanggal Target Website: {start_date_str or 'Awal'} s.d. {end_date_str or 'Kini'}")
     print(f"[INFO] Batas Kedalaman (Max Depth): {max_depth} | Max Pages: {max_results} | Engine: {crawler_type}")
     
     # 3. Parameter input resmi apify/website-content-crawler
@@ -846,6 +851,23 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
                 or item.get("date")
                 or (item.get("crawl") or {}).get("loadedTime") if isinstance(item.get("crawl"), dict) else None
             )
+
+            # Filtering rentang tanggal jika metadata tanggal tersedia dan rentang diatur
+            if (start_date_str or end_date_str) and date_raw:
+                try:
+                    date_iso = parse_to_wib_iso(date_raw)
+                    item_date_str = str(date_iso)[:10]
+                    item_d = datetime.strptime(item_date_str, "%Y-%m-%d").date()
+                    if start_date_str:
+                        s_d = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                        if item_d < s_d:
+                            continue
+                    if end_date_str:
+                        e_d = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+                        if item_d > e_d:
+                            continue
+                except Exception:
+                    pass
 
             # Filtering pencarian kata kunci / frasa jika pengguna mengisikan kata kunci di searchbar
             if keywords:

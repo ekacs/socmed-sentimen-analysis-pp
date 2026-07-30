@@ -715,7 +715,15 @@ with tab_scrape:
     # -----------------------------------------------------------------
     if "Website / Dokumen Publik" in selected_platforms:
         with st.form("form_config_website"):
-            st.markdown("### 🌐 Konfigurasi Penarikan Website / Dokumen Publik ")
+            st.markdown("### 🌐 Konfigurasi Penarikan Website / Dokumen Publik (Apify Content Crawler)")
+            col_w_d1, col_w_d2 = st.columns(2)
+            with col_w_d1:
+                web_start_val = _parse_date(website_cfg.get("start_date"), 30)
+                web_start_input = st.date_input("Tanggal Mulai Target (Website):", value=web_start_val, key="web_start")
+            with col_w_d2:
+                web_end_val = _parse_date(website_cfg.get("end_date"), 0)
+                web_end_input = st.date_input("Tanggal Akhir Target (Website):", value=web_end_val, key="web_end")
+
             web_urls_raw = website_cfg.get("website_urls", website_cfg.get("start_urls", ["https://www.example.com"]))
             web_urls_str = ", ".join(web_urls_raw) if isinstance(web_urls_raw, list) else str(web_urls_raw)
             web_url_input = st.text_input("Target URL (Start URLs — pisahkan koma jika lebih dari satu):", value=web_urls_str, help="Contoh: https://www.kemendagri.go.id, https://situs.com/kebijakan", key="web_urls")
@@ -755,6 +763,8 @@ with tab_scrape:
                     st.error("⚠️ Input Target URL (Start URLs) wajib diisi!")
                 else:
                     web_obj = {
+                        "start_date": web_start_input.strftime("%Y-%m-%d"),
+                        "end_date": web_end_input.strftime("%Y-%m-%d"),
                         "website_urls": web_urls_list,
                         "start_urls": web_urls_list,
                         "keywords": [k.strip() for k in web_kw_input.split(",") if k.strip()],
