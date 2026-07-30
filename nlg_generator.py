@@ -99,6 +99,10 @@ def generate_executive_summary(
                 time.sleep(2 * (attempt + 1))
         
     except Exception as e:
+        err_str = str(e).lower()
+        if "429" in err_str or "quota" in err_str or "resourceexhausted" in err_str or "rate limit" in err_str:
+            import db_manager
+            db_manager.set_gemini_quota_flag(True)
         return f"### ❌ Kesalahan API Gemini\n\nGagal menghubungi server AI Gemini. Detail kesalahan: {e}"
 
 if __name__ == "__main__":

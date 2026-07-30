@@ -10,13 +10,14 @@ from apify_client.errors import ApifyApiError
 # Impor fungsi pembaca konfigurasi
 from config_parser import load_config, build_twitter_query
 # Impor fungsi basis data
-from db_manager import simpan_data_ke_db, buat_tabel, get_scraping_mode, simpan_keysearch_history
+from db_manager import simpan_data_ke_db, buat_tabel, get_scraping_mode, simpan_keysearch_history, set_apify_quota_flag
 
 def handle_apify_error(platform_name: str, e: Exception):
-    err_str = str(e)
-    if "402" in err_str or "payment" in err_str.lower():
+    err_str = str(e).lower()
+    if "402" in err_str or "payment" in err_str or "credit" in err_str or "quota" in err_str or "out of compute" in err_str:
         print(f"[ERROR] ❌ Saldo / Credit Token Apify (APIFY_API_TOKEN) telah HABIS atau pembayaran diperlukan (HTTP 402 Payment Required).")
-        print(f"[ERROR] 👉 Silakan lakukan top up credit pada akun Apify Anda atau perbarui APIFY_API_TOKEN di file .env!")
+        print(f"[ERROR] 👉 Silakan lakukan top up credit pada akun Apify Anda atau perbarui APIFY_API_TOKEN!")
+        set_apify_quota_flag(True)
     else:
         print(f"[ERROR] ❌ Kesalahan saat memanggil Aktor {platform_name} Apify: {e}")
 

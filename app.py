@@ -245,6 +245,22 @@ def check_db_storage_full():
         pass
     return False
 
+def check_apify_quota_exhausted():
+    try:
+        if hasattr(db_manager, 'is_apify_quota_exhausted'):
+            return db_manager.is_apify_quota_exhausted()
+    except Exception as _e:
+        pass
+    return False
+
+def check_gemini_quota_exhausted():
+    try:
+        if hasattr(db_manager, 'is_gemini_quota_exhausted'):
+            return db_manager.is_gemini_quota_exhausted()
+    except Exception as _e:
+        pass
+    return False
+
 # Set Stopwords Lengkap Bahasa Indonesia & Artefak Web / URL Noise
 STOPWORDS_INDONESIA = {
     # Artefak URL & Web Noise
@@ -433,6 +449,12 @@ with col_db2:
 if check_db_storage_full():
     st.sidebar.error("🚨 Status Storage DB: Penyimpanan Penuh (Hubungi Developer untuk Pembersihan Storage)")
 
+if check_apify_quota_exhausted():
+    st.sidebar.error("🚨 Status APIFY: Quota/Saldo Habis (Hubungi Developer / Top-up Quota)")
+
+if check_gemini_quota_exhausted():
+    st.sidebar.error("🚨 Status Gemini AI: Quota Token Habis (Hubungi Developer / Top-up Token)")
+
 st.sidebar.divider()
 st.sidebar.info("💡 **Tips Tema:** Klik ikon **⋮** di sudut kanan atas layar > **Settings > Theme** untuk memilih *Light* atau *Dark Mode*.")
 
@@ -463,6 +485,7 @@ with tab_scrape:
         total_db_rows = len(df_all) if not df_all.empty else 0
 
     db_is_full = check_db_storage_full()
+    apify_is_out = check_apify_quota_exhausted()
     
     if db_is_full:
         st.error(
@@ -470,6 +493,12 @@ with tab_scrape:
             "untuk penggunaan lebih lanjut dapat menghubungi Mrs Prof. Tuti Rachmawati, PhD - Universitas Parahyangan**"
         )
         st.caption(f"📦 Status Storage Database: 🚨 **Penyimpanan Penuh / Gagal Menulis Data ke Supabase** ({total_db_rows:,} baris tersimpan).")
+    elif apify_is_out:
+        st.error(
+            "🚨 **Mohon maaf untuk sementara waktu mesin penarikan data tidak dapat digunakan karena saldo/kuota paket APIFY telah HABIS "
+            "untuk penggunaan lebih lanjut dapat menghubungi Mrs Prof. Tuti Rachmawati, PhD - Universitas Parahyangan**"
+        )
+        st.caption(f"📦 Status Storage Database: 🟢 **Normal** ({total_db_rows:,} baris tersimpan) | 🚨 **Kuota APIFY Habis**")
     else:
         st.caption(f"📦 Status Storage Database: 🟢 **Normal** ({total_db_rows:,} baris tersimpan).")
     
@@ -720,6 +749,8 @@ with tab_scrape:
     st.markdown("### 🚀 Eksekusi Penarikan Data")
     if db_is_full:
         st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", disabled=True, help="Penyimpanan database penuh (gagal menyimpan data ke Supabase). Penarikan data dinonaktifkan sementara.")
+    elif apify_is_out:
+        st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", disabled=True, help="Saldo/kuota paket APIFY habis. Penarikan data dinonaktifkan sementara.")
     else:
         if st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", key="btn_run_scraper_main"):
             with st.status("🚀 Menghubungkan ke Apify Cloud & menarik data mentah...", expanded=True) as status_s:
@@ -757,8 +788,19 @@ with tab_ml:
         if st.button("🔄 Cek Data RAW Baru", use_container_width=True):
             st.rerun()
 
+    gemini_is_out = check_gemini_quota_exhausted()
+    if gemini_is_out:
+        st.error(
+            "🚨 **Mohon maaf untuk sementara waktu fitur pemrosesan AI tidak dapat digunakan karena kuota token Gemini AI telah HABIS "
+            "untuk penggunaan lebih lanjut dapat menghubungi Mrs Prof. Tuti Rachmawati, PhD - Universitas Parahyangan**"
+        )
+
     st.divider()
-    btn_run_pipeline = st.button("🧠 Jalankan Proses AI & ML Sekarang", type="primary", use_container_width=True, key="btn_run_pipeline_tab2")
+    if gemini_is_out:
+        st.button("🧠 Jalankan Proses AI & ML Sekarang", type="primary", disabled=True, use_container_width=True, help="Kuota token Gemini AI habis. Pemrosesan AI dinonaktifkan sementara.")
+        btn_run_pipeline = False
+    else:
+        btn_run_pipeline = st.button("🧠 Jalankan Proses AI & ML Sekarang", type="primary", use_container_width=True, key="btn_run_pipeline_tab2")
     
     if btn_run_pipeline:
         with st.status("🧠 Melakukan pembersihan duplikat RAW, standardisasi EYD (Gemini), & klasifikasi SVM...", expanded=True) as status_ml:
@@ -1251,19 +1293,26 @@ with tab_viz:
         else:
             fokus_kebijakan_txt = f"isu publik dengan kata kunci ({top_kw_str})"
 
-        if st.button("🔄 Perbarui Analisis Narasi (Gemini AI)", type="primary", key="btn_gen_nlg_tab4"):
-            with st.spinner(f"Menganalisis isu '{fokus_kebijakan_txt}' & menyusun narasi minimal 250 kata..."):
-                narrative_res = generate_executive_summary(
-                    total_data=total_cleaned_viz,
-                    persen_negatif=round(persen_neg_v, 1),
-                    persen_positif=round(persen_pos_v, 1),
-                    persen_netral=round(persen_neu_v, 1),
-                    top_keywords=top_kw_str,
-                    contoh_cuitan=contoh_suara,
-                    kebijakan_fokus=fokus_kebijakan_txt,
-                    api_key=session_credentials.get_active_gemini_key()
-                )
-                st.session_state['ai_narrative_viz_cache'] = narrative_res
+        if gemini_is_out:
+            st.error(
+                "🚨 **Mohon maaf untuk sementara waktu fitur pemrosesan AI tidak dapat digunakan karena kuota token Gemini AI telah HABIS "
+                "untuk penggunaan lebih lanjut dapat menghubungi Mrs Prof. Tuti Rachmawati, PhD - Universitas Parahyangan**"
+            )
+            st.button("🔄 Perbarui Analisis Narasi (Gemini AI)", type="primary", disabled=True, help="Kuota token Gemini AI habis. Fitur AI dinonaktifkan sementara.")
+        else:
+            if st.button("🔄 Perbarui Analisis Narasi (Gemini AI)", type="primary", key="btn_gen_nlg_tab4"):
+                with st.spinner(f"Menganalisis isu '{fokus_kebijakan_txt}' & menyusun narasi minimal 250 kata..."):
+                    narrative_res = generate_executive_summary(
+                        total_data=total_cleaned_viz,
+                        persen_negatif=round(persen_neg_v, 1),
+                        persen_positif=round(persen_pos_v, 1),
+                        persen_netral=round(persen_neu_v, 1),
+                        top_keywords=top_kw_str,
+                        contoh_cuitan=contoh_suara,
+                        kebijakan_fokus=fokus_kebijakan_txt,
+                        api_key=session_credentials.get_active_gemini_key()
+                    )
+                    st.session_state['ai_narrative_viz_cache'] = narrative_res
                 
         if st.session_state['ai_narrative_viz_cache']:
             st.markdown(st.session_state['ai_narrative_viz_cache'])

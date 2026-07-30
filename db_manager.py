@@ -149,48 +149,67 @@ def buat_tabel():
     finally:
         conn.close()
 
-def set_storage_full_flag(is_full: bool = True, db_url=None):
+def set_system_config_flag(key: str, is_active: bool = True, db_url=None):
     """
-    Menyimpan atau memperbarui status kapasitas storage penuh pada tabel system_config.
+    Menyimpan atau memperbarui status flag pada tabel system_config.
     """
     try:
         conn = get_connection(db_url)
         cursor = conn.cursor()
-        val = "TRUE" if is_full else "FALSE"
+        val = "TRUE" if is_active else "FALSE"
         db_type = get_db_type(db_url)
         if db_type == "postgresql":
             query = """
                 INSERT INTO system_config (config_key, config_value)
-                VALUES ('DB_STORAGE_FULL', %s)
+                VALUES (%s, %s)
                 ON CONFLICT (config_key) DO UPDATE SET config_value = EXCLUDED.config_value
             """
+            cursor.execute(query, (key, val))
         else:
             query = """
                 INSERT OR REPLACE INTO system_config (config_key, config_value)
-                VALUES ('DB_STORAGE_FULL', ?)
+                VALUES (?, ?)
             """
-        cursor.execute(query, (val,))
+            cursor.execute(query, (key, val))
         conn.commit()
         conn.close()
     except Exception as e:
-        print(f"[WARNING] Gagal memperbarui status DB_STORAGE_FULL: {e}")
+        print(f"[WARNING] Gagal memperbarui status system_config '{key}': {e}")
 
-def is_storage_full(db_url=None) -> bool:
+def get_system_config_flag(key: str, db_url=None) -> bool:
     """
-    Mengecek apakah storage database mengalami eror penulisan / kapasitas penuh (DB_STORAGE_FULL = 'TRUE').
+    Mengecek apakah status flag pada system_config bernilai 'TRUE'.
     """
     try:
         conn = get_connection(db_url)
         cursor = conn.cursor()
         ph = get_placeholder(db_url)
-        cursor.execute(f"SELECT config_value FROM system_config WHERE config_key = {ph}", ('DB_STORAGE_FULL',))
+        cursor.execute(f"SELECT config_value FROM system_config WHERE config_key = {ph}", (key,))
         row = cursor.fetchone()
         conn.close()
         if row and row[0] and row[0].upper() == "TRUE":
             return True
     except Exception as e:
-        print(f"[WARNING] Gagal mengecek status DB_STORAGE_FULL: {e}")
+        print(f"[WARNING] Gagal mengecek status system_config '{key}': {e}")
     return False
+
+def set_storage_full_flag(is_full: bool = True, db_url=None):
+    set_system_config_flag('DB_STORAGE_FULL', is_full, db_url)
+
+def is_storage_full(db_url=None) -> bool:
+    return get_system_config_flag('DB_STORAGE_FULL', db_url)
+
+def set_apify_quota_flag(is_exhausted: bool = True, db_url=None):
+    set_system_config_flag('APIFY_QUOTA_EXHAUSTED', is_exhausted, db_url)
+
+def is_apify_quota_exhausted(db_url=None) -> bool:
+    return get_system_config_flag('APIFY_QUOTA_EXHAUSTED', db_url)
+
+def set_gemini_quota_flag(is_exhausted: bool = True, db_url=None):
+    set_system_config_flag('GEMINI_QUOTA_EXHAUSTED', is_exhausted, db_url)
+
+def is_gemini_quota_exhausted(db_url=None) -> bool:
+    return get_system_config_flag('GEMINI_QUOTA_EXHAUSTED', db_url)
 
 def simpan_data_ke_db(data_cuitan):
     """

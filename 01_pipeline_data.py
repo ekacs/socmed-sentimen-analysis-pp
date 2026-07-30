@@ -100,6 +100,10 @@ def clean_batch_with_gemini(client, batch_items):
                 result[pid] = id_to_cleaned.get(idx, raw)
             return result
         except Exception as e:
+            err_str = str(e).lower()
+            if "429" in err_str or "quota" in err_str or "resourceexhausted" in err_str or "rate limit" in err_str:
+                print(f"[ERROR] ❌ Kuota token Gemini AI telah HABIS / Rate Limit tercapai: {e}")
+                db_manager.set_gemini_quota_flag(True)
             if attempt == 2:
                 print(f"[WARNING] Batch cleaning fallback ke teks asli: {e}")
                 return {pid: raw for pid, raw in batch_items}
