@@ -1187,9 +1187,9 @@ with tab_viz:
     except Exception:
         hist_sep = {"keywords": [], "hashtags": [], "profiles": []}
 
-    kw_options = hist_sep.get("keywords", [])
-    ht_options = hist_sep.get("hashtags", [])
-    pr_options = hist_sep.get("profiles", [])
+    kw_options = ["ALL (Semua Data)"] + [str(k) for k in hist_sep.get("keywords", []) if str(k) != "ALL (Semua Data)"]
+    ht_options = ["ALL (Semua Data)"] + [str(h) for h in hist_sep.get("hashtags", []) if str(h) != "ALL (Semua Data)"]
+    pr_options = ["ALL (Semua Data)"] + [str(p) for p in hist_sep.get("profiles", []) if str(p) != "ALL (Semua Data)"]
 
     col_h1, col_h2, col_h3 = st.columns(3)
     with col_h1:
@@ -1197,22 +1197,36 @@ with tab_viz:
             "🔍 Riwayat Kata Kunci:",
             options=kw_options,
             default=None,
-            help="Pilih satu atau lebih kata kunci riwayat (opsional)."
+            help="Pilih kata kunci riwayat atau 'ALL (Semua Data)'."
         )
     with col_h2:
         selected_ht = st.multiselect(
             "🏷️ Riwayat Tagar / Hashtag:",
             options=ht_options,
             default=None,
-            help="Pilih satu atau lebih hashtag riwayat (opsional)."
+            help="Pilih hashtag riwayat atau 'ALL (Semua Data)'."
         )
     with col_h3:
         selected_pr = st.multiselect(
             "👥 Riwayat User Profile:",
             options=pr_options,
             default=None,
-            help="Pilih satu atau lebih username/profil riwayat (opsional)."
+            help="Pilih username/profil riwayat atau 'ALL (Semua Data)'."
         )
+
+    # Validasi Pemilihan Target Analisis
+    is_all_selected = (
+        ("ALL (Semua Data)" in (selected_kw or [])) or
+        ("ALL (Semua Data)" in (selected_ht or [])) or
+        ("ALL (Semua Data)" in (selected_pr or []))
+    )
+
+    specific_kw = [k for k in (selected_kw or []) if k != "ALL (Semua Data)"]
+    specific_ht = [h for h in (selected_ht or []) if h != "ALL (Semua Data)"]
+    specific_pr = [p for p in (selected_pr or []) if p != "ALL (Semua Data)"]
+    has_specific_selected = bool(specific_kw or specific_ht or specific_pr)
+
+    is_target_valid = is_all_selected or has_specific_selected
 
     # Rentang tanggal
     if not df_base_viz.empty and 'date' in df_base_viz.columns:
@@ -1241,43 +1255,49 @@ with tab_viz:
     with col_dt2:
         st.markdown("<br>", unsafe_allow_html=True)
         btn_exec_analysis = st.button("🔍 Jalankan Analisis Sekarang", type="primary", key="btn_exec_viz", use_container_width=True)
-        
-    df_viz_filtered = df_base_viz.copy()
 
-    # Filter berdasarkan rentang tanggal (jika tanggal valid/parsed, saring sesuai rentang; pertahankan data jika tanggal kosong agar tidak terbuang)
-    if isinstance(viz_date_range, tuple) and len(viz_date_range) == 2:
-        date_mask = (
-            (df_viz_filtered['date_parsed'] >= viz_date_range[0]) & 
-            (df_viz_filtered['date_parsed'] <= viz_date_range[1])
-        ) | df_viz_filtered['date_parsed'].isna()
-        df_viz_filtered = df_viz_filtered[date_mask]
+    if not is_target_valid:
+        st.divider()
+        st.warning(
+            "⚠️ **Analisis belum dapat dikerjakan.** Silakan pilih minimal salah satu target pencarian "
+            "(Kata Kunci, Tagar, atau Profil Akun) atau pilih **'ALL (Semua Data)'** untuk melakukan "
+            "analisis komprehensif yang merepresentasikan seluruh data."
+        )
+    else:
+        df_viz_filtered = df_base_viz.copy()
 
-    # Gabungkan istilah pencarian dari 3 multiselect (opsional / tidak wajib terisi semua, cukup minimal 1)
-    selected_search_terms = []
-    if selected_kw:
-        for k in selected_kw:
-            ck = str(k).strip().lower().lstrip("#@")
-            if ck and ck not in selected_search_terms:
-                selected_search_terms.append(ck)
-    if selected_ht:
-        for h in selected_ht:
-            ch = str(h).strip().lower().lstrip("#@")
-            if ch and ch not in selected_search_terms:
-                selected_search_terms.append(ch)
-    if selected_pr:
-        for p in selected_pr:
-            cp = str(p).strip().lower().lstrip("#@")
-            if cp and cp not in selected_search_terms:
-                selected_search_terms.append(cp)
+        # Filter berdasarkan rentang tanggal
+        if isinstance(viz_date_range, tuple) and len(viz_date_range) == 2:
+            date_mask = (
+                (df_viz_filtered['date_parsed'] >= viz_date_range[0]) & 
+                (df_viz_filtered['date_parsed'] <= viz_date_range[1])
+            ) | df_viz_filtered['date_parsed'].isna()
+            df_viz_filtered = df_viz_filtered[date_mask]
 
-    if selected_search_terms and not df_viz_filtered.empty:
-        def _matches_keysearch(row):
-            txt = (str(row.get('cleaned_text') or '') + ' ' + str(row.get('raw_text') or '') + ' ' + str(row.get('username') or '')).lower()
-            return any(st_term in txt for st_term in selected_search_terms)
+        # Gabungkan istilah pencarian spesifik jika 'ALL' tidak dipilih sendiri
+        selected_search_terms = []
+        if has_specific_selected and not is_all_selected:
+            for k in specific_kw:
+                ck = str(k).strip().lower().lstrip("#@")
+                if ck and ck not in selected_search_terms:
+                    selected_search_terms.append(ck)
+            for h in specific_ht:
+                ch = str(h).strip().lower().lstrip("#@")
+                if ch and ch not in selected_search_terms:
+                    selected_search_terms.append(ch)
+            for p in specific_pr:
+                cp = str(p).strip().lower().lstrip("#@")
+                if cp and cp not in selected_search_terms:
+                    selected_search_terms.append(cp)
 
-        df_filtered_by_key = df_viz_filtered[df_viz_filtered.apply(_matches_keysearch, axis=1)]
-        if not df_filtered_by_key.empty:
-            df_viz_filtered = df_filtered_by_key
+        if selected_search_terms and not df_viz_filtered.empty:
+            def _matches_keysearch(row):
+                txt = (str(row.get('cleaned_text') or '') + ' ' + str(row.get('raw_text') or '') + ' ' + str(row.get('username') or '')).lower()
+                return any(st_term in txt for st_term in selected_search_terms)
+
+            df_filtered_by_key = df_viz_filtered[df_viz_filtered.apply(_matches_keysearch, axis=1)]
+            if not df_filtered_by_key.empty:
+                df_viz_filtered = df_filtered_by_key
 
     df_viz_cleaned = df_viz_filtered[df_viz_filtered['status'] == 'CLEANED'] if 'status' in df_viz_filtered.columns else df_viz_filtered
 
@@ -1506,21 +1526,24 @@ with tab_viz:
                     story_p.append(t_m)
                     story_p.append(PageBreak())
 
-                    story_p.append(Paragraph('BAB I — PENGATURAN TARGET SCRAPING & KEYSEARCH (6.1)', sH1))
+                    story_p.append(Paragraph('BAB I — PENGATURAN TARGET SCRAPING & KEYSEARCH', sH1))
                     story_p.append(Paragraph('Ringkasan konfigurasi target scraping dan pilihan riwayat keysearch:', sB))
                     story_p.append(Spacer(1, 0.2*cm))
                     
-                    gen_pdf = (cfg_pdf or {}).get('config', {}).get('general', {})
+                    kw_disp = ", ".join(selected_kw) if selected_kw else ("ALL (Semua Data)" if is_all_selected else "-")
+                    pr_disp = ", ".join(selected_pr) if selected_pr else ("ALL (Semua Data)" if is_all_selected else "-")
+                    ht_disp = ", ".join(selected_ht) if selected_ht else ("ALL (Semua Data)" if is_all_selected else "-")
+
                     t_cfg_p = Table([
-                        [Paragraph('<b>Target Keysearch / Riwayat</b>', sB), Paragraph(', '.join(selected_search_terms) if selected_search_terms else ', '.join(gen_pdf.get('keywords', ['-'])), sB)],
-                        [Paragraph('<b>Target Profil Akun</b>', sB), Paragraph(', '.join(gen_pdf.get('profiles', ['-'])), sB)],
-                        [Paragraph('<b>Target Hashtag</b>', sB), Paragraph(', '.join(gen_pdf.get('hashtags', ['-'])), sB)],
+                        [Paragraph('<b>Target Keysearch / Riwayat</b>', sB), Paragraph(kw_disp, sB)],
+                        [Paragraph('<b>Target Profil Akun</b>', sB), Paragraph(pr_disp, sB)],
+                        [Paragraph('<b>Target Hashtag</b>', sB), Paragraph(ht_disp, sB)],
                         [Paragraph('<b>Rentang Waktu Periode</b>', sB), Paragraph(f"{viz_date_range[0]} s/d {viz_date_range[1]}" if isinstance(viz_date_range, tuple) else "-", sB)],
                     ], colWidths=[5*cm, 11*cm], style=TableStyle([('GRID',(0,0),(-1,-1),0.3,colors.lightgrey)]))
                     story_p.append(t_cfg_p)
                     story_p.append(Spacer(1, 0.5*cm))
 
-                    story_p.append(Paragraph('BAB II — RINGKASAN REVIEW DATA (5.2)', sH1))
+                    story_p.append(Paragraph('BAB II — RINGKASAN REVIEW DATA', sH1))
                     story_p.append(Paragraph(f'Hasil review data live: <b>{len(df_base_viz):,}</b> data diterima, <b>{pdf_metrics["total_sentiment_labelled"]:,}</b> terlabel sentimen.', sB))
                     story_p.append(Spacer(1, 0.2*cm))
                     
@@ -1562,10 +1585,10 @@ with tab_viz:
                         keepWithNext=True
                     )
 
-                    story_p.append(Paragraph('BAB IV — RINGKASAN EKSEKUTIF NARASI AI', sH1))
+                    story_p.append(Paragraph('BAB IV — RINGKASAN EKSEKUTIF', sH1))
                     narasi_pdf_txt = st.session_state.get('ai_narrative_viz_cache', '')
                     if not narasi_pdf_txt:
-                        story_p.append(Paragraph('<i>Narasi AI belum di-generate di dashboard. Silakan klik tombol Perbarui Analisis Narasi terlebih dahulu.</i>', sBodyJustified))
+                        story_p.append(Paragraph('<i>Narasi belum di-generate di dashboard. Silakan klik tombol Perbarui Analisis Narasi terlebih dahulu.</i>', sBodyJustified))
                     else:
                         raw_blocks = [b.strip() for b in narasi_pdf_txt.replace('\r\n', '\n').split('\n') if b.strip()]
                         
