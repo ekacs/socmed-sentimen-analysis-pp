@@ -409,24 +409,24 @@ with tab_scrape:
             "untuk penggunaan lebih lanjut dapat menghubungi Mrs Prof. Tuti Rachmawati, PhD - Universitas Parahyangan**"
         )
     
-    # Panduan Twitter Advanced Search
-    with st.expander("📖 Panduan Sintaks Pencarian Lanjutan (Twitter Advanced Search Operator)", expanded=False):
-        st.markdown(
-            "Anda dapat memasukkan kombinasi operator pencarian lanjutan di bidang **Target Kata Kunci** sesuai panduan "
-            "[Twitter Advanced Search Guide](https://github.com/igorbrigadir/twitter-advanced-search):\n\n"
-            "| Operator | Fungsi / Deskripsi | Contoh Penggunaan |\n"
-            "| :--- | :--- | :--- |\n"
-            "| `\"frasa persis\"` | Mencari frasa kata kunci yang persis berurutan | `\"Ibu Kota Baru\"` |\n"
-            "| `kata1 kata2` | Mencari tweet yang mengandung KEDUA kata tersebut | `IKN Nusantara` |\n"
-            "| `from:username` | Menarik tweet yang ditulis oleh akun tertentu | `from:jokowi` |\n"
-            "| `to:username` | Menarik tweet balasan (reply) ke akun tertentu | `to:kemenpupr` |\n"
-            "| `since:YYYY-MM-DD` | Tweet yang dibuat SEJAK tanggal tertentu | `since:2026-07-01` |\n"
-            "| `until:YYYY-MM-DD` | Tweet yang dibuat SAMPAI tanggal tertentu | `until:2026-07-13` |\n"
-            "| `min_faves:N` | Minimal jumlah Suka (Likes) | `min_faves:100` |\n"
-            "| `min_retweets:N` | Minimal jumlah Retweet/Share | `min_retweets:50` |\n"
-            "| `-kata` | Mengecualikan tweet yang mengandung kata tertentu | `IKN -kaltim` |\n"
-            "| `lang:id` | Membatasi hasil hanya tweet berbahasa Indonesia | `subsidi lang:id` |\n"
-        )
+    # # Panduan Twitter Advanced Search
+    # with st.expander("📖 Panduan Sintaks Pencarian Lanjutan (Twitter Advanced Search Operator)", expanded=False):
+    #     st.markdown(
+    #         "Anda dapat memasukkan kombinasi operator pencarian lanjutan di bidang **Target Kata Kunci** sesuai panduan "
+    #         "[Twitter Advanced Search Guide](https://github.com/igorbrigadir/twitter-advanced-search):\n\n"
+    #         "| Operator | Fungsi / Deskripsi | Contoh Penggunaan |\n"
+    #         "| :--- | :--- | :--- |\n"
+    #         "| `\"frasa persis\"` | Mencari frasa kata kunci yang persis berurutan | `\"Ibu Kota Baru\"` |\n"
+    #         "| `kata1 kata2` | Mencari tweet yang mengandung KEDUA kata tersebut | `IKN Nusantara` |\n"
+    #         "| `from:username` | Menarik tweet yang ditulis oleh akun tertentu | `from:jokowi` |\n"
+    #         "| `to:username` | Menarik tweet balasan (reply) ke akun tertentu | `to:kemenpupr` |\n"
+    #         "| `since:YYYY-MM-DD` | Tweet yang dibuat SEJAK tanggal tertentu | `since:2026-07-01` |\n"
+    #         "| `until:YYYY-MM-DD` | Tweet yang dibuat SAMPAI tanggal tertentu | `until:2026-07-13` |\n"
+    #         "| `min_faves:N` | Minimal jumlah Suka (Likes) | `min_faves:100` |\n"
+    #         "| `min_retweets:N` | Minimal jumlah Retweet/Share | `min_retweets:50` |\n"
+    #         "| `-kata` | Mengecualikan tweet yang mengandung kata tertentu | `IKN -kaltim` |\n"
+    #         "| `lang:id` | Membatasi hasil hanya tweet berbahasa Indonesia | `subsidi lang:id` |\n"
+    #     )
 
     # Muat Konfigurasi Target dari target_config.json
     if os.path.exists(CONFIG_FILE):
