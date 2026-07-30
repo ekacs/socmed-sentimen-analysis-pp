@@ -1244,12 +1244,13 @@ with tab_viz:
         
     df_viz_filtered = df_base_viz.copy()
 
-    # Filter berdasarkan rentang tanggal
+    # Filter berdasarkan rentang tanggal (jika tanggal valid/parsed, saring sesuai rentang; pertahankan data jika tanggal kosong agar tidak terbuang)
     if isinstance(viz_date_range, tuple) and len(viz_date_range) == 2:
-        df_viz_filtered = df_viz_filtered[
+        date_mask = (
             (df_viz_filtered['date_parsed'] >= viz_date_range[0]) & 
             (df_viz_filtered['date_parsed'] <= viz_date_range[1])
-        ]
+        ) | df_viz_filtered['date_parsed'].isna()
+        df_viz_filtered = df_viz_filtered[date_mask]
 
     # Gabungkan istilah pencarian dari 3 multiselect (opsional / tidak wajib terisi semua, cukup minimal 1)
     selected_search_terms = []
