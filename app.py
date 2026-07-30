@@ -237,6 +237,14 @@ st.markdown("""
 def load_data_from_db():
     return db_manager.baca_data_untuk_streamlit()
 
+def check_db_storage_full():
+    try:
+        if hasattr(db_manager, 'is_storage_full'):
+            return db_manager.is_storage_full()
+    except Exception as _e:
+        pass
+    return False
+
 # Set Stopwords Lengkap Bahasa Indonesia & Artefak Web / URL Noise
 STOPWORDS_INDONESIA = {
     # Artefak URL & Web Noise
@@ -422,12 +430,8 @@ with col_db2:
     if st.button("🔄 Muat Ulang", use_container_width=True, help="Muat ulang data dari basis data.", key="btn_reload_db_sidebar"):
         st.rerun()
 
-if db_manager.is_storage_full():
-    st.sidebar.error("🚨 Status Storage DB: Penyimpanan Penuh")
-    if st.sidebar.button("🔄 Reset Status Storage DB", use_container_width=True, help="Reset status penyimpanan ke normal jika storage Supabase sudah dikosongkan."):
-        db_manager.set_storage_full_flag(False)
-        st.sidebar.success("✅ Status storage DB berhasil di-reset ke normal!")
-        st.rerun()
+if check_db_storage_full():
+    st.sidebar.error("🚨 Status Storage DB: Penyimpanan Penuh (Hubungi Developer untuk Pembersihan Storage)")
 
 st.sidebar.divider()
 st.sidebar.info("💡 **Tips Tema:** Klik ikon **⋮** di sudut kanan atas layar > **Settings > Theme** untuk memilih *Light* atau *Dark Mode*.")
@@ -458,7 +462,7 @@ with tab_scrape:
     except Exception:
         total_db_rows = len(df_all) if not df_all.empty else 0
 
-    db_is_full = db_manager.is_storage_full()
+    db_is_full = check_db_storage_full()
     
     if db_is_full:
         st.error(
