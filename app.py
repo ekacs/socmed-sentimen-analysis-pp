@@ -715,7 +715,7 @@ with tab_scrape:
     # -----------------------------------------------------------------
     if "Website / Dokumen Publik" in selected_platforms:
         with st.form("form_config_website"):
-            st.markdown("### 🌐 Konfigurasi Penarikan Website / Dokumen Publik (Apify Content Crawler)")
+            st.markdown("### 🌐 Konfigurasi Penarikan Website / Dokumen Publik (Aktor: easyapi/google-news-scraper)")
             col_w_d1, col_w_d2 = st.columns(2)
             with col_w_d1:
                 web_start_val = _parse_date(website_cfg.get("start_date"), 30)
@@ -724,57 +724,30 @@ with tab_scrape:
                 web_end_val = _parse_date(website_cfg.get("end_date"), 0)
                 web_end_input = st.date_input("Tanggal Akhir Target (Website):", value=web_end_val, key="web_end")
 
-            web_urls_raw = website_cfg.get("website_urls", website_cfg.get("start_urls", ["https://www.example.com"]))
+            web_urls_raw = website_cfg.get("website_urls", website_cfg.get("start_urls", ["https://www.kompas.com"]))
             web_urls_str = ", ".join(web_urls_raw) if isinstance(web_urls_raw, list) else str(web_urls_raw)
-            web_url_input = st.text_input("Target URL (Start URLs — pisahkan koma jika lebih dari satu):", value=web_urls_str, help="Contoh: https://www.kemendagri.go.id, https://situs.com/kebijakan", key="web_urls")
+            web_url_input = st.text_input("Target Domain / URL Website (Opsional — pisahkan koma):", value=web_urls_str, help="Contoh: kompas.com, detik.com, kemendagri.go.id (Kosongkan jika ingin mencakup seluruh situs berita)", key="web_urls")
 
             web_kw_val = ", ".join(website_cfg.get("keywords", ["kebijakan publik"]))
             web_kw_input = st.text_input("Kata Kunci / Frasa Pencarian (Searchbar — Mendukung sintaks Google Dork):", value=web_kw_val, help='Mendukung kaidah Google Dork! Contoh: "makan bergizi gratis", intitle:"stunting", inurl:nasional, atau -politik', key="web_kw")
 
-            col_web1, col_web2 = st.columns(2)
-            with col_web1:
-                web_max_val = int(website_cfg.get("max_results_website") or website_cfg.get("max_results", 50))
-                web_max_input = st.slider("Batas maksimal halaman (Max Crawl Pages):", 5, 500, web_max_val, 5, key="web_max")
-            with col_web2:
-                web_depth_val = int(website_cfg.get("max_depth", 1))
-                web_depth_input = st.slider("Batas Kedalaman Scraping (Max Crawl Depth):", 0, 5, web_depth_val, 1, help="0 = Hanya URL Awal, 1 = URL Awal + Link Langsung di dalamnya, dst.", key="web_depth")
-
-            web_crawler_mode_val = website_cfg.get("crawler_type", "playwright:adaptive")
-            crawler_mode_options = ["playwright:adaptive", "playwright:firefox", "cheerio"]
-            crawler_mode_idx = crawler_mode_options.index(web_crawler_mode_val) if web_crawler_mode_val in crawler_mode_options else 0
-            
-            web_crawler_mode = st.selectbox(
-                "Mode Engine Crawler (Aktor: apify/website-content-crawler):",
-                options=crawler_mode_options,
-                index=crawler_mode_idx,
-                format_func=lambda x: {
-                    "playwright:adaptive": "Adaptive (Otomatis: Cepat & Rendering JS jika diperlukan — Rekomendasi)",
-                    "playwright:firefox": "Headless Browser Firefox (Renders JS penuh, Cocok untuk Web Kompleks)",
-                    "cheerio": "Raw HTTP Cheerio (Sangat Cepat & Hemat Kuota, Khusus HTML Murni Tanpa JS)"
-                }.get(x, x),
-                help="Mode default 'adaptive' disarankan agar efisien kuota dan mendukung situs web dinamis.",
-                key="web_crawler_mode_select"
-            )
+            web_max_val = int(website_cfg.get("max_results_website") or website_cfg.get("max_results", 100))
+            web_max_input = st.slider("Batas Maksimal Artikel Berita (Max Results):", 10, 1000, web_max_val, 10, key="web_max")
 
             btn_save_web = st.form_submit_button("💾 Simpan Konfigurasi Website")
             if btn_save_web:
                 web_urls_list = [u.strip() for u in web_url_input.split(",") if u.strip()]
-                if not web_urls_list:
-                    st.error("⚠️ Input Target URL (Start URLs) wajib diisi!")
-                else:
-                    web_obj = {
-                        "start_date": web_start_input.strftime("%Y-%m-%d"),
-                        "end_date": web_end_input.strftime("%Y-%m-%d"),
-                        "website_urls": web_urls_list,
-                        "start_urls": web_urls_list,
-                        "keywords": [k.strip() for k in web_kw_input.split(",") if k.strip()],
-                        "crawler_type": web_crawler_mode,
-                        "max_depth": web_depth_input,
-                        "max_results": web_max_input,
-                        "max_results_website": web_max_input
-                    }
-                    if save_platform_config("website", web_obj):
-                        st.success("✅ Konfigurasi Website / Dokumen Publik berhasil disimpan!")
+                web_obj = {
+                    "start_date": web_start_input.strftime("%Y-%m-%d"),
+                    "end_date": web_end_input.strftime("%Y-%m-%d"),
+                    "website_urls": web_urls_list,
+                    "start_urls": web_urls_list,
+                    "keywords": [k.strip() for k in web_kw_input.split(",") if k.strip()],
+                    "max_results": web_max_input,
+                    "max_results_website": web_max_input
+                }
+                if save_platform_config("website", web_obj):
+                    st.success("✅ Konfigurasi Website / Dokumen Publik berhasil disimpan!")
 
     st.divider()
     st.markdown("### 🚀 Eksekusi Penarikan Data")

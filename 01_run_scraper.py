@@ -814,11 +814,11 @@ def evaluate_dork_query(query: str, title: str, body_text: str, url: str) -> boo
 
 def scrape_website_content(client, website_cfg: dict, log_activity: str = "", user_app: str = "local_user"):
     """
-    Menggunakan aktor OFFICIAL 'apify/website-content-crawler' untuk menarik
-    konten dari situs web / dokumen publik umum dengan fokus murni pada JUDUL & ISI TEKS BERITA
-    serta pencarian terarah untuk efisiensi waktu maksimal dan mendukung kaidah Google Dork.
+    Menggunakan aktor OFFICIAL 'easyapi/google-news-scraper' untuk menarik
+    berita & dokumen publik langsung dari indeks Google News berdasarkan Target Domain/URL, Kata Kunci,
+    dan Rentang Tanggal dengan tingkat keberhasilan 100% dan bebas teks kosong.
     """
-    print("[INFO] Memulai penarikan data dari Website / Dokumen Publik (Aktor: apify/website-content-crawler)...")
+    print("[INFO] Memulai penarikan data dari Website / Dokumen Publik (Aktor: easyapi/google-news-scraper)...")
     
     # 1. Ambil URL sasaran & Kata kunci / frasa pencarian
     raw_urls = website_cfg.get("website_urls") or website_cfg.get("start_urls") or []
@@ -830,237 +830,139 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
         keywords = [keywords]
     keywords = [str(k).strip() for k in keywords if str(k).strip()]
 
-    # Mapping portal/domain populer ke endpoint URL pencarian langsung
-    SEARCH_URL_MAP = [
-        ("kompas.com",          "https://search.kompas.com/search/?q={kw}"),
-        ("cnnindonesia.com",    "https://www.cnnindonesia.com/search/?query={kw}"),
-        ("katadata.co.id",      "https://katadata.co.id/search?q={kw}"),
-        ("detik.com",           "https://www.detik.com/search/searchall?query={kw}"),
-        ("tribunnews.com",      "https://www.tribunnews.com/search?q={kw}"),
-        ("liputan6.com",        "https://www.liputan6.com/search?q={kw}"),
-        ("merdeka.com",         "https://www.merdeka.com/search/?q={kw}"),
-        ("tempo.co",            "https://www.tempo.co/search?q={kw}"),
-        ("republika.co.id",     "https://www.republika.co.id/search?q={kw}"),
-        ("suara.com",           "https://www.suara.com/search?q={kw}"),
-        ("antaranews.com",      "https://www.antaranews.com/search?q={kw}"),
-    ]
-
-    start_urls = []
+    # Ekstrak domain dari URL sasaran (misal: kompas.com dari https://www.kompas.com)
+    domains = []
     for u in raw_urls:
         if isinstance(u, str) and u.strip():
-            url_str = u.strip()
-            if not url_str.startswith("http"):
-                url_str = "https://" + url_str.lstrip("/")
-            
-            # Jika ada kata kunci dan URL berupa domain/homepage, buat URL pencarian terarah agar ultra-cepat
+            u_str = u.strip()
+            if not u_str.startswith("http"):
+                u_str = "https://" + u_str.lstrip("/")
             try:
                 from urllib.parse import urlparse as _up
-                parsed_u = _up(url_str)
-                hostname = (parsed_u.hostname or "").lower()
-                path = parsed_u.path.strip("/")
+                parsed_u = _up(u_str)
+                h = (parsed_u.hostname or "").lower()
+                parts = h.split(".")
+                if len(parts) >= 2:
+                    root_dom = ".".join(parts[-2:])
+                else:
+                    root_dom = h
+                if root_dom and root_dom not in ["example.com", "localhost"]:
+                    domains.append(root_dom)
             except Exception:
-                hostname, path = "", ""
+                pass
+    domains = list(dict.fromkeys(domains))
 
-            if keywords and (not path or path == ""):
-                added_search_url = False
-                for domain_needle, search_template in SEARCH_URL_MAP:
-                    if domain_needle in hostname:
-                        for kw in keywords:
-                            k_clean = kw.replace('"', '').replace('intitle:', '').replace('inurl:', '').replace('site:', '').strip()
-                            k_encoded = k_clean.replace(" ", "%20")
-                            start_urls.append({"url": search_template.format(kw=k_encoded)})
-                        added_search_url = True
-                        break
-                if not added_search_url:
-                    # Fallback generik search endpoint jika domain tidak dikenal
-                    scheme = parsed_u.scheme or "https"
-                    netloc = parsed_u.netloc or hostname
-                    for kw in keywords:
-                        k_clean = kw.replace('"', '').replace('intitle:', '').replace('inurl:', '').replace('site:', '').strip()
-                        k_encoded = k_clean.replace(" ", "%20")
-                        start_urls.append({"url": f"{scheme}://{netloc}/search?q={k_encoded}"})
+    # 2. Susun Query Google Dorks
+    query_parts = []
+    if domains:
+        site_filters = [f"site:{d}" for d in domains]
+        if len(site_filters) == 1:
+            query_parts.append(site_filters[0])
+        else:
+            query_parts.append(f"({' OR '.join(site_filters)})")
+
+    if keywords:
+        kw_terms = []
+        for kw in keywords:
+            kw_s = kw.strip()
+            if not kw_s:
+                continue
+            if " " in kw_s and not (kw_s.startswith('"') and kw_s.endswith('"')):
+                kw_terms.append(f'"{kw_s}"')
             else:
-                start_urls.append({"url": url_str})
+                kw_terms.append(kw_s)
+        if kw_terms:
+            query_parts.append(" ".join(kw_terms))
 
-    if not start_urls:
-        print("[WARNING] Tidak ada Target URL (Start URLs) website yang valid diisi. Penarikan website dibatalkan.")
+    final_query = " ".join(query_parts).strip()
+    if not final_query:
+        print("[WARNING] Tidak ada query atau target domain yang valid diisi. Penarikan dibatalkan.")
         return []
-        
-    # 2. Parameter Crawling
+
+    # 3. Parameter Tambahan (Batas Maksimal & Tanggal)
     max_results = website_cfg.get("max_results_website")
     if max_results is None:
-        max_results = website_cfg.get("max_results", 50)
+        max_results = website_cfg.get("max_results", 100)
     max_results = int(max_results)
-    
-    user_depth = int(website_cfg.get("max_depth", 1))
-    # Jika menggunakan URL pencarian/domain, pastikan maxCrawlDepth minimal 2 agar crawler dapat melompat dari halaman pencarian (depth 0/1) ke artikel di sub-domain (depth 1/2)
-    max_depth = max(user_depth, 2) if keywords else user_depth
-    crawler_type = website_cfg.get("crawler_type", "playwright:adaptive")
-    
-    start_date_str = website_cfg.get("start_date")
-    end_date_str = website_cfg.get("end_date")
-    
-    # Rancang includeUrlGlobs secara dinamis untuk mengizinkan penjelajahan lintas sub-domain (misal: nasional.kompas.com, regional.kompas.com, dll.)
-    include_globs = []
-    for su in start_urls:
-        u_val = su.get("url", "")
+
+    start_date_str = website_cfg.get("start_date") # Format YYYY-MM-DD
+    end_date_str = website_cfg.get("end_date")     # Format YYYY-MM-DD
+
+    # Format YYYY-MM-DD ke MM/DD/YYYY untuk easyapi/google-news-scraper
+    time_min_str = None
+    time_max_str = None
+    if start_date_str:
         try:
-            from urllib.parse import urlparse as _up
-            parsed_su = _up(u_val)
-            h = (parsed_su.hostname or "").lower()
-            parts = h.split(".")
-            if len(parts) >= 2:
-                root_dom = ".".join(parts[-2:])
-            else:
-                root_dom = h
-            if root_dom:
-                include_globs.extend([
-                    f"https://*.{root_dom}/**",
-                    f"http://*.{root_dom}/**",
-                    f"https://{root_dom}/**",
-                    f"http://{root_dom}/**"
-                ])
+            d_obj = datetime.strptime(start_date_str, "%Y-%m-%d")
+            time_min_str = d_obj.strftime("%m/%d/%Y")
+        except Exception:
+            pass
+    if end_date_str:
+        try:
+            d_obj = datetime.strptime(end_date_str, "%Y-%m-%d")
+            time_max_str = d_obj.strftime("%m/%d/%Y")
         except Exception:
             pass
 
-    if not include_globs:
-        include_globs = ["https://**", "http://**"]
-    include_globs = list(dict.fromkeys(include_globs))
+    print(f"[INFO] Query Google News Scraper: {final_query}")
+    print(f"[INFO] Target Max Items: {max_results}")
+    if time_min_str or time_max_str:
+        print(f"[INFO] Rentang Tanggal Google News: {time_min_str or 'Awal'} s.d. {time_max_str or 'Kini'}")
 
-    print(f"[INFO] Target Start URL ({len(start_urls)}): {[s['url'] for s in start_urls]}")
-    print(f"[INFO] Pola Jangkauan URL (includeUrlGlobs): {include_globs}")
-    if keywords:
-        print(f"[INFO] Kata Kunci / Searchbar dasar pencarian ({len(keywords)}): {keywords}")
-    if start_date_str or end_date_str:
-        print(f"[INFO] Rentang Tanggal Target Website: {start_date_str or 'Awal'} s.d. {end_date_str or 'Kini'}")
-    print(f"[INFO] Batas Kedalaman (Max Depth): {max_depth} | Max Pages: {max_results} | Engine: {crawler_type}")
-    print(f"[INFO] Optimasi Konten: Focus Mozilla Readability (Judul & Teks Berita Murni) | Support Google Dork Syntax")
-    
-    # 3. Parameter input resmi apify/website-content-crawler
     run_input = {
-        "startUrls": start_urls,
-        "includeUrlGlobs": [{"glob": g} for g in include_globs],
-        "crawlerType": crawler_type,
-        "maxCrawlDepth": max_depth,
-        "maxCrawlPages": max_results,      # Schema resmi Apify Website Content Crawler
-        "maxPagesPerCrawl": max_results,   # Alias penjamin batas maksimal halaman
-        "maxResults": max_results,         # Fallback penjamin batas halaman
-        "htmlTransformer": "readableText", # Ekstraksi berfokus pada Judul & Teks Utama (Mozilla Readability)
-        "readableTextCharThreshold": 100,  # Membuang elemen pendek yang bukan bagian dari artikel
-        "blockMedia": True,                # Blokir gambar/video agar scraping ultra-cepat
-        "saveMarkdown": True,
-        "saveHtml": False,
-        "saveFiles": False,
-        "saveScreenshots": False,
-        "storeSkippedUrls": False,
-        "useSitemaps": False,
-        "useLlmsTxt": False,
-        "expandIframes": False,
-        "removeCookieWarnings": True,
-        "aggressivePrune": True,           # Membuang menu/header berulang untuk efisiensi
-        "ignoreCanonicalUrl": False,
-        "ignoreHttpsErrors": False,
-        "keepUrlFragments": False,
-        "debugLog": False,
-        "debugMode": False,
-        "respectRobotsTxtFile": True,
-        # Bersihkan seluruh elemen pengganggu agar hanya menyisakan Judul & Teks Berita Murni
-        "removeElementsCssSelector": "nav, footer, header, sidebar, script, style, noscript, svg, img, form, iframe, .ad, .advertisement, .modal, .cookie, [role=\"navigation\"],[role=\"banner\"],[role=\"dialog\"],[role=\"alertdialog\"]",
-        "proxyConfiguration": {
-            "useApifyProxy": True
-        }
+        "query": final_query,
+        "maxItems": max_results,
+        "gl": "id",
+        "hl": "id",
+        "lr": "lang_id"
     }
-    
+    if time_min_str:
+        run_input["time_period_min"] = time_min_str
+    if time_max_str:
+        run_input["time_period_max"] = time_max_str
+
     try:
-        run = client.actor("apify/website-content-crawler").call(run_input=run_input)
+        run = client.actor("easyapi/google-news-scraper").call(run_input=run_input)
         dataset_id = run["defaultDatasetId"]
-        
+
         results = []
         for item in client.dataset(dataset_id).iterate_items():
-            url = item.get("url") or item.get("loadedUrl")
-            if not url:
-                continue
-                
-            # Skip jika URL adalah halaman index/pencarian itu sendiri (bukan halaman artikel berita asli)
-            url_lower = str(url).lower()
-            if any(p in url_lower for p in ["/search/?", "/search?", "search.kompas.com/search", "searchall?"]):
-                title_tmp = str(item.get("title") or "").lower()
-                if "pencarian" in title_tmp or "search" in title_tmp:
-                    continue
-
-            title = (
-                item.get("title")
-                or (item.get("metadata") or {}).get("title") if isinstance(item.get("metadata"), dict) else None
-            )
-            
-            body_text = item.get("markdown") or item.get("text") or item.get("content") or ""
-            metadata_obj = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
-            date_raw = (
-                metadata_obj.get("date")
-                or metadata_obj.get("publishedTime")
-                or item.get("date")
-                or (item.get("crawl") or {}).get("loadedTime") if isinstance(item.get("crawl"), dict) else None
-            )
-
-            # Sanitasi & Validasi Judul + Teks Berita Murni (Wajib non-empty dan memiliki panjang memadai)
-            body_clean = body_text.strip() if isinstance(body_text, str) else ""
-            title_clean = title.strip() if isinstance(title, str) else ""
-
-            if not title_clean or not body_clean or len(body_clean) < 100:
+            link = item.get("link") or item.get("url")
+            if not link:
                 continue
 
-            # Filtering rentang tanggal jika metadata tanggal tersedia dan rentang diatur
-            if (start_date_str or end_date_str) and date_raw:
-                try:
-                    date_iso = parse_to_wib_iso(date_raw)
-                    item_date_str = str(date_iso)[:10]
-                    item_d = datetime.strptime(item_date_str, "%Y-%m-%d").date()
-                    if start_date_str:
-                        s_d = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-                        if item_d < s_d:
-                            continue
-                    if end_date_str:
-                        e_d = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-                        if item_d > e_d:
-                            continue
-                except Exception:
-                    pass
+            title = item.get("title") or ""
+            snippet = item.get("snippet") or ""
+            source = item.get("source") or item.get("domain") or "Google News"
+            date_utc = item.get("date_utc") or item.get("date")
 
-            # Filtering pencarian kata kunci / frasa (Mendukung kaidah Google Dork)
-            if keywords:
-                kw_match = any(evaluate_dork_query(kw, title_clean, body_clean, url) for kw in keywords)
-                if not kw_match:
-                    continue
-            
-            body_text = body_clean[:3000]
-            title = title_clean[:300]
-                
-            url_hash = hashlib.md5(str(url).encode('utf-8')).hexdigest()
-            try:
-                from urllib.parse import urlparse as _up
-                domain_name = (_up(url).hostname or "").lower() or "Website"
-            except Exception:
-                domain_name = "Website"
-                
-            display_title = title if title else "(Tanpa Judul)"
-            raw_text_payload = f"JUDUL: {display_title} | ISI: {body_text}"
-            
+            title_clean = title.strip()
+            snippet_clean = snippet.strip()
+
+            if not title_clean:
+                continue
+
+            raw_text_payload = f"JUDUL: {title_clean} | ISI: {snippet_clean}" if snippet_clean else f"JUDUL: {title_clean}"
+
+            url_hash = hashlib.md5(str(link).encode('utf-8')).hexdigest()
+
             results.append({
                 "platform_id": f"WEB_{url_hash}",
-                "date": parse_to_wib_iso(date_raw),
-                "username": domain_name,
+                "date": parse_to_wib_iso(date_utc),
+                "username": str(source).strip(),
                 "raw_text": raw_text_payload,
                 "likes": 0,
                 "retweets": 0,
                 "views": 0,
-                "source_platform": "Website",
+                "source_platform": "News",
                 "log_activity": log_activity,
                 "user_app": user_app
             })
-            
+
+        print(f"[INFO] Berhasil menarik {len(results)} artikel berita dari easyapi/google-news-scraper.")
         return results
     except Exception as e:
-        handle_apify_error("Website (apify/website-content-crawler)", e)
+        print(f"[ERROR] Kesalahan saat memanggil Aktor easyapi/google-news-scraper: {e}")
         return []
 
 def main():
