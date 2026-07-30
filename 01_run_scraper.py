@@ -752,11 +752,71 @@ def scrape_news_portal(client, general_cfg, log_activity: str = "", user_app: st
         print(f"[ERROR] Kesalahan saat memanggil Aktor Portal Berita Apify (apify/website-content-crawler): {e}")
         return []
 
+def evaluate_dork_query(query: str, title: str, body_text: str, url: str) -> bool:
+    """
+    Evaluasi pencarian berbasis kaidah Google Dork (exact match "", intitle:, inurl:, site:, -not).
+    """
+    if not query or not str(query).strip():
+        return True
+        
+    title_l = (title or "").lower()
+    body_l = (body_text or "").lower()
+    url_l = (url or "").lower()
+    full_content = f"{title_l} {body_l}"
+    
+    import re
+    # Ekstrak token / operator dork (misal: intitle:"...", inurl:"...", -kata, "frasa persis", atau kata tunggal)
+    tokens = re.findall(r'(?:intitle:|inurl:|site:)?(?:"[^"]*"|\S+)', str(query))
+    
+    for token in tokens:
+        t_str = token.strip()
+        if not t_str:
+            continue
+            
+        t_lower = t_str.lower()
+        
+        # Pengecualian (-kata)
+        if t_str.startswith("-") and len(t_str) > 1:
+            negated = t_str[1:].strip('"').lower()
+            if negated in full_content:
+                return False
+            continue
+
+        # Target Judul (intitle:)
+        if t_lower.startswith("intitle:"):
+            target = t_str[8:].strip('"').lower()
+            if target not in title_l:
+                return False
+            continue
+
+        # Target URL (inurl:)
+        if t_lower.startswith("inurl:"):
+            target = t_str[6:].strip('"').lower()
+            if target not in url_l:
+                return False
+            continue
+            
+        # Target Domain (site:) - Diabaikan di level content filter
+        if t_lower.startswith("site:"):
+            continue
+
+        # Frasa persis ("makan bergizi gratis")
+        if t_str.startswith('"') and t_str.endswith('"'):
+            phrase = t_str[1:-1].lower()
+            if phrase not in full_content:
+                return False
+        else:
+            term = t_lower
+            if term not in full_content:
+                return False
+                
+    return True
+
 def scrape_website_content(client, website_cfg: dict, log_activity: str = "", user_app: str = "local_user"):
     """
     Menggunakan aktor OFFICIAL 'apify/website-content-crawler' untuk menarik
     konten dari situs web / dokumen publik umum dengan fokus murni pada JUDUL & ISI TEKS BERITA
-    serta pencarian terarah untuk efisiensi waktu maksimal.
+    serta pencarian terarah untuk efisiensi waktu maksimal dan mendukung kaidah Google Dork.
     """
     print("[INFO] Memulai penarikan data dari Website / Dokumen Publik (Aktor: apify/website-content-crawler)...")
     
@@ -806,7 +866,8 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
                 for domain_needle, search_template in SEARCH_URL_MAP:
                     if domain_needle in hostname:
                         for kw in keywords:
-                            k_encoded = kw.replace(" ", "%20")
+                            k_clean = kw.replace('"', '').replace('intitle:', '').replace('inurl:', '').replace('site:', '').strip()
+                            k_encoded = k_clean.replace(" ", "%20")
                             start_urls.append({"url": search_template.format(kw=k_encoded)})
                         added_search_url = True
                         break
@@ -815,7 +876,8 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
                     scheme = parsed_u.scheme or "https"
                     netloc = parsed_u.netloc or hostname
                     for kw in keywords:
-                        k_encoded = kw.replace(" ", "%20")
+                        k_clean = kw.replace('"', '').replace('intitle:', '').replace('inurl:', '').replace('site:', '').strip()
+                        k_encoded = k_clean.replace(" ", "%20")
                         start_urls.append({"url": f"{scheme}://{netloc}/search?q={k_encoded}"})
             else:
                 start_urls.append({"url": url_str})
@@ -872,7 +934,7 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
     if start_date_str or end_date_str:
         print(f"[INFO] Rentang Tanggal Target Website: {start_date_str or 'Awal'} s.d. {end_date_str or 'Kini'}")
     print(f"[INFO] Batas Kedalaman (Max Depth): {max_depth} | Max Pages: {max_results} | Engine: {crawler_type}")
-    print(f"[INFO] Optimasi Konten: Focus Mozilla Readability (Judul & Teks Berita Murni) | Media Blocked")
+    print(f"[INFO] Optimasi Konten: Focus Mozilla Readability (Judul & Teks Berita Murni) | Support Google Dork Syntax")
     
     # 3. Parameter input resmi apify/website-content-crawler
     run_input = {
@@ -956,10 +1018,9 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
                 except Exception:
                     pass
 
-            # Filtering pencarian kata kunci / frasa jika pengguna mengisikan kata kunci di searchbar
+            # Filtering pencarian kata kunci / frasa (Mendukung kaidah Google Dork)
             if keywords:
-                combined_content = f"{title or ''} {body_text}".lower()
-                kw_match = any(kw.lower() in combined_content for kw in keywords)
+                kw_match = any(evaluate_dork_query(kw, title or "", body_text, url) for kw in keywords)
                 if not kw_match:
                     continue
             

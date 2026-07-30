@@ -729,7 +729,7 @@ with tab_scrape:
             web_url_input = st.text_input("Target URL (Start URLs — pisahkan koma jika lebih dari satu):", value=web_urls_str, help="Contoh: https://www.kemendagri.go.id, https://situs.com/kebijakan", key="web_urls")
 
             web_kw_val = ", ".join(website_cfg.get("keywords", ["kebijakan publik"]))
-            web_kw_input = st.text_input("Kata Kunci / Frasa Pencarian (Searchbar — masukkan beberapa kata atau kalimat sebagai dasar pencarian):", value=web_kw_val, help="Masukkan kata atau kalimat sebagai kriteria penyaringan konten web.", key="web_kw")
+            web_kw_input = st.text_input("Kata Kunci / Frasa Pencarian (Searchbar — Mendukung sintaks Google Dork):", value=web_kw_val, help='Mendukung kaidah Google Dork! Contoh: "makan bergizi gratis", intitle:"stunting", inurl:nasional, atau -politik', key="web_kw")
 
             col_web1, col_web2 = st.columns(2)
             with col_web1:
