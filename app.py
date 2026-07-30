@@ -537,6 +537,7 @@ with tab_scrape:
     instagram_cfg = cfg_all_root.get("instagram", general_cfg)
     linkedin_cfg = cfg_all_root.get("linkedin", general_cfg)
     news_cfg = cfg_all_root.get("portal_berita", general_cfg)
+    website_cfg = cfg_all_root.get("website", general_cfg)
 
     raw_source_list = current_config.get("source_types")
     if not raw_source_list:
@@ -549,10 +550,11 @@ with tab_scrape:
         "twitter_": "Twitter (X)",
         "instagram": "Instagram",
         "linkedin": "LinkedIn",
-        "portal_berita": "Portal Berita"
+        "portal_berita": "Portal Berita",
+        "website": "Website / Dokumen Publik"
     }
     rev_mapping = {v: k for k, v in mapping_source_types.items()}
-    platform_options = ["Twitter (X)", "Instagram", "LinkedIn", "Portal Berita"]
+    platform_options = ["Twitter (X)", "Instagram", "LinkedIn", "Portal Berita", "Website / Dokumen Publik"]
     
     default_selected = [mapping_source_types.get(s) for s in raw_source_list if mapping_source_types.get(s)]
     if not default_selected: default_selected = ["Twitter (X)"]
@@ -744,6 +746,62 @@ with tab_scrape:
                 }
                 if save_platform_config("portal_berita", news_obj):
                     st.success("✅ Konfigurasi Portal Berita berhasil disimpan!")
+
+    # -----------------------------------------------------------------
+    # 5. FORM WEBSITE / DOKUMEN PUBLIK
+    # -----------------------------------------------------------------
+    if "Website / Dokumen Publik" in selected_platforms:
+        with st.form("form_config_website"):
+            st.markdown("### 🌐 Konfigurasi Penarikan Website / Dokumen Publik (Apify Content Crawler)")
+            web_urls_raw = website_cfg.get("website_urls", website_cfg.get("start_urls", ["https://www.example.com"]))
+            web_urls_str = ", ".join(web_urls_raw) if isinstance(web_urls_raw, list) else str(web_urls_raw)
+            web_url_input = st.text_input("Target URL (Start URLs — pisahkan koma jika lebih dari satu):", value=web_urls_str, help="Contoh: https://www.kemendagri.go.id, https://situs.com/kebijakan", key="web_urls")
+
+            web_kw_val = ", ".join(website_cfg.get("keywords", ["kebijakan publik"]))
+            web_kw_input = st.text_input("Kata Kunci / Frasa Pencarian (Searchbar — masukkan beberapa kata atau kalimat sebagai dasar pencarian):", value=web_kw_val, help="Masukkan kata atau kalimat sebagai kriteria penyaringan konten web.", key="web_kw")
+
+            col_web1, col_web2 = st.columns(2)
+            with col_web1:
+                web_max_val = int(website_cfg.get("max_results_website") or website_cfg.get("max_results", 50))
+                web_max_input = st.slider("Batas maksimal halaman (Max Crawl Pages):", 5, 500, web_max_val, 5, key="web_max")
+            with col_web2:
+                web_depth_val = int(website_cfg.get("max_depth", 1))
+                web_depth_input = st.slider("Batas Kedalaman Scraping (Max Crawl Depth):", 0, 5, web_depth_val, 1, help="0 = Hanya URL Awal, 1 = URL Awal + Link Langsung di dalamnya, dst.", key="web_depth")
+
+            web_crawler_mode_val = website_cfg.get("crawler_type", "playwright:adaptive")
+            crawler_mode_options = ["playwright:adaptive", "playwright:firefox", "cheerio"]
+            crawler_mode_idx = crawler_mode_options.index(web_crawler_mode_val) if web_crawler_mode_val in crawler_mode_options else 0
+            
+            web_crawler_mode = st.selectbox(
+                "Mode Engine Crawler (Aktor: apify/website-content-crawler):",
+                options=crawler_mode_options,
+                index=crawler_mode_idx,
+                format_func=lambda x: {
+                    "playwright:adaptive": "Adaptive (Otomatis: Cepat & Rendering JS jika diperlukan — Rekomendasi)",
+                    "playwright:firefox": "Headless Browser Firefox (Renders JS penuh, Cocok untuk Web Kompleks)",
+                    "cheerio": "Raw HTTP Cheerio (Sangat Cepat & Hemat Kuota, Khusus HTML Murni Tanpa JS)"
+                }.get(x, x),
+                help="Mode default 'adaptive' disarankan agar efisien kuota dan mendukung situs web dinamis.",
+                key="web_crawler_mode_select"
+            )
+
+            btn_save_web = st.form_submit_button("💾 Simpan Konfigurasi Website")
+            if btn_save_web:
+                web_urls_list = [u.strip() for u in web_url_input.split(",") if u.strip()]
+                if not web_urls_list:
+                    st.error("⚠️ Input Target URL (Start URLs) wajib diisi!")
+                else:
+                    web_obj = {
+                        "website_urls": web_urls_list,
+                        "start_urls": web_urls_list,
+                        "keywords": [k.strip() for k in web_kw_input.split(",") if k.strip()],
+                        "crawler_type": web_crawler_mode,
+                        "max_depth": web_depth_input,
+                        "max_results": web_max_input,
+                        "max_results_website": web_max_input
+                    }
+                    if save_platform_config("website", web_obj):
+                        st.success("✅ Konfigurasi Website / Dokumen Publik berhasil disimpan!")
 
     st.divider()
     st.markdown("### 🚀 Eksekusi Penarikan Data")
@@ -970,19 +1028,22 @@ with tab_review:
         ig_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Instagram', case=False, na=False).sum())
         li_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('LinkedIn', case=False, na=False).sum())
         news_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('News|Portal', case=False, na=False).sum())
+        web_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Website', case=False, na=False).sum())
         tot_p_r = total_volume_rev if total_volume_rev > 0 else 1
         
         tw_pct_r = tw_cnt_r / tot_p_r * 100
         ig_pct_r = ig_cnt_r / tot_p_r * 100
         li_pct_r = li_cnt_r / tot_p_r * 100
         news_pct_r = news_cnt_r / tot_p_r * 100
+        web_pct_r = web_cnt_r / tot_p_r * 100
         
         st.markdown("<div style='margin-top: 10px; margin-bottom: 2px; font-weight: 600; font-size: 0.9em; color: #444;'>🌐 Distribusi Volume Data per Platform:</div>", unsafe_allow_html=True)
-        cp1, cp2, cp3, cp4 = st.columns(4)
+        cp1, cp2, cp3, cp4, cp5 = st.columns(5)
         with cp1: st.metric("𝕏 Twitter / X", f"{tw_pct_r:.1f}%", delta=f"{tw_cnt_r:,} data", delta_color="off")
         with cp2: st.metric("📸 Instagram", f"{ig_pct_r:.1f}%", delta=f"{ig_cnt_r:,} data", delta_color="off")
         with cp3: st.metric("💼 LinkedIn", f"{li_pct_r:.1f}%", delta=f"{li_cnt_r:,} data", delta_color="off")
         with cp4: st.metric("📰 Portal Berita", f"{news_pct_r:.1f}%", delta=f"{news_cnt_r:,} data", delta_color="off")
+        with cp5: st.metric("🌐 Website", f"{web_pct_r:.1f}%", delta=f"{web_cnt_r:,} data", delta_color="off")
 
     if not df_reviewed_final.empty:
         st.markdown("<br>", unsafe_allow_html=True)

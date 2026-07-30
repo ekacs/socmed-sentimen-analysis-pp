@@ -752,6 +752,146 @@ def scrape_news_portal(client, general_cfg, log_activity: str = "", user_app: st
         print(f"[ERROR] Kesalahan saat memanggil Aktor Portal Berita Apify (apify/website-content-crawler): {e}")
         return []
 
+def scrape_website_content(client, website_cfg: dict, log_activity: str = "", user_app: str = "local_user"):
+    """
+    Menggunakan aktor OFFICIAL 'apify/website-content-crawler' untuk menarik
+    konten dari situs web / dokumen publik umum berdasarkan Target URL (Start URLs) dan Kata Kunci / Searchbar.
+    """
+    print("[INFO] Memulai penarikan data dari Website / Dokumen Publik (Aktor: apify/website-content-crawler)...")
+    
+    # 1. Ambil URL sasaran & Kata kunci / frasa pencarian
+    raw_urls = website_cfg.get("website_urls") or website_cfg.get("start_urls") or []
+    if isinstance(raw_urls, str):
+        raw_urls = [raw_urls]
+    
+    start_urls = []
+    for u in raw_urls:
+        if isinstance(u, str) and u.strip():
+            url_str = u.strip()
+            if not url_str.startswith("http"):
+                url_str = "https://" + url_str.lstrip("/")
+            start_urls.append({"url": url_str})
+            
+    keywords = website_cfg.get("keywords", [])
+    if isinstance(keywords, str):
+        keywords = [keywords]
+    keywords = [str(k).strip() for k in keywords if str(k).strip()]
+    
+    if not start_urls:
+        print("[WARNING] Tidak ada Target URL (Start URLs) website yang valid diisi. Penarikan website dibatalkan.")
+        return []
+        
+    # 2. Parameter Crawling
+    max_results = website_cfg.get("max_results_website")
+    if max_results is None:
+        max_results = website_cfg.get("max_results", 50)
+    max_results = int(max_results)
+    
+    max_depth = int(website_cfg.get("max_depth", 1))
+    crawler_type = website_cfg.get("crawler_type", "playwright:adaptive")
+    
+    print(f"[INFO] Target URL ({len(start_urls)}): {[s['url'] for s in start_urls]}")
+    if keywords:
+        print(f"[INFO] Kata Kunci / Searchbar dasar pencarian ({len(keywords)}): {keywords}")
+    print(f"[INFO] Batas Kedalaman (Max Depth): {max_depth} | Max Pages: {max_results} | Engine: {crawler_type}")
+    
+    # 3. Parameter input resmi apify/website-content-crawler
+    run_input = {
+        "startUrls": start_urls,
+        "crawlerType": crawler_type,
+        "maxCrawlDepth": max_depth,
+        "maxPagesPerCrawl": max_results,
+        "blockMedia": True,
+        "saveMarkdown": True,
+        "saveHtml": False,
+        "saveFiles": False,
+        "saveScreenshots": False,
+        "storeSkippedUrls": False,
+        "useSitemaps": False,
+        "useLlmsTxt": False,
+        "expandIframes": True,
+        "removeCookieWarnings": True,
+        "aggressivePrune": False,
+        "ignoreCanonicalUrl": False,
+        "ignoreHttpsErrors": False,
+        "keepUrlFragments": False,
+        "debugLog": False,
+        "debugMode": False,
+        "respectRobotsTxtFile": True,
+        "proxyConfiguration": {
+            "useApifyProxy": True
+        }
+    }
+    
+    try:
+        run = client.actor("apify/website-content-crawler").call(run_input=run_input)
+        dataset_id = run["defaultDatasetId"]
+        
+        results = []
+        for item in client.dataset(dataset_id).iterate_items():
+            url = item.get("url") or item.get("loadedUrl")
+            if not url:
+                continue
+                
+            title = (
+                item.get("title")
+                or (item.get("metadata") or {}).get("title") if isinstance(item.get("metadata"), dict) else None
+            )
+            
+            body_text = item.get("markdown") or item.get("text") or item.get("content") or ""
+            metadata_obj = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+            date_raw = (
+                metadata_obj.get("date")
+                or metadata_obj.get("publishedTime")
+                or item.get("date")
+                or (item.get("crawl") or {}).get("loadedTime") if isinstance(item.get("crawl"), dict) else None
+            )
+
+            # Filtering pencarian kata kunci / frasa jika pengguna mengisikan kata kunci di searchbar
+            if keywords:
+                combined_content = f"{title or ''} {body_text}".lower()
+                kw_match = any(kw.lower() in combined_content for kw in keywords)
+                if not kw_match:
+                    continue
+            
+            if isinstance(body_text, str):
+                body_text = body_text[:3000]
+            else:
+                body_text = ""
+            if isinstance(title, str):
+                title = title.strip()[:300]
+                
+            if (not title or not title.strip()) and (not body_text or len(body_text.strip()) < 80):
+                continue
+                
+            url_hash = hashlib.md5(str(url).encode('utf-8')).hexdigest()
+            try:
+                from urllib.parse import urlparse as _up
+                domain_name = (_up(url).hostname or "").lower() or "Website"
+            except Exception:
+                domain_name = "Website"
+                
+            display_title = title if title else "(Tanpa Judul)"
+            raw_text_payload = f"JUDUL: {display_title} | ISI: {body_text}"
+            
+            results.append({
+                "platform_id": f"WEB_{url_hash}",
+                "date": parse_to_wib_iso(date_raw),
+                "username": domain_name,
+                "raw_text": raw_text_payload,
+                "likes": 0,
+                "retweets": 0,
+                "views": 0,
+                "source_platform": "Website",
+                "log_activity": log_activity,
+                "user_app": user_app
+            })
+            
+        return results
+    except Exception as e:
+        handle_apify_error("Website (apify/website-content-crawler)", e)
+        return []
+
 def main():
     # 1. Pastikan tabel database siap
     buat_tabel()
@@ -791,7 +931,7 @@ def main():
     # Simpan riwayat keysearch ke database dari seluruh platform aktif
     try:
         all_kw, all_prof, all_hash = [], [], []
-        for c_key in ["general", "twitter", "instagram", "linkedin", "portal_berita"]:
+        for c_key in ["general", "twitter", "instagram", "linkedin", "portal_berita", "website"]:
             sub_cfg = cfg_base.get(c_key, {})
             if isinstance(sub_cfg, dict):
                 all_kw.extend(sub_cfg.get("keywords", []))
@@ -833,6 +973,9 @@ def main():
         elif source_type in ["portal_berita", "news_portal", "news"]:
             plat_cfg = cfg_base.get("portal_berita", general_cfg)
             partial = scrape_news_portal(client, plat_cfg, log_activity=log_activity, user_app=user_app)
+        elif source_type in ["website", "website_content_crawler", "website_crawler"]:
+            plat_cfg = cfg_base.get("website", general_cfg)
+            partial = scrape_website_content(client, plat_cfg, log_activity=log_activity, user_app=user_app)
         else:
             print(f"[WARNING] Tipe sumber '{source_type}' tidak dikenal. Dilewati.")
             continue
