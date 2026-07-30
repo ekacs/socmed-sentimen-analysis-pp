@@ -76,14 +76,16 @@ def format_log_activity(dt: datetime = None) -> str:
 # Memuat file .env — override=False agar env var sistem (GitHub Actions) tidak tertimpa
 load_dotenv(override=False)
 
-def get_apify_client():
+def get_apify_client(token=None):
     """
     Menginisialisasi klien Apify secara aman dengan memvalidasi token API.
+    Jika token diberikan secara eksplisit, gunakan token tersebut. Jika tidak, gunakan os.getenv("APIFY_API_TOKEN").
     """
-    token = os.getenv("APIFY_API_TOKEN")
+    if not token:
+        token = os.getenv("APIFY_API_TOKEN")
     if not token or token == "YOUR_APIFY_API_TOKEN_HERE":
-        print("[ERROR] Token API Apify ('APIFY_API_TOKEN') tidak dikonfigurasi di file .env.")
-        print("[ERROR] Silakan edit file .env dan masukkan token API Apify Anda yang valid.")
+        print("[ERROR] Token API Apify ('APIFY_API_TOKEN') tidak dikonfigurasi.")
+        print("[ERROR] Silakan atur token API Apify Anda yang valid.")
         return None
     return ApifyClient(token)
 

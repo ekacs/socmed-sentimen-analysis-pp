@@ -17,13 +17,15 @@ DB_FILE = 'sentimen_kebijakan.db'
 MODEL_PATH = 'models/svm_model.pkl'
 VEC_PATH = 'models/tfidf_vectorizer.pkl'
 
-def get_gemini_client():
+def get_gemini_client(api_key=None):
     """
     Menginisialisasi klien Gemini SDK resmi secara aman.
+    Jika api_key diberikan secara eksplisit, gunakan api_key tersebut. Jika tidak, gunakan os.getenv("GEMINI_API_KEY").
     """
-    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        api_key = os.getenv("GEMINI_API_KEY")
     if not api_key or api_key == "YOUR_GEMINI_API_KEY_HERE":
-        print("[WARNING] Kunci API Gemini ('GEMINI_API_KEY') tidak dikonfigurasi di file .env.")
+        print("[WARNING] Kunci API Gemini ('GEMINI_API_KEY') tidak dikonfigurasi.")
         print("[WARNING] Prapemrosesan AI (Gemini) akan dinonaktifkan (teks asli akan disalin ke cleaned_text).")
         return None
     try:

@@ -12,6 +12,10 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import db_manager
+import session_credentials
+
+# Inisialisasi kredensial berbasis sesi pengguna (Session-Only)
+session_credentials.init_session_credentials()
 
 # Inisialisasi tabel database saat aplikasi Streamlit pertama kali dimuat.
 try:
@@ -55,7 +59,7 @@ except Exception as e:
 PDF_LIBS_OK = HAS_MATPLOTLIB and HAS_REPORTLAB
 
 def get_supabase_dashboard_url():
-    db_url = os.getenv("DATABASE_URL", "")
+    db_url = session_credentials.get_active_supabase_url()
     match = re.search(r"postgres\.([a-zA-Z0-9\-]+)", db_url)
     if match:
         project_ref = match.group(1)
@@ -350,6 +354,59 @@ with st.sidebar.popover("🔒 Disclaimer Keamanan & Kerahasiaan Data", use_conta
         "3. **Penyimpanan:** Data tersimpan secara aman di Supabase PostgreSQL dengan enkripsi standar industri.\n"
         "4. **Penggunaan AI:** Pembersihan teks oleh Gemini AI dilakukan tanpa menyimpan histori pribadi pengguna luar."
     )
+
+# 1b. Popover Pengaturan API Key Sesi Pengguna
+with st.sidebar.popover("🔐 Pengaturan API Key Sesi", use_container_width=True):
+    st.markdown("### 🔐 Pengaturan API Key Sesi Pengguna")
+    st.caption(
+        "Kunci API yang Anda masukkan di sini hanya tersimpan dalam memori sesi browser Anda "
+        "(Session-Only) dan **otomatis terhapus** saat tab browser ditutup. Nilai kunci tersamarkan dengan **asterisk/bullet** (`••••••••`). "
+        "Jika dikosongkan/di-reset, sistem secara otomatis menggunakan kunci bawaan dari file `.env`."
+    )
+    
+    cur_apify = session_credentials.get_active_apify_token()
+    cur_gemini = session_credentials.get_active_gemini_key()
+    cur_supabase = session_credentials.get_active_supabase_url()
+    
+    has_custom_apify = bool(st.session_state.get(session_credentials.KEY_APIFY, "").strip())
+    has_custom_gemini = bool(st.session_state.get(session_credentials.KEY_GEMINI, "").strip())
+    has_custom_supabase = bool(st.session_state.get(session_credentials.KEY_SUPABASE, "").strip())
+    
+    st.markdown("**Status Kredensial Sesi Aktif:**")
+    st.text(f"• Apify: {'🟢 Kustom Sesi (' + session_credentials.mask_credential(cur_apify) + ')' if has_custom_apify else '⚪ Default (.env)'}")
+    st.text(f"• Gemini: {'🟢 Kustom Sesi (' + session_credentials.mask_credential(cur_gemini) + ')' if has_custom_gemini else '⚪ Default (.env)'}")
+    st.text(f"• Supabase: {'🟢 Kustom Sesi (' + session_credentials.mask_credential(cur_supabase) + ')' if has_custom_supabase else '⚪ Default (.env)'}")
+    
+    st.divider()
+    
+    with st.form("form_session_credentials", clear_on_submit=True):
+        st.markdown("**Update Kredensial Sesi (Input Tersamarkan):**")
+        input_apify = st.text_input("🔑 Apify API Token:", type="password", placeholder="Masukkan Apify Token kustom...", help="Token Apify untuk penarikan data publik.")
+        input_gemini = st.text_input("🧠 Gemini API Key:", type="password", placeholder="Masukkan Gemini API Key kustom...", help="Kunci API Gemini untuk pembersihan EYD dan NLG Laporan.")
+        input_supabase = st.text_input("🗄️ Supabase DATABASE_URL:", type="password", placeholder="postgresql://postgres:...@db...supabase.co:5432/postgres", help="URL PostgreSQL Supabase kustom.")
+        
+        c_btn_cred1, c_btn_cred2 = st.columns([1, 1])
+        with c_btn_cred1:
+            btn_save_cred = st.form_submit_button("💾 Simpan Sesi", use_container_width=True)
+        with c_btn_cred2:
+            btn_reset_cred = st.form_submit_button("🗑️ Reset Default", use_container_width=True)
+            
+        if btn_save_cred:
+            if input_apify.strip():
+                st.session_state[session_credentials.KEY_APIFY] = input_apify.strip()
+            if input_gemini.strip():
+                st.session_state[session_credentials.KEY_GEMINI] = input_gemini.strip()
+            if input_supabase.strip():
+                st.session_state[session_credentials.KEY_SUPABASE] = input_supabase.strip()
+            st.success("✅ Kredensial sesi berhasil diperbarui!")
+            st.rerun()
+            
+        if btn_reset_cred:
+            st.session_state[session_credentials.KEY_APIFY] = ""
+            st.session_state[session_credentials.KEY_GEMINI] = ""
+            st.session_state[session_credentials.KEY_SUPABASE] = ""
+            st.info("ℹ️ Kredensial dikembalikan ke nilai default (.env).")
+            st.rerun()
 
 # 2. Akses Database Awan
 st.sidebar.divider()
@@ -660,14 +717,14 @@ with tab_scrape:
         if st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", key="btn_run_scraper_main"):
             with st.status("🚀 Menghubungkan ke Apify Cloud & menarik data mentah...", expanded=True) as status_s:
                 try:
-                    result = subprocess.run([sys.executable, "01_run_scraper.py"], capture_output=True, text=True, check=True)
+                    result = subprocess.run([sys.executable, "01_run_scraper.py"], capture_output=True, text=True, check=True, env=session_credentials.get_session_env_dict())
                     status_s.update(label="✅ Penarikan data selesai!", state="complete", expanded=False)
                     st.success("✅ Penarikan data mentah selesai. Data siap diproses di Tahapan 2.")
                     with st.expander("📋 Log Scraper"):
                         st.code(result.stdout, language="text")
                 except subprocess.CalledProcessError as e:
                     status_s.update(label=f"❌ Gagal (Exit code: {e.returncode})", state="error", expanded=True)
-                    st.error("❌ Gagal menjalankan scraper. Cek token APIFY_API_TOKEN di file .env.")
+                    st.error("❌ Gagal menjalankan scraper. Cek token APIFY_API_TOKEN di sesi / file .env.")
                     with st.expander("📋 Log Kesalahan"):
                         st.code(e.stdout or e.stderr, language="text")
 
@@ -699,7 +756,7 @@ with tab_ml:
     if btn_run_pipeline:
         with st.status("🧠 Melakukan pembersihan duplikat RAW, standardisasi EYD (Gemini), & klasifikasi SVM...", expanded=True) as status_ml:
             try:
-                result = subprocess.run([sys.executable, "01_pipeline_data.py"], capture_output=True, text=True, check=True)
+                result = subprocess.run([sys.executable, "01_pipeline_data.py"], capture_output=True, text=True, check=True, env=session_credentials.get_session_env_dict())
                 status_ml.update(label="✅ Proses AI & ML Selesai!", state="complete", expanded=False)
                 st.success("✅ Proses prapemrosesan AI & klasifikasi ML selesai dengan sukses! Data siap di-review di Tahapan 3.")
                 with st.expander("📋 Log Detail Pemrosesan Pipeline"):
@@ -707,7 +764,7 @@ with tab_ml:
                     if result.stderr: st.code(result.stderr, language="text")
             except subprocess.CalledProcessError as e:
                 status_ml.update(label=f"❌ Gagal (Exit code: {e.returncode})", state="error", expanded=True)
-                st.error("❌ Gagal memproses pipeline data. Cek file .env (GEMINI_API_KEY) dan ketersediaan model SVM.")
+                st.error("❌ Gagal memproses pipeline data. Cek kunci GEMINI_API_KEY di sesi / file .env dan ketersediaan model SVM.")
                 with st.expander("📋 Log Kesalahan"):
                     st.code(e.stdout or e.stderr, language="text")
 
@@ -1196,7 +1253,8 @@ with tab_viz:
                     persen_netral=round(persen_neu_v, 1),
                     top_keywords=top_kw_str,
                     contoh_cuitan=contoh_suara,
-                    kebijakan_fokus=fokus_kebijakan_txt
+                    kebijakan_fokus=fokus_kebijakan_txt,
+                    api_key=session_credentials.get_active_gemini_key()
                 )
                 st.session_state['ai_narrative_viz_cache'] = narrative_res
                 

@@ -14,7 +14,8 @@ def generate_executive_summary(
     persen_netral: float,
     top_keywords: str,
     contoh_cuitan: str,
-    kebijakan_fokus: str = "Kebijakan dan Isu Publik"
+    kebijakan_fokus: str = "Kebijakan dan Isu Publik",
+    api_key: str = None
 ) -> str:
     """
     Menghasilkan laporan ringkasan eksekutif analitis berbasis AI (NLG) 
@@ -30,16 +31,16 @@ def generate_executive_summary(
         )
 
     # 2. Validasi Kunci API Gemini secara aman
-    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        api_key = os.getenv("GEMINI_API_KEY")
     if not api_key or api_key == "YOUR_GEMINI_API_KEY_HERE":
         return (
             "### ⚠️ Kunci API Gemini Belum Dikonfigurasi\n\n"
             "Fitur **Penyusunan Ringkasan Eksekutif berbasis AI (NLG)** saat ini dinonaktifkan "
-            "karena kunci API `GEMINI_API_KEY` tidak ditemukan atau masih bernilai standar di file `.env`.\n\n"
+            "karena kunci API `GEMINI_API_KEY` tidak ditemukan di sesi atau di file `.env`.\n\n"
             "**Langkah Pengaktifan:**\n"
-            "1. Buka file `.env` di direktori proyek Anda.\n"
-            "2. Masukkan kunci API Gemini Anda yang valid pada variabel `GEMINI_API_KEY`.\n"
-            "3. Klik tombol **🔄 Perbarui Analisis Narasi** kembali."
+            "1. Masukkan kunci API Gemini Anda pada sidebar **🔐 Pengaturan Kredensial API** atau file `.env`.\n"
+            "2. Klik tombol **🔄 Perbarui Analisis Narasi** kembali."
         )
 
     try:

@@ -8,21 +8,23 @@ load_dotenv(override=False)
 
 DB_FILE = 'sentimen_kebijakan.db'
 
-def get_db_type():
+def get_db_type(db_url=None):
     """
     Menentukan tipe database yang digunakan berdasarkan ketersediaan DATABASE_URL.
     """
-    db_url = os.getenv("DATABASE_URL", "")
+    if not db_url:
+        db_url = os.getenv("DATABASE_URL", "")
     if db_url and ("postgresql://" in db_url or "postgres://" in db_url) and "YOUR_DATABASE_URL" not in db_url:
         return "postgresql"
     return "sqlite"
 
-def get_connection():
+def get_connection(db_url=None):
     """
     Mendapatkan koneksi database yang sesuai (sqlite3 atau psycopg2).
     """
-    db_type = get_db_type()
-    db_url = os.getenv("DATABASE_URL", "")
+    if not db_url:
+        db_url = os.getenv("DATABASE_URL", "")
+    db_type = get_db_type(db_url)
     
     if db_type == "postgresql":
         import psycopg2
@@ -35,11 +37,11 @@ def get_connection():
     else:
         return sqlite3.connect(DB_FILE)
 
-def get_placeholder():
+def get_placeholder(db_url=None):
     """
     Mendapatkan string placeholder parameter SQL yang sesuai (? untuk SQLite, %s untuk PostgreSQL).
     """
-    return "%s" if get_db_type() == "postgresql" else "?"
+    return "%s" if get_db_type(db_url) == "postgresql" else "?"
 
 def buat_tabel():
     """
