@@ -1184,8 +1184,6 @@ with tab_viz:
     else:
         if selected_search_terms:
             fokus_kebijakan_txt = ", ".join(selected_search_terms)
-        elif selected_hist:
-            fokus_kebijakan_txt = ", ".join(selected_hist)
         else:
             fokus_kebijakan_txt = f"isu publik dengan kata kunci ({top_kw_str})"
 
@@ -1284,7 +1282,7 @@ with tab_viz:
                     
                     gen_pdf = (cfg_pdf or {}).get('config', {}).get('general', {})
                     t_cfg_p = Table([
-                        [Paragraph('<b>Target Keysearch / Riwayat</b>', sB), Paragraph(', '.join(selected_hist) if selected_hist else ', '.join(gen_pdf.get('keywords', ['-'])), sB)],
+                        [Paragraph('<b>Target Keysearch / Riwayat</b>', sB), Paragraph(', '.join(selected_search_terms) if selected_search_terms else ', '.join(gen_pdf.get('keywords', ['-'])), sB)],
                         [Paragraph('<b>Target Profil Akun</b>', sB), Paragraph(', '.join(gen_pdf.get('profiles', ['-'])), sB)],
                         [Paragraph('<b>Target Hashtag</b>', sB), Paragraph(', '.join(gen_pdf.get('hashtags', ['-'])), sB)],
                         [Paragraph('<b>Rentang Waktu Periode</b>', sB), Paragraph(f"{viz_date_range[0]} s/d {viz_date_range[1]}" if isinstance(viz_date_range, tuple) else "-", sB)],
