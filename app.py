@@ -97,7 +97,6 @@ div[data-st-fullscreen="true"] div[data-testid="stDataFrame"] [role="grid"] {
 
 DB_FILE = 'sentimen_kebijakan.db'
 CONFIG_FILE = 'target_config.json'
-MAX_SUPABASE_ROWS = 666666
 
 # ====================================================================
 # [EXPORT PDF] Helper functions
@@ -423,6 +422,13 @@ with col_db2:
     if st.button("🔄 Muat Ulang", use_container_width=True, help="Muat ulang data dari basis data.", key="btn_reload_db_sidebar"):
         st.rerun()
 
+if db_manager.is_storage_full():
+    st.sidebar.error("🚨 Status Storage DB: Penyimpanan Penuh")
+    if st.sidebar.button("🔄 Reset Status Storage DB", use_container_width=True, help="Reset status penyimpanan ke normal jika storage Supabase sudah dikosongkan."):
+        db_manager.set_storage_full_flag(False)
+        st.sidebar.success("✅ Status storage DB berhasil di-reset ke normal!")
+        st.rerun()
+
 st.sidebar.divider()
 st.sidebar.info("💡 **Tips Tema:** Klik ikon **⋮** di sudut kanan atas layar > **Settings > Theme** untuk memilih *Light* atau *Dark Mode*.")
 
@@ -443,7 +449,7 @@ with tab_scrape:
     st.subheader("📥 Tahapan 1: Penarikan Data (Scraper)")
     st.markdown("Tentukan parameter target penarikan data publik dari Twitter (X), Instagram, LinkedIn, dan Portal Berita.")
     
-    # 3.1 Cek Kapasitas Database Supabase
+    # 3.1 Cek Kapasitas Storage Database (Real-Time Error Detection)
     try:
         if hasattr(db_manager, 'hitung_total_baris'):
             total_db_rows = db_manager.hitung_total_baris()
@@ -452,19 +458,16 @@ with tab_scrape:
     except Exception:
         total_db_rows = len(df_all) if not df_all.empty else 0
 
-    db_is_full = total_db_rows >= MAX_SUPABASE_ROWS
+    db_is_full = db_manager.is_storage_full()
     
-    c_cap1, c_cap2 = st.columns([3, 1])
-    with c_cap1:
-        st.caption(f"📦 Status Kapasitas Storage Database: **{total_db_rows:,}** / **{MAX_SUPABASE_ROWS:,}** baris tersimpan.")
-    with c_cap2:
-        st.progress(min(1.0, total_db_rows / MAX_SUPABASE_ROWS))
-        
     if db_is_full:
         st.error(
             "🚨 **Mohon maaf untuk sementara waktu mesin tidak dapat digunakan karena penyimpanan database telah penuh "
             "untuk penggunaan lebih lanjut dapat menghubungi Mrs Prof. Tuti Rachmawati, PhD - Universitas Parahyangan**"
         )
+        st.caption(f"📦 Status Storage Database: 🚨 **Penyimpanan Penuh / Gagal Menulis Data ke Supabase** ({total_db_rows:,} baris tersimpan).")
+    else:
+        st.caption(f"📦 Status Storage Database: 🟢 **Normal** ({total_db_rows:,} baris tersimpan).")
     
     # # Panduan Twitter Advanced Search
     # with st.expander("📖 Panduan Sintaks Pencarian Lanjutan (Twitter Advanced Search Operator)", expanded=False):
@@ -712,7 +715,7 @@ with tab_scrape:
     st.divider()
     st.markdown("### 🚀 Eksekusi Penarikan Data")
     if db_is_full:
-        st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", disabled=True, help="Database penuh (maks 666.666 baris). Penarikan data dinonaktifkan sementara.")
+        st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", disabled=True, help="Penyimpanan database penuh (gagal menyimpan data ke Supabase). Penarikan data dinonaktifkan sementara.")
     else:
         if st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", key="btn_run_scraper_main"):
             with st.status("🚀 Menghubungkan ke Apify Cloud & menarik data mentah...", expanded=True) as status_s:
