@@ -1107,7 +1107,7 @@ with tab_review:
                             line_shape='spline', height=260
                         )
                         fig_tr.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-                        st.plotly_chart(fig_tr, use_container_width=True)
+                        st.plotly_chart(fig_tr, use_container_width=True, key="chart_tab3_trend")
                     else:
                         st.info("Belum ada data tren sentimen terklasifikasi.")
                 except Exception as e_tr:
@@ -1125,7 +1125,7 @@ with tab_review:
                 color='Sentimen', color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'}
             )
             fig_rev_pie.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=260)
-            st.plotly_chart(fig_rev_pie, use_container_width=True)
+            st.plotly_chart(fig_rev_pie, use_container_width=True, key="chart_tab3_pie")
 
         # Grafik 3: Top Kata Kunci / Tagar (Horizontal Bar Chart)
         with col_c3:
@@ -1137,7 +1137,7 @@ with tab_review:
                     color_discrete_sequence=['#4B6CB7'], height=260
                 )
                 fig_kw.update_layout(margin=dict(l=10, r=10, t=10, b=10), yaxis=dict(autorange="reversed"))
-                st.plotly_chart(fig_kw, use_container_width=True)
+                st.plotly_chart(fig_kw, use_container_width=True, key="chart_tab3_kw")
             else:
                 st.info("Belum ada kata kunci dominan.")
 
@@ -1352,7 +1352,7 @@ with tab_viz:
                              color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'},
                              line_shape='spline', height=260)
             fig_tr.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-            st.plotly_chart(fig_tr, use_container_width=True)
+            st.plotly_chart(fig_tr, use_container_width=True, key="chart_tab4_trend")
         else:
             st.info("Belum ada data sentimen terklasifikasi untuk membentuk grafik tren.")
             
@@ -1364,7 +1364,7 @@ with tab_viz:
                            color='Sentimen', color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'},
                            height=260)
             fig_p.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-            st.plotly_chart(fig_p, use_container_width=True)
+            st.plotly_chart(fig_p, use_container_width=True, key="chart_tab4_pie")
         else:
             st.info("Belum ada data sentimen terklasifikasi.")
 
@@ -1377,7 +1377,7 @@ with tab_viz:
                 color_discrete_sequence=['#4B6CB7'], height=260
             )
             fig_kw_v.update_layout(margin=dict(l=10, r=10, t=10, b=10), yaxis=dict(autorange="reversed"))
-            st.plotly_chart(fig_kw_v, use_container_width=True)
+            st.plotly_chart(fig_kw_v, use_container_width=True, key="chart_tab4_kw")
         else:
             st.info("Belum ada kata kunci dominan.")
 
