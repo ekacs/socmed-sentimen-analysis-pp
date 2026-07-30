@@ -715,7 +715,7 @@ with tab_scrape:
     # -----------------------------------------------------------------
     if "Website / Dokumen Publik" in selected_platforms:
         with st.form("form_config_website"):
-            st.markdown("### 🌐 Konfigurasi Penarikan Website / Dokumen Publik (Aktor: easyapi/google-news-scraper)")
+            st.markdown("### 🌐 Konfigurasi Penarikan Website / Dokumen Publik")
             col_w_d1, col_w_d2 = st.columns(2)
             with col_w_d1:
                 web_start_val = _parse_date(website_cfg.get("start_date"), 30)
@@ -814,7 +814,7 @@ with tab_scrape:
 # TAB 2: PROSES AI & KLASIFIKASI ML
 # =====================================================================
 with tab_ml:
-    st.subheader("🧠 Tahapan 2: Proses AI (Gemini EYD) & Klasifikasi ML (SVM)")
+    st.subheader("🧠 Tahapan 2: Proses AI (EYD Bahasa Indonesia) & Klasifikasi ML (SVM)")
     st.info(
         "ℹ️ **Ketentuan Prapemrosesan Otomatis:**\n\n"
         "**pembersihan data duplikat** (data dengan `username`, `raw_text`, dan `date` yang persis sama). Jika ada duplikat, "
@@ -1073,17 +1073,45 @@ with tab_review:
             if 'date' in df_reviewed_final.columns and not df_reviewed_final.empty:
                 try:
                     df_rev_copy = df_reviewed_final.copy()
-                    df_rev_copy['date_parsed'] = pd.to_datetime(df_rev_copy['date'], errors='coerce').dt.date
-                    df_trend = df_rev_copy.groupby(['date_parsed', 'sentiment_label']).size().reset_index(name='count')
-                    fig_tr = px.line(
-                        df_trend, x='date_parsed', y='count', color='sentiment_label',
-                        color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'},
-                        line_shape='spline', height=260
-                    )
-                    fig_tr.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-                    st.plotly_chart(fig_tr, use_container_width=True)
-                except Exception:
-                    st.info("Format tanggal belum dapat diproses untuk grafik tren.")
+                    
+                    def _parse_robust_date(val):
+                        if pd.isna(val) or val is None or str(val).strip() in ["", "-", "None", "NaT"]:
+                            return None
+                        val_s = str(val).strip()
+                        try:
+                            dt = pd.to_datetime(val_s, utc=True, errors='coerce')
+                            if pd.notna(dt):
+                                return dt.date()
+                        except Exception:
+                            pass
+                        import re
+                        m = re.search(r'(\d{4}-\d{2}-\d{2})', val_s)
+                        if m:
+                            try:
+                                return datetime.strptime(m.group(1), "%Y-%m-%d").date()
+                            except Exception:
+                                pass
+                        return None
+
+                    df_rev_copy['date_parsed'] = df_rev_copy['date'].apply(_parse_robust_date)
+                    v_df = df_rev_copy.dropna(subset=['date_parsed'])
+                    if v_df.empty:
+                        df_rev_copy['date_parsed'] = datetime.date.today()
+                        v_df = df_rev_copy
+
+                    df_trend = v_df.groupby(['date_parsed', 'sentiment_label']).size().reset_index(name='count')
+                    if not df_trend.empty:
+                        fig_tr = px.line(
+                            df_trend, x='date_parsed', y='count', color='sentiment_label',
+                            color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'},
+                            line_shape='spline', height=260
+                        )
+                        fig_tr.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+                        st.plotly_chart(fig_tr, use_container_width=True)
+                    else:
+                        st.info("Belum ada data tren sentimen terklasifikasi.")
+                except Exception as e_tr:
+                    st.info(f"Format tanggal belum dapat diproses untuk grafik tren: {e_tr}")
             else:
                 st.info("Data tanggal tidak tersedia.")
 
@@ -1189,10 +1217,15 @@ with tab_viz:
     # Rentang tanggal
     if not df_base_viz.empty and 'date' in df_base_viz.columns:
         try:
-            df_base_viz['date_parsed'] = pd.to_datetime(df_base_viz['date'], errors='coerce').dt.date
+            df_base_viz['date_parsed'] = df_base_viz['date'].apply(_parse_robust_date)
             v_dates = df_base_viz['date_parsed'].dropna()
-            min_d = v_dates.min() if not v_dates.empty else datetime.date.today() - datetime.timedelta(days=30)
-            max_d = v_dates.max() if not v_dates.empty else datetime.date.today()
+            if not v_dates.empty:
+                min_d = v_dates.min()
+                max_d = v_dates.max()
+            else:
+                df_base_viz['date_parsed'] = datetime.date.today()
+                min_d = datetime.date.today() - datetime.timedelta(days=30)
+                max_d = datetime.date.today()
         except Exception:
             df_base_viz['date_parsed'] = datetime.date.today()
             min_d = datetime.date.today() - datetime.timedelta(days=30)
