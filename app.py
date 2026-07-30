@@ -1048,7 +1048,7 @@ with tab_review:
         tw_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Twitter', case=False, na=False).sum())
         ig_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Instagram', case=False, na=False).sum())
         li_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('LinkedIn', case=False, na=False).sum())
-        web_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Website|News|Portal', case=False, na=False).sum())
+        web_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Website|News|Portal|http|\.com|\.go\.id|\.id', case=False, na=False).sum())
         tot_p_r = total_volume_rev if total_volume_rev > 0 else 1
         
         tw_pct_r = tw_cnt_r / tot_p_r * 100
@@ -1289,7 +1289,7 @@ with tab_viz:
         tw_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Twitter', case=False, na=False).sum())
         ig_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Instagram', case=False, na=False).sum())
         li_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('LinkedIn', case=False, na=False).sum())
-        web_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Website|News|Portal', case=False, na=False).sum())
+        web_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Website|News|Portal|http|\.com|\.go\.id|\.id', case=False, na=False).sum())
         tot_p_v = total_volume_viz if total_volume_viz > 0 else 1
         
         tw_pct_v = tw_cnt_v / tot_p_v * 100

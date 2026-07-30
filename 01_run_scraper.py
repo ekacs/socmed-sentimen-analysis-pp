@@ -742,7 +742,7 @@ def scrape_news_portal(client, general_cfg, log_activity: str = "", user_app: st
                 "likes": 0,
                 "retweets": 0,
                 "views": 0,
-                "source_platform": "News",
+                "source_platform": str(url).strip(),
                 "log_activity": log_activity,
                 "user_app": user_app
             })
@@ -931,9 +931,17 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
             if not link:
                 continue
 
+            # Diambil dari field domain
+            domain_val = item.get("domain") or ""
+            if not domain_val:
+                try:
+                    from urllib.parse import urlparse as _up
+                    domain_val = (_up(link).hostname or "").lower()
+                except Exception:
+                    domain_val = item.get("source") or "Website"
+
             title = item.get("title") or ""
             snippet = item.get("snippet") or ""
-            source = item.get("source") or item.get("domain") or "Google News"
             date_utc = item.get("date_utc") or item.get("date")
 
             title_clean = title.strip()
@@ -949,12 +957,12 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
             results.append({
                 "platform_id": f"WEB_{url_hash}",
                 "date": parse_to_wib_iso(date_utc),
-                "username": str(source).strip(),
+                "username": str(domain_val).strip(),       # Diambil dari field 'domain'
                 "raw_text": raw_text_payload,
                 "likes": 0,
                 "retweets": 0,
                 "views": 0,
-                "source_platform": "News",
+                "source_platform": str(link).strip(),     # Diambil dari field 'link' (URL Berita)
                 "log_activity": log_activity,
                 "user_app": user_app
             })
