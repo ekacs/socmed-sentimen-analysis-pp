@@ -201,11 +201,19 @@ def simpan_data_ke_db(data_cuitan):
         
         cursor.executemany(query, data_tuple)
         conn.commit()
-        print(f"[SUCCESS] {len(data_cuitan)} data diproses. Penyisipan ke {db_type} selesai (duplikasi diabaikan otomatis).")
+        print(f"[SUCCESS] {len(data_cuitan)} data diproses. Penyisipan ke {db_type} selesai.")
     except Exception as e:
         print(f"[ERROR] Kesalahan saat menyisipkan data ke database: {e}")
     finally:
         conn.close()
+        
+    # Otomatis jalankan pembersihan duplikasi (username + raw_text sama, pertahankan date paling muda)
+    try:
+        deleted_dups = hapus_duplikasi_data_raw()
+        if deleted_dups > 0:
+            print(f"[INFO] Deduplikasi Tahapan 1: {deleted_dups} data duplikat (username & raw_text sama) dibersihkan, mempertahankan data tanggal paling muda.")
+    except Exception as _ex:
+        print(f"[WARNING] Gagal otomatis deduplikasi setelah simpan: {_ex}")
 
 def baca_data_untuk_streamlit():
     """
@@ -393,36 +401,39 @@ def hitung_total_baris():
 
 def hapus_duplikasi_data_raw():
     """
-    Menghapus data duplikat (username + raw_text sama) pada status 'RAW'.
-    Mempertahankan baris dengan date (created_at) paling awal.
+    Menghapus data duplikat jika terdapat kesamaan (username + raw_text + date).
+    Aturan Prioritas Yang Dipertahankan:
+    1. Dipertahankan baris dengan total engagement (likes + retweets + views) PALING TINGGI.
+    2. Jika engagement sama semua, dipertahankan urutan TERAKHIR yang masuk scraping.
     Return: jumlah baris yang dihapus.
     """
     conn = get_connection()
     cursor = conn.cursor()
     deleted_count = 0
+    placeholder = get_placeholder()
     try:
-        # Cari grup (username, raw_text) yang memiliki duplikat di status RAW
+        # Cari grup (username, raw_text, date) yang memiliki duplikat
         cursor.execute("""
-            SELECT username, raw_text, COUNT(*) 
+            SELECT username, raw_text, date, COUNT(*) 
             FROM log_cuitan 
-            WHERE status = 'RAW'
-            GROUP BY username, raw_text 
+            GROUP BY username, raw_text, date 
             HAVING COUNT(*) > 1
         """)
         dup_groups = cursor.fetchall()
         
-        placeholder = get_placeholder()
-        for username, raw_text, _ in dup_groups:
-            # Ambil semua platform_id terurut berdasarkan date ASC
-            cursor.execute(f"""
-                SELECT platform_id 
+        for username, raw_text, date_val, _ in dup_groups:
+            # Urutkan berdasarkan total engagement DESC, lalu platform_id DESC (penyisipan terakhir)
+            query_get = f"""
+                SELECT platform_id, 
+                       (COALESCE(likes, 0) + COALESCE(retweets, 0) + COALESCE(views, 0)) AS total_eng
                 FROM log_cuitan 
-                WHERE username = {placeholder} AND raw_text = {placeholder} AND status = 'RAW'
-                ORDER BY date ASC
-            """, (username, raw_text))
+                WHERE username = {placeholder} AND raw_text = {placeholder} AND date = {placeholder}
+                ORDER BY total_eng DESC, platform_id DESC
+            """
+            cursor.execute(query_get, (username, raw_text, date_val))
             rows = cursor.fetchall()
             if len(rows) > 1:
-                # Simpan platform_id yang paling awal, hapus sisanya
+                # rows[0] adalah data dengan engagement tertinggi / urutan penyisipan terakhir yang DIPERTAHANKAN
                 ids_to_delete = [r[0] for r in rows[1:]]
                 for del_id in ids_to_delete:
                     cursor.execute(f"DELETE FROM log_cuitan WHERE platform_id = {placeholder}", (del_id,))
@@ -430,10 +441,10 @@ def hapus_duplikasi_data_raw():
                     
         conn.commit()
         if deleted_count > 0:
-            print(f"[INFO] Deduplikasi data RAW: berhasil menghapus {deleted_count} data duplikat.")
+            print(f"[INFO] Deduplikasi data: berhasil menghapus {deleted_count} data duplikat (kesamaan username, text, date).")
         return deleted_count
     except Exception as e:
-        print(f"[ERROR] Gagal menghapus duplikasi data RAW: {e}")
+        print(f"[ERROR] Gagal menghapus duplikasi data: {e}")
         return 0
     finally:
         conn.close()

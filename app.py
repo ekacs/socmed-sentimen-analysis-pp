@@ -678,9 +678,8 @@ with tab_ml:
     st.subheader("🧠 Tahapan 2: Proses AI (Gemini EYD) & Klasifikasi ML (SVM)")
     st.info(
         "ℹ️ **Ketentuan Prapemrosesan Otomatis:**\n\n"
-        "Sebelum proses AI (Gemini EYD) dan klasifikasi sentimen (SVM) dijalankan, sistem secara otomatis melakukan "
-        "**pembersihan data duplikat** pada data scraping mentah (data dengan `username` dan `raw_text` yang persis sama, "
-        "hanya mempertahankan baris dengan `created_at` / `date` paling awal)."
+        "**pembersihan data duplikat** (data dengan `username`, `raw_text`, dan `date` yang persis sama). Jika ada duplikat, "
+        "sistem mempertahankan data dengan **informasi engagement paling tinggi**, dan jika engagement sama maka mempertahankan **urutan terakhir yang masuk scraping**)."
     )
     
     # Hitung data RAW yang tersedia
