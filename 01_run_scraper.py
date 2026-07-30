@@ -942,7 +942,9 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
         "includeUrlGlobs": [{"glob": g} for g in include_globs],
         "crawlerType": crawler_type,
         "maxCrawlDepth": max_depth,
-        "maxPagesPerCrawl": max_results,
+        "maxCrawlPages": max_results,      # Schema resmi Apify Website Content Crawler
+        "maxPagesPerCrawl": max_results,   # Alias penjamin batas maksimal halaman
+        "maxResults": max_results,         # Fallback penjamin batas halaman
         "htmlTransformer": "readableText", # Ekstraksi berfokus pada Judul & Teks Utama (Mozilla Readability)
         "readableTextCharThreshold": 100,  # Membuang elemen pendek yang bukan bagian dari artikel
         "blockMedia": True,                # Blokir gambar/video agar scraping ultra-cepat
@@ -982,7 +984,6 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
             # Skip jika URL adalah halaman index/pencarian itu sendiri (bukan halaman artikel berita asli)
             url_lower = str(url).lower()
             if any(p in url_lower for p in ["/search/?", "/search?", "search.kompas.com/search", "searchall?"]):
-                # Jika halaman pencarian memuat artikel berita asli, tetap lanjut, namun jika hanya listing search skip
                 title_tmp = str(item.get("title") or "").lower()
                 if "pencarian" in title_tmp or "search" in title_tmp:
                     continue
@@ -1000,6 +1001,13 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
                 or item.get("date")
                 or (item.get("crawl") or {}).get("loadedTime") if isinstance(item.get("crawl"), dict) else None
             )
+
+            # Sanitasi & Validasi Judul + Teks Berita Murni (Wajib non-empty dan memiliki panjang memadai)
+            body_clean = body_text.strip() if isinstance(body_text, str) else ""
+            title_clean = title.strip() if isinstance(title, str) else ""
+
+            if not title_clean or not body_clean or len(body_clean) < 100:
+                continue
 
             # Filtering rentang tanggal jika metadata tanggal tersedia dan rentang diatur
             if (start_date_str or end_date_str) and date_raw:
@@ -1020,19 +1028,12 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
 
             # Filtering pencarian kata kunci / frasa (Mendukung kaidah Google Dork)
             if keywords:
-                kw_match = any(evaluate_dork_query(kw, title or "", body_text, url) for kw in keywords)
+                kw_match = any(evaluate_dork_query(kw, title_clean, body_clean, url) for kw in keywords)
                 if not kw_match:
                     continue
             
-            if isinstance(body_text, str):
-                body_text = body_text[:3000]
-            else:
-                body_text = ""
-            if isinstance(title, str):
-                title = title.strip()[:300]
-                
-            if (not title or not title.strip()) and (not body_text or len(body_text.strip()) < 80):
-                continue
+            body_text = body_clean[:3000]
+            title = title_clean[:300]
                 
             url_hash = hashlib.md5(str(url).encode('utf-8')).hexdigest()
             try:
