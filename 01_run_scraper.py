@@ -970,11 +970,8 @@ def main():
         elif source_type == "linkedin":
             plat_cfg = cfg_base.get("linkedin", general_cfg)
             partial = scrape_linkedin(client, plat_cfg, log_activity=log_activity, user_app=user_app)
-        elif source_type in ["portal_berita", "news_portal", "news"]:
-            plat_cfg = cfg_base.get("portal_berita", general_cfg)
-            partial = scrape_news_portal(client, plat_cfg, log_activity=log_activity, user_app=user_app)
-        elif source_type in ["website", "website_content_crawler", "website_crawler"]:
-            plat_cfg = cfg_base.get("website", general_cfg)
+        elif source_type in ["website", "website_content_crawler", "website_crawler", "portal_berita", "news_portal", "news"]:
+            plat_cfg = cfg_base.get("website", cfg_base.get("portal_berita", general_cfg))
             partial = scrape_website_content(client, plat_cfg, log_activity=log_activity, user_app=user_app)
         else:
             print(f"[WARNING] Tipe sumber '{source_type}' tidak dikenal. Dilewati.")

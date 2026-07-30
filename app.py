@@ -473,7 +473,7 @@ tab_scrape, tab_ml, tab_review, tab_viz = st.tabs([
 # =====================================================================
 with tab_scrape:
     st.subheader("📥 Tahapan 1: Penarikan Data (Scraper)")
-    st.markdown("Tentukan parameter target penarikan data publik dari Twitter (X), Instagram, LinkedIn, dan Portal Berita.")
+    st.markdown("Tentukan parameter target penarikan data publik dari Twitter (X), Instagram, LinkedIn, dan Website / Dokumen Publik.")
     
     # 3.1 Cek Kapasitas Storage Database (Real-Time Error Detection)
     try:
@@ -502,25 +502,6 @@ with tab_scrape:
     else:
         st.caption(f"📦 Status Storage Database: 🟢 **Normal** ({total_db_rows:,} baris tersimpan).")
     
-    # # Panduan Twitter Advanced Search
-    # with st.expander("📖 Panduan Sintaks Pencarian Lanjutan (Twitter Advanced Search Operator)", expanded=False):
-    #     st.markdown(
-    #         "Anda dapat memasukkan kombinasi operator pencarian lanjutan di bidang **Target Kata Kunci** sesuai panduan "
-    #         "[Twitter Advanced Search Guide](https://github.com/igorbrigadir/twitter-advanced-search):\n\n"
-    #         "| Operator | Fungsi / Deskripsi | Contoh Penggunaan |\n"
-    #         "| :--- | :--- | :--- |\n"
-    #         "| `\"frasa persis\"` | Mencari frasa kata kunci yang persis berurutan | `\"Ibu Kota Baru\"` |\n"
-    #         "| `kata1 kata2` | Mencari tweet yang mengandung KEDUA kata tersebut | `IKN Nusantara` |\n"
-    #         "| `from:username` | Menarik tweet yang ditulis oleh akun tertentu | `from:jokowi` |\n"
-    #         "| `to:username` | Menarik tweet balasan (reply) ke akun tertentu | `to:kemenpupr` |\n"
-    #         "| `since:YYYY-MM-DD` | Tweet yang dibuat SEJAK tanggal tertentu | `since:2026-07-01` |\n"
-    #         "| `until:YYYY-MM-DD` | Tweet yang dibuat SAMPAI tanggal tertentu | `until:2026-07-13` |\n"
-    #         "| `min_faves:N` | Minimal jumlah Suka (Likes) | `min_faves:100` |\n"
-    #         "| `min_retweets:N` | Minimal jumlah Retweet/Share | `min_retweets:50` |\n"
-    #         "| `-kata` | Mengecualikan tweet yang mengandung kata tertentu | `IKN -kaltim` |\n"
-    #         "| `lang:id` | Membatasi hasil hanya tweet berbahasa Indonesia | `subsidi lang:id` |\n"
-    #     )
-
     # Muat Konfigurasi Target dari target_config.json
     if os.path.exists(CONFIG_FILE):
         try:
@@ -536,7 +517,6 @@ with tab_scrape:
     twitter_cfg = cfg_all_root.get("twitter", general_cfg)
     instagram_cfg = cfg_all_root.get("instagram", general_cfg)
     linkedin_cfg = cfg_all_root.get("linkedin", general_cfg)
-    news_cfg = cfg_all_root.get("portal_berita", general_cfg)
     website_cfg = cfg_all_root.get("website", general_cfg)
 
     raw_source_list = current_config.get("source_types")
@@ -550,11 +530,10 @@ with tab_scrape:
         "twitter_": "Twitter (X)",
         "instagram": "Instagram",
         "linkedin": "LinkedIn",
-        "portal_berita": "Portal Berita",
         "website": "Website / Dokumen Publik"
     }
     rev_mapping = {v: k for k, v in mapping_source_types.items()}
-    platform_options = ["Twitter (X)", "Instagram", "LinkedIn", "Portal Berita", "Website / Dokumen Publik"]
+    platform_options = ["Twitter (X)", "Instagram", "LinkedIn", "Website / Dokumen Publik"]
     
     default_selected = [mapping_source_types.get(s) for s in raw_source_list if mapping_source_types.get(s)]
     if not default_selected: default_selected = ["Twitter (X)"]
@@ -717,42 +696,11 @@ with tab_scrape:
                     st.success("✅ Konfigurasi LinkedIn berhasil disimpan!")
 
     # -----------------------------------------------------------------
-    # 4. FORM PORTAL BERITA
-    # -----------------------------------------------------------------
-    if "Portal Berita" in selected_platforms:
-        with st.form("form_config_news"):
-            st.markdown("### 📰 Konfigurasi Penarikan Portal Berita")
-            news_urls_raw = news_cfg.get("news_portal_urls", ["https://www.kompas.com/"])
-            news_urls_str = ", ".join(news_urls_raw) if isinstance(news_urls_raw, list) else str(news_urls_raw)
-            news_url_input = st.text_input("URL Portal Berita (default: https://www.kompas.com/):", value=news_urls_str, key="news_urls")
-
-            news_start_val = _parse_date(news_cfg.get("start_date"), 30)
-            news_start_input = st.date_input("Tanggal Posting Terlama (Portal Berita)", value=news_start_val, key="news_start")
-
-            news_kw_val = ", ".join(news_cfg.get("keywords", ["kebijakan"]))
-            news_max_val = int(news_cfg.get("max_results_news") or news_cfg.get("max_results", 50))
-
-            news_kw_input = st.text_input("Kata Kunci (Portal Berita):", value=news_kw_val, key="news_kw")
-            news_max_input = st.slider("Batas maksimal data yang discrape (Portal Berita):", 5, 200, news_max_val, 5, key="news_max")
-
-            btn_save_news = st.form_submit_button("💾 Simpan Konfigurasi Portal Berita")
-            if btn_save_news:
-                news_obj = {
-                    "start_date": news_start_input.strftime("%Y-%m-%d"),
-                    "keywords": [k.strip() for k in news_kw_input.split(",") if k.strip()],
-                    "news_portal_urls": [u.strip() for u in news_url_input.split(",") if u.strip()],
-                    "max_results": news_max_input,
-                    "max_results_news": news_max_input
-                }
-                if save_platform_config("portal_berita", news_obj):
-                    st.success("✅ Konfigurasi Portal Berita berhasil disimpan!")
-
-    # -----------------------------------------------------------------
-    # 5. FORM WEBSITE / DOKUMEN PUBLIK
+    # 4. FORM WEBSITE / DOKUMEN PUBLIK
     # -----------------------------------------------------------------
     if "Website / Dokumen Publik" in selected_platforms:
         with st.form("form_config_website"):
-            st.markdown("### 🌐 Konfigurasi Penarikan Website / Dokumen Publik (Apify Content Crawler)")
+            st.markdown("### 🌐 Konfigurasi Penarikan Website / Dokumen Publik ")
             web_urls_raw = website_cfg.get("website_urls", website_cfg.get("start_urls", ["https://www.example.com"]))
             web_urls_str = ", ".join(web_urls_raw) if isinstance(web_urls_raw, list) else str(web_urls_raw)
             web_url_input = st.text_input("Target URL (Start URLs — pisahkan koma jika lebih dari satu):", value=web_urls_str, help="Contoh: https://www.kemendagri.go.id, https://situs.com/kebijakan", key="web_urls")
@@ -1027,23 +975,20 @@ with tab_review:
         tw_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Twitter', case=False, na=False).sum())
         ig_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Instagram', case=False, na=False).sum())
         li_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('LinkedIn', case=False, na=False).sum())
-        news_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('News|Portal', case=False, na=False).sum())
-        web_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Website', case=False, na=False).sum())
+        web_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Website|News|Portal', case=False, na=False).sum())
         tot_p_r = total_volume_rev if total_volume_rev > 0 else 1
         
         tw_pct_r = tw_cnt_r / tot_p_r * 100
         ig_pct_r = ig_cnt_r / tot_p_r * 100
         li_pct_r = li_cnt_r / tot_p_r * 100
-        news_pct_r = news_cnt_r / tot_p_r * 100
         web_pct_r = web_cnt_r / tot_p_r * 100
         
         st.markdown("<div style='margin-top: 10px; margin-bottom: 2px; font-weight: 600; font-size: 0.9em; color: #444;'>🌐 Distribusi Volume Data per Platform:</div>", unsafe_allow_html=True)
-        cp1, cp2, cp3, cp4, cp5 = st.columns(5)
+        cp1, cp2, cp3, cp4 = st.columns(4)
         with cp1: st.metric("𝕏 Twitter / X", f"{tw_pct_r:.1f}%", delta=f"{tw_cnt_r:,} data", delta_color="off")
         with cp2: st.metric("📸 Instagram", f"{ig_pct_r:.1f}%", delta=f"{ig_cnt_r:,} data", delta_color="off")
         with cp3: st.metric("💼 LinkedIn", f"{li_pct_r:.1f}%", delta=f"{li_cnt_r:,} data", delta_color="off")
-        with cp4: st.metric("📰 Portal Berita", f"{news_pct_r:.1f}%", delta=f"{news_cnt_r:,} data", delta_color="off")
-        with cp5: st.metric("🌐 Website", f"{web_pct_r:.1f}%", delta=f"{web_cnt_r:,} data", delta_color="off")
+        with cp4: st.metric("🌐 Website / Dokumen Publik", f"{web_pct_r:.1f}%", delta=f"{web_cnt_r:,} data", delta_color="off")
 
     if not df_reviewed_final.empty:
         st.markdown("<br>", unsafe_allow_html=True)
@@ -1271,20 +1216,20 @@ with tab_viz:
         tw_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Twitter', case=False, na=False).sum())
         ig_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Instagram', case=False, na=False).sum())
         li_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('LinkedIn', case=False, na=False).sum())
-        news_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('News|Portal', case=False, na=False).sum())
+        web_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Website|News|Portal', case=False, na=False).sum())
         tot_p_v = total_volume_viz if total_volume_viz > 0 else 1
         
         tw_pct_v = tw_cnt_v / tot_p_v * 100
         ig_pct_v = ig_cnt_v / tot_p_v * 100
         li_pct_v = li_cnt_v / tot_p_v * 100
-        news_pct_v = news_cnt_v / tot_p_v * 100
+        web_pct_v = web_cnt_v / tot_p_v * 100
         
         st.markdown("<div style='margin-top: 10px; margin-bottom: 2px; font-weight: 600; font-size: 0.9em; color: #444;'>🌐 Distribusi Volume Data per Platform:</div>", unsafe_allow_html=True)
         cp1, cp2, cp3, cp4 = st.columns(4)
         with cp1: st.metric("𝕏 Twitter / X", f"{tw_pct_v:.1f}%", delta=f"{tw_cnt_v:,} data", delta_color="off")
         with cp2: st.metric("📸 Instagram", f"{ig_pct_v:.1f}%", delta=f"{ig_cnt_v:,} data", delta_color="off")
         with cp3: st.metric("💼 LinkedIn", f"{li_pct_v:.1f}%", delta=f"{li_cnt_v:,} data", delta_color="off")
-        with cp4: st.metric("📰 Portal Berita", f"{news_pct_v:.1f}%", delta=f"{news_cnt_v:,} data", delta_color="off")
+        with cp4: st.metric("🌐 Website / Dokumen Publik", f"{web_pct_v:.1f}%", delta=f"{web_cnt_v:,} data", delta_color="off")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
