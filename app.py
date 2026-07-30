@@ -58,6 +58,21 @@ except Exception as e:
 
 PDF_LIBS_OK = HAS_MATPLOTLIB and HAS_REPORTLAB
 
+def kill_process_tree(proc_obj):
+    """Membunuh seluruh proses dan anak prosesnya (process tree) secara paksa."""
+    if not proc_obj:
+        return False
+    try:
+        pid = proc_obj.pid
+        if sys.platform == "win32":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True)
+        else:
+            proc_obj.kill()
+        return True
+    except Exception as e:
+        print(f"[DEBUG] Error killing process: {e}")
+        return False
+
 def get_supabase_dashboard_url():
     db_url = session_credentials.get_active_supabase_url()
     match = re.search(r"postgres\.([a-zA-Z0-9\-]+)", db_url)
@@ -753,24 +768,64 @@ with tab_scrape:
 
     st.divider()
     st.markdown("### 🚀 Eksekusi Penarikan Data")
-    if db_is_full:
-        st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", disabled=True, help="Penyimpanan database penuh (gagal menyimpan data ke Supabase). Penarikan data dinonaktifkan sementara.")
-    elif apify_is_out:
-        st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", disabled=True, help="Saldo/kuota paket APIFY habis. Penarikan data dinonaktifkan sementara.")
-    else:
-        if st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", key="btn_run_scraper_main"):
-            with st.status("🚀 Menghubungkan ke Apify Cloud & menarik data mentah...", expanded=True) as status_s:
-                try:
-                    result = subprocess.run([sys.executable, "01_run_scraper.py"], capture_output=True, text=True, check=True, env=session_credentials.get_session_env_dict())
+    
+    c_s1_run, c_s1_stop = st.columns([3, 1])
+    with c_s1_stop:
+        btn_stop_s1 = st.button("🛑 STOP / Hentikan Paksa", key="btn_stop_scraper_s1", use_container_width=True, help="Hentikan proses penarikan data yang sedang berjalan secara paksa.")
+    with c_s1_run:
+        if db_is_full:
+            st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", disabled=True, use_container_width=True, help="Penyimpanan database penuh (gagal menyimpan data ke Supabase). Penarikan data dinonaktifkan sementara.")
+            btn_run_s1 = False
+        elif apify_is_out:
+            st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", disabled=True, use_container_width=True, help="Saldo/kuota paket APIFY habis. Penarikan data dinonaktifkan sementara.")
+            btn_run_s1 = False
+        else:
+            btn_run_s1 = st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", use_container_width=True, key="btn_run_scraper_main")
+
+    if btn_stop_s1:
+        proc_s1 = st.session_state.get("proc_scraper_obj")
+        if proc_s1 and proc_s1.poll() is None:
+            kill_process_tree(proc_s1)
+            st.session_state["proc_scraper_obj"] = None
+            st.warning("⏹️ Penarikan data (Tahapan 1) telah dihentikan secara paksa oleh pengguna!")
+        else:
+            st.info("ℹ️ Tidak ada proses penarikan data yang sedang berjalan.")
+
+    if btn_run_s1:
+        with st.status("🚀 Menghubungkan ke Apify Cloud & menarik data mentah...", expanded=True) as status_s:
+            try:
+                proc = subprocess.Popen(
+                    [sys.executable, "01_run_scraper.py"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    env=session_credentials.get_session_env_dict()
+                )
+                st.session_state["proc_scraper_obj"] = proc
+                
+                import time
+                while proc.poll() is None:
+                    time.sleep(0.5)
+                    
+                stdout, stderr = proc.communicate()
+                st.session_state["proc_scraper_obj"] = None
+                
+                if proc.returncode == 0:
                     status_s.update(label="✅ Penarikan data selesai!", state="complete", expanded=False)
                     st.success("✅ Penarikan data mentah selesai. Data siap diproses di Tahapan 2.")
                     with st.expander("📋 Log Scraper"):
-                        st.code(result.stdout, language="text")
-                except subprocess.CalledProcessError as e:
-                    status_s.update(label=f"❌ Gagal (Exit code: {e.returncode})", state="error", expanded=True)
-                    st.error("❌ Gagal menjalankan scraper. Cek token APIFY_API_TOKEN di sesi / file .env.")
+                        st.code(stdout, language="text")
+                else:
+                    status_s.update(label=f"❌ Gagal / Dihentikan (Exit code: {proc.returncode})", state="error", expanded=True)
+                    if proc.returncode in [-9, 15, 1] and ("taskkill" in (stderr or "").lower() or "keyboardinterrupt" in (stderr or "").lower()):
+                        st.warning("⏹️ Penarikan data dihentikan secara paksa oleh pengguna.")
+                    else:
+                        st.error("❌ Penarikan data gagal atau dihentikan. Cek token APIFY_API_TOKEN di sesi / file .env.")
                     with st.expander("📋 Log Kesalahan"):
-                        st.code(e.stdout or e.stderr, language="text")
+                        st.code(stdout or stderr, language="text")
+            except Exception as e_s1:
+                status_s.update(label=f"❌ Gagal memproses: {e_s1}", state="error", expanded=True)
+                st.error(f"❌ Terjadi kesalahan saat menjalankan scraper: {e_s1}")
 
 # =====================================================================
 # TAB 2: PROSES AI & KLASIFIKASI ML
@@ -802,26 +857,61 @@ with tab_ml:
         )
 
     st.divider()
-    if gemini_is_out:
-        st.button("🧠 Jalankan Proses AI & ML Sekarang", type="primary", disabled=True, use_container_width=True, help="Kuota token Gemini AI habis. Pemrosesan AI dinonaktifkan sementara.")
-        btn_run_pipeline = False
-    else:
-        btn_run_pipeline = st.button("🧠 Jalankan Proses AI & ML Sekarang", type="primary", use_container_width=True, key="btn_run_pipeline_tab2")
+    c_s2_run, c_s2_stop = st.columns([3, 1])
+    with c_s2_stop:
+        btn_stop_s2 = st.button("🛑 STOP / Hentikan Paksa", key="btn_stop_pipeline_s2", use_container_width=True, help="Hentikan proses AI & ML yang sedang berjalan secara paksa.")
+    with c_s2_run:
+        if gemini_is_out:
+            st.button("🧠 Jalankan Proses AI & ML Sekarang", type="primary", disabled=True, use_container_width=True, help="Kuota token Gemini AI habis. Pemrosesan AI dinonaktifkan sementara.")
+            btn_run_pipeline = False
+        else:
+            btn_run_pipeline = st.button("🧠 Jalankan Proses AI & ML Sekarang", type="primary", use_container_width=True, key="btn_run_pipeline_tab2")
+
+    if btn_stop_s2:
+        proc_s2 = st.session_state.get("proc_pipeline_obj")
+        if proc_s2 and proc_s2.poll() is None:
+            kill_process_tree(proc_s2)
+            st.session_state["proc_pipeline_obj"] = None
+            st.warning("⏹️ Pemrosesan AI & ML (Tahapan 2) telah dihentikan secara paksa oleh pengguna!")
+        else:
+            st.info("ℹ️ Tidak ada proses AI & ML yang sedang berjalan.")
     
     if btn_run_pipeline:
         with st.status("🧠 Melakukan pembersihan duplikat RAW, standardisasi EYD (Gemini), & klasifikasi SVM...", expanded=True) as status_ml:
             try:
-                result = subprocess.run([sys.executable, "01_pipeline_data.py"], capture_output=True, text=True, check=True, env=session_credentials.get_session_env_dict())
-                status_ml.update(label="✅ Proses AI & ML Selesai!", state="complete", expanded=False)
-                st.success("✅ Proses prapemrosesan AI & klasifikasi ML selesai dengan sukses! Data siap di-review di Tahapan 3.")
-                with st.expander("📋 Log Detail Pemrosesan Pipeline"):
-                    st.code(result.stdout, language="text")
-                    if result.stderr: st.code(result.stderr, language="text")
-            except subprocess.CalledProcessError as e:
-                status_ml.update(label=f"❌ Gagal (Exit code: {e.returncode})", state="error", expanded=True)
-                st.error("❌ Gagal memproses pipeline data. Cek kunci GEMINI_API_KEY di sesi / file .env dan ketersediaan model SVM.")
-                with st.expander("📋 Log Kesalahan"):
-                    st.code(e.stdout or e.stderr, language="text")
+                proc = subprocess.Popen(
+                    [sys.executable, "01_pipeline_data.py"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    env=session_credentials.get_session_env_dict()
+                )
+                st.session_state["proc_pipeline_obj"] = proc
+                
+                import time
+                while proc.poll() is None:
+                    time.sleep(0.5)
+                    
+                stdout, stderr = proc.communicate()
+                st.session_state["proc_pipeline_obj"] = None
+                
+                if proc.returncode == 0:
+                    status_ml.update(label="✅ Proses AI & ML Selesai!", state="complete", expanded=False)
+                    st.success("✅ Proses prapemrosesan AI & klasifikasi ML selesai dengan sukses! Data siap di-review di Tahapan 3.")
+                    with st.expander("📋 Log Detail Pemrosesan Pipeline"):
+                        st.code(stdout, language="text")
+                        if stderr: st.code(stderr, language="text")
+                else:
+                    status_ml.update(label=f"❌ Gagal / Dihentikan (Exit code: {proc.returncode})", state="error", expanded=True)
+                    if proc.returncode in [-9, 15, 1] and ("taskkill" in (stderr or "").lower() or "keyboardinterrupt" in (stderr or "").lower()):
+                        st.warning("⏹️ Pemrosesan AI & ML dihentikan secara paksa oleh pengguna.")
+                    else:
+                        st.error("❌ Gagal memproses pipeline data. Cek kunci GEMINI_API_KEY di sesi / file .env dan ketersediaan model SVM.")
+                    with st.expander("📋 Log Kesalahan"):
+                        st.code(stdout or stderr, language="text")
+            except Exception as e_s2:
+                status_ml.update(label=f"❌ Gagal memproses: {e_s2}", state="error", expanded=True)
+                st.error(f"❌ Terjadi kesalahan saat menjalankan pipeline AI & ML: {e_s2}")
 
 # =====================================================================
 # TAB 3: REVIEW DATA
