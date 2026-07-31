@@ -1166,6 +1166,34 @@ with tab_review:
             }
         )
 
+    # 5.3 Modul Restore / Import Backup Data Log Cuitan ke Database Supabase
+    st.markdown("<br>", unsafe_allow_html=True)
+    with st.expander("📦 Restore Backup & Impor Data ke Basis Data Supabase (.csv, .xlsx, .sql)", expanded=False):
+        st.markdown("Fitur ini memungkinkan Anda memulihkan (*restore*) file cadangan data `log_cuitan` hasil backup lokal langsung ke tabel Supabase/SQLite.")
+        col_b1, col_b2 = st.columns([3, 1])
+        with col_b1:
+            up_backup_file = st.file_uploader(
+                "Upload File Backup (Format: CSV, XLSX, atau SQL Insert):",
+                type=['csv', 'xlsx', 'xls', 'sql'],
+                key="up_backup_db_file"
+            )
+        with col_b2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            btn_restore_db = st.button("📥 Import Data ke Database", type="primary", key="btn_restore_db_exec", use_container_width=True)
+
+        if btn_restore_db:
+            if up_backup_file is None:
+                st.warning("⚠️ Silakan pilih file cadangan (.csv, .xlsx, atau .sql) terlebih dahulu.")
+            else:
+                ext = up_backup_file.name.split(".")[-1].lower()
+                with st.spinner("Memproses impor data cadangan ke basis data Supabase..."):
+                    ok_imp, cnt_imp, msg_imp = db_manager.import_backup_log_cuitan(up_backup_file, ext)
+                    if ok_imp:
+                        st.success(f"✅ {msg_imp}")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ {msg_imp}")
+
 # =====================================================================
 # TAB 4: VISUALISASI & ANALISIS DASHBOARD
 # =====================================================================
@@ -1178,53 +1206,31 @@ with tab_viz:
     # 6.1 Pengaturan Analisis
     st.markdown("### ⚙️ Pengaturan Parameter Analisis")
     
-    # Ambil riwayat terpisah untuk kata kunci, hashtag, dan user profile
+    # Ambil riwayat gabungan unik untuk 1 Searchbar Tunggal
     try:
-        if hasattr(db_manager, 'ambil_riwayat_terpisah'):
+        if hasattr(db_manager, 'ambil_riwayat_gabungan'):
+            unified_history = db_manager.ambil_riwayat_gabungan()
+        elif hasattr(db_manager, 'ambil_riwayat_terpisah'):
             hist_sep = db_manager.ambil_riwayat_terpisah()
+            unified_history = hist_sep.get("unified", [])
         else:
-            hist_sep = {"keywords": [], "hashtags": [], "profiles": []}
+            unified_history = []
     except Exception:
-        hist_sep = {"keywords": [], "hashtags": [], "profiles": []}
+        unified_history = []
 
-    kw_options = ["ALL (Semua Data)"] + [str(k) for k in hist_sep.get("keywords", []) if str(k) != "ALL (Semua Data)"]
-    ht_options = ["ALL (Semua Data)"] + [str(h) for h in hist_sep.get("hashtags", []) if str(h) != "ALL (Semua Data)"]
-    pr_options = ["ALL (Semua Data)"] + [str(p) for p in hist_sep.get("profiles", []) if str(p) != "ALL (Semua Data)"]
+    keysearch_options = ["ALL (Semua Data)"] + [str(term) for term in unified_history if str(term) != "ALL (Semua Data)"]
 
-    col_h1, col_h2, col_h3 = st.columns(3)
-    with col_h1:
-        selected_kw = st.multiselect(
-            "🔍 Riwayat Kata Kunci:",
-            options=kw_options,
-            default=["ALL (Semua Data)"],
-            help="Pilih kata kunci riwayat atau 'ALL (Semua Data)'."
-        )
-    with col_h2:
-        selected_ht = st.multiselect(
-            "🏷️ Riwayat Tagar / Hashtag:",
-            options=ht_options,
-            default=None,
-            help="Pilih hashtag riwayat atau 'ALL (Semua Data)'."
-        )
-    with col_h3:
-        selected_pr = st.multiselect(
-            "👥 Riwayat User Profile:",
-            options=pr_options,
-            default=None,
-            help="Pilih username/profil riwayat atau 'ALL (Semua Data)'."
-        )
-
-    # Validasi Pemilihan Target Analisis
-    is_all_selected = (
-        ("ALL (Semua Data)" in (selected_kw or [])) or
-        ("ALL (Semua Data)" in (selected_ht or [])) or
-        ("ALL (Semua Data)" in (selected_pr or []))
+    selected_keysearch = st.multiselect(
+        "🔍 Riwayat Keysearch (Kata Kunci, Tagar, & Profil):",
+        options=keysearch_options,
+        default=["ALL (Semua Data)"],
+        help="Pilih satu atau beberapa istilah riwayat pencarian (Kata Kunci, Hashtag, Username), atau pilih 'ALL (Semua Data)'."
     )
 
-    specific_kw = [k for k in (selected_kw or []) if k != "ALL (Semua Data)"]
-    specific_ht = [h for h in (selected_ht or []) if h != "ALL (Semua Data)"]
-    specific_pr = [p for p in (selected_pr or []) if p != "ALL (Semua Data)"]
-    has_specific_selected = bool(specific_kw or specific_ht or specific_pr)
+    # Validasi Pemilihan Target Analisis
+    is_all_selected = "ALL (Semua Data)" in (selected_keysearch or [])
+    specific_terms = [t for t in (selected_keysearch or []) if t != "ALL (Semua Data)"]
+    has_specific_selected = bool(specific_terms)
 
     is_target_valid = is_all_selected or has_specific_selected
 
@@ -1277,18 +1283,10 @@ with tab_viz:
 
         # Gabungkan istilah pencarian spesifik jika 'ALL' tidak dipilih sendiri
         if has_specific_selected and not is_all_selected:
-            for k in specific_kw:
-                ck = str(k).strip().lower().lstrip("#@")
+            for term in specific_terms:
+                ck = str(term).strip().lower().lstrip("#@")
                 if ck and ck not in selected_search_terms:
                     selected_search_terms.append(ck)
-            for h in specific_ht:
-                ch = str(h).strip().lower().lstrip("#@")
-                if ch and ch not in selected_search_terms:
-                    selected_search_terms.append(ch)
-            for p in specific_pr:
-                cp = str(p).strip().lower().lstrip("#@")
-                if cp and cp not in selected_search_terms:
-                    selected_search_terms.append(cp)
 
         if selected_search_terms and not df_viz_filtered.empty:
             def _matches_keysearch(row):
@@ -1455,93 +1453,59 @@ with tab_viz:
         else:
             st.info("Klik tombol **🔄 Perbarui Analisis Narasi** di atas untuk menghasilkan ringkasan eksekutif.")
 
-    # 6.3 Print Hasil Analisis (PDF Export)
     st.divider()
-    st.markdown("### 📄 Export Laporan PDF")
-    st.markdown("Cetak laporan PDF lengkap yang mencakup Informasi Data Scraping (6.1), Visualisasi Review Data (5.2), dan Narasi Eksekutif AI (6.2).")
 
-    if not PDF_LIBS_OK:
-        st.warning(f"⚠️ Library PDF belum lengkap. Install via: `pip install reportlab matplotlib`\nDetail: {PDF_IMPORT_ERROR_MSG}")
-    else:
-        _pdf_report_buf = None
-        if st.button("📥 Susun & Download Laporan PDF ", type="primary", key="btn_build_pdf_tab4"):
-            with st.spinner("Menyusun PDF Laporan Eksekutif + Grafik Visual..."):
-                pdf_metrics = {
-                    "total_volume": total_volume_viz,
-                    "sentiment_dominant": dominant_viz,
-                    "total_engagement": tot_engagement_v,
-                    "total_sentiment_labelled": total_labelled_viz,
-                    "persen_pos": persen_pos_v,
-                    "persen_neu": persen_neu_v,
-                    "persen_neg": persen_neg_v,
-                    "pos_count": pos_cnt_v,
-                    "neu_count": neu_cnt_v,
-                    "neg_count": neg_cnt_v,
-                }
-                
+    # 6.3 Cetak Laporan PDF Resmi
+    st.subheader("📄 Cetak Laporan Resmi Eksekutif (PDF)")
+    st.markdown("Ekspor dokumen laporan analisis sentimen publik lengkap dalam bentuk file PDF yang siap dicetak dan didistribusikan.")
+
+    if st.button("📥 Download Laporan Eksekutif PDF", type="primary", key="btn_gen_pdf_tab4"):
+        if not REPORTLAB_OK:
+            st.error("🚨 Modul ReportLab belum terinstall. Silakan install dengan `pip install reportlab`.")
+        else:
+            with st.spinner("Menyusun dokumen PDF eksekutif..."):
                 try:
-                    with open(CONFIG_FILE, 'r') as f:
-                        cfg_pdf = json.load(f)
-                except Exception:
-                    cfg_pdf = {}
-                    
-                try:
-                    from reportlab.lib.pagesizes import A4
-                    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-                    from reportlab.lib.units import cm
-                    from reportlab.lib import colors
-                    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, PageBreak
-                    
-                    buf_p = BytesIO()
-                    doc_p = SimpleDocTemplate(buf_p, pagesize=A4, leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2.5*cm, title='Laporan Analisis Sentimen Kebijakan', author='AI Sentimen App')
+                    pdf_buf = BytesIO()
+                    doc_pdf = SimpleDocTemplate(
+                        pdf_buf, pagesize=A4,
+                        rightMargin=1.5*cm, leftMargin=1.5*cm,
+                        topMargin=1.5*cm, bottomMargin=1.5*cm
+                    )
                     story_p = []
                     styles_p = getSampleStyleSheet()
-                    
-                    sT = ParagraphStyle('T', parent=styles_p['Title'], fontSize=18, alignment=1, textColor=colors.HexColor('#1a365d'))
-                    sH1 = ParagraphStyle('H1', parent=styles_p['Heading1'], fontSize=14, textColor=colors.HexColor('#1a365d'), spaceBefore=10)
-                    sH2 = ParagraphStyle('H2', parent=styles_p['Heading2'], fontSize=11, textColor=colors.HexColor('#2c5282'), spaceBefore=6)
-                    sB = ParagraphStyle('B', parent=styles_p['BodyText'], fontSize=9, leading=13, alignment=4)
 
-                    def _pn(canvas, d):
-                        canvas.saveState()
-                        canvas.setFont('Helvetica', 8); canvas.setFillColor(colors.grey)
-                        canvas.drawCentredString(A4[0]/2.0, 1.2*cm, f'Halaman {d.page}')
-                        canvas.drawString(2*cm, 1.2*cm, 'Laporan Analisis Sentimen Kebijakan Publik — AI Powered')
-                        canvas.restoreState()
+                    sTitle = ParagraphStyle('DocTitle', parent=styles_p['Heading1'], fontSize=16, leading=20, alignment=1, textColor=colors.HexColor('#1a365d'))
+                    sH1 = ParagraphStyle('SectionH1', parent=styles_p['Heading2'], fontSize=12, leading=16, textColor=colors.HexColor('#1a365d'), spaceBefore=10, spaceAfter=6)
+                    sB = ParagraphStyle('BodyTextCustom', parent=styles_p['Normal'], fontSize=9, leading=13)
+                    sBodyJustified = ParagraphStyle('BodyJustified', parent=styles_p['Normal'], fontSize=9, leading=14, alignment=4)
 
-                    story_p.append(Paragraph('LAPORAN ANALISIS SENTIMEN KEBIJAKAN PUBLIK', sT))
-                    story_p.append(Spacer(1, 0.4*cm))
-                    tgl_s = datetime.datetime.now().strftime('%d %B %Y — %H:%M WIB')
+                    tgl_s = datetime.date.today().strftime('%d %B %Y')
+                    story_p.append(Paragraph('LAPORAN HASIL ANALISIS SENTIMEN PUBLIK', sTitle))
+                    story_p.append(Spacer(1, 0.2*cm))
                     story_p.append(Paragraph(f'Tanggal Laporan: <b>{tgl_s}</b>', ParagraphStyle('Sub', parent=styles_p['Normal'], alignment=1)))
                     story_p.append(Spacer(1, 0.8*cm))
                     
                     t_m = Table([
                         ['Total Volume Data', 'Sentimen Dominan', 'Total Engagement'],
-                        [f"{pdf_metrics['total_volume']:,}", str(pdf_metrics['sentiment_dominant']), f"{pdf_metrics['total_engagement']:,}"]
+                        [f"{total_volume_viz:,}", dominant_viz, f"{tot_engagement_v:,}"]
                     ], colWidths=[5.5*cm]*3, style=TableStyle([
                         ('BACKGROUND',(0,0),(-1,0),colors.HexColor('#1a365d')),('TEXTCOLOR',(0,0),(-1,0),colors.white),
                         ('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),('ALIGN',(0,0),(-1,-1),'CENTER'),
                         ('GRID',(0,0),(-1,-1),0.3,colors.lightgrey)
                     ]))
                     story_p.append(t_m)
-                    story_p.append(PageBreak())
 
                     story_p.append(Paragraph('BAB I — PENGATURAN TARGET SCRAPING & KEYSEARCH', sH1))
                     story_p.append(Paragraph('Ringkasan konfigurasi target scraping dan pilihan riwayat keysearch:', sB))
                     story_p.append(Spacer(1, 0.2*cm))
                     
-                    kw_disp = ", ".join(selected_kw) if selected_kw else ("ALL (Semua Data)" if is_all_selected else "-")
-                    pr_disp = ", ".join(selected_pr) if selected_pr else ("ALL (Semua Data)" if is_all_selected else "-")
-                    ht_disp = ", ".join(selected_ht) if selected_ht else ("ALL (Semua Data)" if is_all_selected else "-")
+                    ks_disp = ", ".join(selected_keysearch) if selected_keysearch else ("ALL (Semua Data)" if is_all_selected else "-")
 
                     t_cfg_p = Table([
-                        [Paragraph('<b>Target Keysearch / Riwayat</b>', sB), Paragraph(kw_disp, sB)],
-                        [Paragraph('<b>Target Profil Akun</b>', sB), Paragraph(pr_disp, sB)],
-                        [Paragraph('<b>Target Hashtag</b>', sB), Paragraph(ht_disp, sB)],
+                        [Paragraph('<b>Target Keysearch / Riwayat</b>', sB), Paragraph(ks_disp, sB)],
                         [Paragraph('<b>Rentang Waktu Periode</b>', sB), Paragraph(f"{viz_date_range[0]} s/d {viz_date_range[1]}" if isinstance(viz_date_range, tuple) else "-", sB)],
                     ], colWidths=[5*cm, 11*cm], style=TableStyle([('GRID',(0,0),(-1,-1),0.3,colors.lightgrey)]))
                     story_p.append(t_cfg_p)
-                    story_p.append(Spacer(1, 0.5*cm))
 
                     story_p.append(Paragraph('BAB II — RINGKASAN REVIEW DATA', sH1))
                     story_p.append(Paragraph(f'Hasil review data live: <b>{len(df_base_viz):,}</b> data diterima, <b>{pdf_metrics["total_sentiment_labelled"]:,}</b> terlabel sentimen.', sB))

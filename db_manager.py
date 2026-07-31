@@ -80,15 +80,13 @@ def buat_tabel():
             )
         ''')
 
-        # Skema tabel keysearch_history
+        # Skema tabel keysearch_history (v3 - unified search_term UNIQUE)
         db_type = get_db_type()
         if db_type == "postgresql":
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS keysearch_history (
                     id SERIAL PRIMARY KEY,
-                    keywords TEXT,
-                    profiles TEXT,
-                    hashtags TEXT,
+                    search_term TEXT UNIQUE NOT NULL,
                     created_at TEXT NOT NULL
                 )
             ''')
@@ -96,14 +94,12 @@ def buat_tabel():
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS keysearch_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    keywords TEXT,
-                    profiles TEXT,
-                    hashtags TEXT,
+                    search_term TEXT UNIQUE NOT NULL,
                     created_at TEXT NOT NULL
                 )
             ''')
 
-        # Auto-migrasi jika tabel log_cuitan lama (v1) masih menggunakan tweet_id
+        # Auto-migrasi jika tabel log_cuitan / keysearch_history lama perlu diselaraskan
         db_type = get_db_type()
         try:
             if db_type == "postgresql":
@@ -122,6 +118,15 @@ def buat_tabel():
                         cursor.execute("ALTER TABLE log_cuitan ADD COLUMN log_activity TEXT;")
                     if 'user_app' not in columns:
                         cursor.execute("ALTER TABLE log_cuitan ADD COLUMN user_app TEXT;")
+                        
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name='keysearch_history';
+                """)
+                kh_cols = [row[0] for row in cursor.fetchall()]
+                if kh_cols and 'search_term' not in kh_cols:
+                    cursor.execute("ALTER TABLE keysearch_history ADD COLUMN search_term TEXT;")
             else:
                 cursor.execute("PRAGMA table_info(log_cuitan);")
                 columns = [row[1] for row in cursor.fetchall()]
@@ -134,8 +139,13 @@ def buat_tabel():
                         cursor.execute("ALTER TABLE log_cuitan ADD COLUMN log_activity TEXT;")
                     if 'user_app' not in columns:
                         cursor.execute("ALTER TABLE log_cuitan ADD COLUMN user_app TEXT;")
+
+                cursor.execute("PRAGMA table_info(keysearch_history);")
+                kh_cols = [row[1] for row in cursor.fetchall()]
+                if kh_cols and 'search_term' not in kh_cols:
+                    cursor.execute("ALTER TABLE keysearch_history ADD COLUMN search_term TEXT;")
         except Exception as mig_err:
-            print(f"[WARNING] Migrasi skema otomatis log_cuitan: {mig_err}")
+            print(f"[WARNING] Migrasi skema otomatis log_cuitan / keysearch_history: {mig_err}")
         
         # Cek dan seed nilai default jika kosong
         cursor.execute("SELECT COUNT(*) FROM system_config WHERE config_key = 'scraping_mode'")
@@ -198,6 +208,276 @@ def set_storage_full_flag(is_full: bool = True, db_url=None):
 
 def is_storage_full(db_url=None) -> bool:
     return get_system_config_flag('DB_STORAGE_FULL', db_url)
+
+def simpan_keysearch_history(keywords=None, profiles=None, hashtags=None, terms=None):
+    """
+    Menyimpan riwayat istilah pencarian unik ke tabel keysearch_history.
+    Mendukung input tunggal/list terms atau masukan keywords, profiles, hashtags.
+    """
+    raw_inputs = []
+    for arg in [keywords, profiles, hashtags, terms]:
+        if arg:
+            if isinstance(arg, list):
+                raw_inputs.extend(arg)
+            else:
+                raw_inputs.append(str(arg))
+                
+    cleaned_terms = []
+    seen = set()
+    for item in raw_inputs:
+        if not item:
+            continue
+        for sub_item in str(item).split(","):
+            s_clean = sub_item.strip()
+            if s_clean and s_clean != "ALL (Semua Data)" and s_clean.lower() not in seen:
+                seen.add(s_clean.lower())
+                cleaned_terms.append(s_clean)
+                
+    if not cleaned_terms:
+        return
+        
+    conn = get_connection()
+    cursor = conn.cursor()
+    placeholder = get_placeholder()
+    db_type = get_db_type()
+    created_at = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    try:
+        for t in cleaned_terms:
+            if db_type == "postgresql":
+                query = f"""
+                    INSERT INTO keysearch_history (search_term, created_at)
+                    VALUES ({placeholder}, {placeholder})
+                    ON CONFLICT (search_term) DO NOTHING
+                """
+                cursor.execute(query, (t, created_at))
+            else:
+                query = f"""
+                    INSERT OR IGNORE INTO keysearch_history (search_term, created_at)
+                    VALUES ({placeholder}, {placeholder})
+                """
+                cursor.execute(query, (t, created_at))
+        conn.commit()
+    except Exception as e:
+        print(f"[ERROR] Gagal menyimpan keysearch_history: {e}")
+    finally:
+        conn.close()
+
+def ambil_riwayat_gabungan():
+    """
+    Mengambil daftar unik seluruh riwayat istilah pencarian untuk dropdown UI.
+    Return: list string unik terurut (misal: ['#IKNNusantara', 'bersih2narkobapolri', 'jokowi', 'mbg'])
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    term_set = set()
+    try:
+        # 1. Coba ambil dari kolom search_term
+        try:
+            cursor.execute("SELECT search_term FROM keysearch_history ORDER BY id DESC")
+            rows = cursor.fetchall()
+            for r in rows:
+                if r[0]:
+                    for sub in str(r[0]).split(","):
+                        st = sub.strip()
+                        if st and st != "ALL (Semua Data)":
+                            term_set.add(st)
+        except Exception:
+            pass
+
+        # 2. Coba fallback dari kolom lama (keywords, profiles, hashtags) jika ada
+        try:
+            cursor.execute("SELECT keywords, profiles, hashtags FROM keysearch_history ORDER BY id DESC")
+            rows = cursor.fetchall()
+            for r in rows:
+                for cell in [r[0], r[1], r[2]]:
+                    if cell and str(cell).strip() not in ["EMPTY", "None", ""]:
+                        for sub in str(cell).split(","):
+                            st = sub.strip()
+                            if st and st != "ALL (Semua Data)":
+                                term_set.add(st)
+        except Exception:
+            pass
+
+        return sorted(list(term_set))
+    except Exception as e:
+        print(f"[ERROR] Gagal mengambil riwayat gabungan: {e}")
+        return []
+    finally:
+        conn.close()
+
+def ambil_riwayat_terpisah():
+    """
+    Fungsi kompatibilitas mundur.
+    Returns: dict {'unified': [...], 'keywords': [...], 'hashtags': [...], 'profiles': [...]}
+    """
+    unified = ambil_riwayat_gabungan()
+    return {
+        "unified": unified,
+        "keywords": unified,
+        "hashtags": unified,
+        "profiles": unified
+    }
+
+def ambil_keysearch_history():
+    """
+    Mengambil seluruh riwayat keysearch untuk dropdown di UI.
+    Return: list of dict {'id', 'search_term', 'created_at', 'display_label'}
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        unified_terms = ambil_riwayat_gabungan()
+        result = []
+        for idx, term in enumerate(unified_terms, start=1):
+            result.append({
+                "id": idx,
+                "search_term": term,
+                "keywords": term,
+                "profiles": term,
+                "hashtags": term,
+                "created_at": "-",
+                "display_label": term
+            })
+        return result
+    except Exception as e:
+        print(f"[ERROR] Gagal mengambil keysearch_history: {e}")
+        return []
+    finally:
+        conn.close()
+
+def import_backup_log_cuitan(file_obj, file_format: str = "csv"):
+    """
+    Mengimpor data cadangan (backup) tabel log_cuitan dari file CSV, XLSX, atau SQL query.
+    Return: (success: bool, imported_count: int, message: str)
+    """
+    try:
+        if file_format == "csv":
+            df = pd.read_csv(file_obj)
+        elif file_format in ["xlsx", "xls"]:
+            df = pd.read_excel(file_obj)
+        elif file_format == "sql":
+            content = file_obj.read().decode("utf-8") if hasattr(file_obj, "read") else str(file_obj)
+            conn = get_connection()
+            cursor = conn.cursor()
+            # Split SQL statements
+            statements = [s.strip() for s in content.split(";") if s.strip()]
+            cnt = 0
+            for stmt in statements:
+                cursor.execute(stmt)
+                cnt += 1
+            conn.commit()
+            conn.close()
+            return True, cnt, f"Berhasil mengeksekusi {cnt} perintah SQL backup ke basis data."
+        else:
+            return False, 0, f"Format file '{file_format}' tidak didukung."
+
+        if df.empty:
+            return False, 0, "File cadangan kosong / tidak memiliki baris data."
+
+        _all_cols = [
+            'platform_id', 'date', 'username', 'raw_text', 'cleaned_text',
+            'sentiment_label', 'confidence_score', 'likes', 'retweets', 'views',
+            'status', 'source_platform', 'log_activity', 'user_app'
+        ]
+
+        column_map = {
+            'tweet_id': 'platform_id',
+            'ID Platform': 'platform_id',
+            'Username': 'username',
+            'Tanggal Pembuatan': 'date',
+            'Teks Mentah': 'raw_text',
+            'Teks Baku (EYD)': 'cleaned_text',
+            'Label Sentimen': 'sentiment_label',
+            'Skor Keyakinan': 'confidence_score',
+            'Platform': 'source_platform',
+            'Likes': 'likes',
+            'Retweets': 'retweets',
+            'Tayangan': 'views',
+            'Log Aktivitas Scraping': 'log_activity',
+            'User Aplikasi': 'user_app'
+        }
+        df.rename(columns=column_map, inplace=True)
+
+        for col in _all_cols:
+            if col not in df.columns:
+                if col in ['likes', 'retweets', 'views']:
+                    df[col] = 0
+                elif col == 'status':
+                    df[col] = 'RAW'
+                elif col == 'source_platform':
+                    df[col] = 'Imported'
+                else:
+                    df[col] = None
+
+        df_to_import = df[_all_cols].copy()
+        
+        df_to_import['likes'] = df_to_import['likes'].fillna(0).astype(int)
+        df_to_import['retweets'] = df_to_import['retweets'].fillna(0).astype(int)
+        df_to_import['views'] = df_to_import['views'].fillna(0).astype(int)
+        df_to_import['status'] = df_to_import['status'].fillna('RAW')
+        df_to_import['source_platform'] = df_to_import['source_platform'].fillna('Imported')
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        placeholder = get_placeholder()
+        db_type = get_db_type()
+
+        records = df_to_import.to_dict(orient='records')
+        inserted_count = 0
+
+        for r in records:
+            p_id = r.get('platform_id')
+            if not p_id or str(p_id).strip() in ['', 'None', 'nan']:
+                import hashlib
+                raw_t = str(r.get('raw_text') or '')
+                u_name = str(r.get('username') or '')
+                p_id = f"IMP_{hashlib.md5((raw_t + u_name).encode('utf-8')).hexdigest()}"
+
+            if db_type == "postgresql":
+                q = f"""
+                    INSERT INTO log_cuitan (
+                        platform_id, date, username, raw_text, cleaned_text,
+                        sentiment_label, confidence_score, likes, retweets, views,
+                        status, source_platform, log_activity, user_app
+                    ) VALUES (
+                        {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
+                        {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
+                        {placeholder}, {placeholder}, {placeholder}, {placeholder}
+                    )
+                    ON CONFLICT (platform_id) DO UPDATE SET
+                        cleaned_text = EXCLUDED.cleaned_text,
+                        sentiment_label = EXCLUDED.sentiment_label,
+                        confidence_score = EXCLUDED.confidence_score,
+                        status = EXCLUDED.status
+                """
+            else:
+                q = f"""
+                    INSERT OR REPLACE INTO log_cuitan (
+                        platform_id, date, username, raw_text, cleaned_text,
+                        sentiment_label, confidence_score, likes, retweets, views,
+                        status, source_platform, log_activity, user_app
+                    ) VALUES (
+                        {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
+                        {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
+                        {placeholder}, {placeholder}, {placeholder}, {placeholder}
+                    )
+                """
+            
+            cursor.execute(q, (
+                str(p_id), str(r.get('date') or ''), str(r.get('username') or ''),
+                str(r.get('raw_text') or ''), r.get('cleaned_text'), r.get('sentiment_label'),
+                r.get('confidence_score'), int(r.get('likes') or 0), int(r.get('retweets') or 0),
+                int(r.get('views') or 0), str(r.get('status') or 'RAW'), str(r.get('source_platform') or 'Imported'),
+                r.get('log_activity'), r.get('user_app')
+            ))
+            inserted_count += 1
+
+        conn.commit()
+        conn.close()
+        return True, inserted_count, f"Berhasil mengimpor {inserted_count:,} baris data cadangan ke basis data ({db_type})."
+    except Exception as e:
+        return False, 0, f"Gagal mengimpor file cadangan: {e}"
 
 def set_apify_quota_flag(is_exhausted: bool = True, db_url=None):
     set_system_config_flag('APIFY_QUOTA_EXHAUSTED', is_exhausted, db_url)
@@ -516,102 +796,6 @@ def hapus_duplikasi_data_raw():
     except Exception as e:
         print(f"[ERROR] Gagal menghapus duplikasi data: {e}")
         return 0
-    finally:
-        conn.close()
-
-def simpan_keysearch_history(keywords, profiles, hashtags):
-    """
-    Menyimpan kombinasi pencarian kata kunci, profil, dan hashtag ke riwayat.
-    """
-    if not (keywords or profiles or hashtags):
-        return
-    conn = get_connection()
-    cursor = conn.cursor()
-    placeholder = get_placeholder()
-    created_at = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
-    try:
-        kw_str = ", ".join(keywords) if isinstance(keywords, list) else str(keywords or "")
-        pr_str = ", ".join(profiles) if isinstance(profiles, list) else str(profiles or "")
-        ht_str = ", ".join(hashtags) if isinstance(hashtags, list) else str(hashtags or "")
-        
-        cursor.execute(f"""
-            SELECT COUNT(*) FROM keysearch_history 
-            WHERE keywords = {placeholder} AND profiles = {placeholder} AND hashtags = {placeholder}
-        """, (kw_str, pr_str, ht_str))
-        if cursor.fetchone()[0] == 0:
-            cursor.execute(f"""
-                INSERT INTO keysearch_history (keywords, profiles, hashtags, created_at)
-                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})
-            """, (kw_str, pr_str, ht_str, created_at))
-            conn.commit()
-    except Exception as e:
-        print(f"[ERROR] Gagal menyimpan keysearch_history: {e}")
-    finally:
-        conn.close()
-
-def ambil_keysearch_history():
-    """
-    Mengambil seluruh riwayat keysearch untuk dropdown di UI.
-    Return: list of dict {'id', 'keywords', 'profiles', 'hashtags', 'display_label'}
-    """
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT id, keywords, profiles, hashtags, created_at FROM keysearch_history ORDER BY id DESC")
-        rows = cursor.fetchall()
-        result = []
-        for r in rows:
-            kw, pr, ht = r[1] or "", r[2] or "", r[3] or ""
-            parts = []
-            if kw: parts.append(f"Keyword: {kw}")
-            if pr: parts.append(f"Profil: {pr}")
-            if ht: parts.append(f"Hashtag: {ht}")
-            label = " | ".join(parts) if parts else "Pencarian Umum"
-            result.append({
-                "id": r[0],
-                "keywords": kw,
-                "profiles": pr,
-                "hashtags": ht,
-                "created_at": r[4],
-                "display_label": label
-            })
-        return result
-    except Exception as e:
-        print(f"[ERROR] Gagal mengambil keysearch_history: {e}")
-        return []
-    finally:
-        conn.close()
-
-def ambil_riwayat_terpisah():
-    """
-    Mengambil daftar unik riwayat kata kunci, hashtag, dan user profile secara terpisah.
-    Returns: dict {'keywords': [...], 'hashtags': [...], 'profiles': [...]}
-    """
-    conn = get_connection()
-    cursor = conn.cursor()
-    kw_set, ht_set, pr_set = set(), set(), set()
-    try:
-        cursor.execute("SELECT keywords, profiles, hashtags FROM keysearch_history ORDER BY id DESC")
-        rows = cursor.fetchall()
-        for r in rows:
-            kw_raw, pr_raw, ht_raw = r[0] or "", r[1] or "", r[2] or ""
-            for item in kw_raw.split(","):
-                i = item.strip()
-                if i: kw_set.add(i)
-            for item in ht_raw.split(","):
-                i = item.strip()
-                if i: ht_set.add(i)
-            for item in pr_raw.split(","):
-                i = item.strip()
-                if i: pr_set.add(i)
-        return {
-            "keywords": sorted(list(kw_set)),
-            "hashtags": sorted(list(ht_set)),
-            "profiles": sorted(list(pr_set))
-        }
-    except Exception as e:
-        print(f"[ERROR] Gagal mengambil riwayat terpisah: {e}")
-        return {"keywords": [], "hashtags": [], "profiles": []}
     finally:
         conn.close()
 
