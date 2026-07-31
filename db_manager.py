@@ -23,21 +23,34 @@ def resolve_db_url(db_url=None):
 
 def get_db_type(db_url=None):
     """
-    Menentukan tipe database yang digunakan berdasarkan ketersediaan DATABASE_URL.
+    Menentukan tipe database yang digunakan berdasarkan preferensi mode & DATABASE_URL.
+    Default mode: 'postgresql' (Supabase Cloud).
     """
+    try:
+        import session_credentials
+        if session_credentials.get_active_db_mode() == "sqlite" and not db_url:
+            return "sqlite"
+    except Exception:
+        pass
+
     db_url = resolve_db_url(db_url)
     if db_url and ("postgresql://" in db_url or "postgres://" in db_url) and "YOUR_DATABASE_URL" not in db_url:
         return "postgresql"
-    return "sqlite"
+    
+    # Jika mode diset postgresql tapi URL belum terisi, tetap laporkan mode postgresql
+    return "postgresql"
 
 def get_connection(db_url=None):
     """
-    Mendapatkan koneksi database yang sesuai (sqlite3 atau psycopg2).
+    Mendapatkan koneksi database yang sesuai (psycopg2 untuk Cloud PostgreSQL/Supabase, atau sqlite3 untuk lokal).
     """
     db_url = resolve_db_url(db_url)
     db_type = get_db_type(db_url)
     
     if db_type == "postgresql":
+        if not db_url or "YOUR_DATABASE_URL" in db_url:
+            # Fallback aman ke SQLite lokal jika URL Cloud belum diisi pengguna agar aplikasi tidak crash
+            return sqlite3.connect(DB_FILE)
         import psycopg2
         # Menghapus bracket literal jika ada di placeholder kata sandi
         if "[" in db_url and "]" in db_url:

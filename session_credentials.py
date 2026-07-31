@@ -24,21 +24,14 @@ def init_session_credentials():
     if KEY_GEMINI not in st.session_state:
         st.session_state[KEY_GEMINI] = ""
     if KEY_DB_MODE not in st.session_state:
-        # Default mode: jika DATABASE_URL ada di .env, default 'postgresql', jika tidak 'sqlite'
-        env_url = os.getenv("DATABASE_URL", "").strip()
-        if env_url and ("postgresql://" in env_url or "postgres://" in env_url) and "YOUR_DATABASE_URL" not in env_url:
-            st.session_state[KEY_DB_MODE] = "postgresql"
-        else:
-            st.session_state[KEY_DB_MODE] = "sqlite"
+        # Default mode utama aplikasi: Cloud PostgreSQL (Supabase)
+        st.session_state[KEY_DB_MODE] = "postgresql"
 
 def get_active_db_mode() -> str:
-    """Mengembalikan mode DB aktif ('sqlite' atau 'postgresql')."""
-    if hasattr(st, "session_state") and KEY_DB_MODE in st.session_state:
+    """Mengembalikan mode DB aktif ('sqlite' atau 'postgresql'). Default: 'postgresql' (Supabase Cloud)."""
+    if hasattr(st, "session_state") and KEY_DB_MODE in st.session_state and st.session_state[KEY_DB_MODE]:
         return st.session_state[KEY_DB_MODE]
-    env_url = os.getenv("DATABASE_URL", "").strip()
-    if env_url and ("postgresql://" in env_url or "postgres://" in env_url) and "YOUR_DATABASE_URL" not in env_url:
-        return "postgresql"
-    return "sqlite"
+    return "postgresql"
 
 def get_active_apify_token() -> str:
     """Mengembalikan Apify token kustom pengguna jika ada, jika tidak fallback ke .env."""
