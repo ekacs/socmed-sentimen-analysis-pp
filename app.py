@@ -1682,7 +1682,7 @@ with tab_viz:
     st.divider()
 
     # 6.3 Cetak Laporan PDF Resmi
-    st.subheader("📄 Cetak Laporan Resmi Eksekutif (PDF)")
+    st.subheader("📄 Cetak Laporan Eksekutif (PDF)")
     st.markdown("Ekspor dokumen laporan analisis sentimen publik lengkap dalam bentuk file PDF yang siap dicetak dan didistribusikan.")
 
     if st.button("📥 Download Laporan Eksekutif PDF", type="primary", key="btn_gen_pdf_tab4"):
