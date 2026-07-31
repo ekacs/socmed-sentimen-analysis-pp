@@ -1137,21 +1137,25 @@ with tab_review:
 
                     df_rev_copy['date_parsed'] = df_rev_copy['date'].apply(_parse_robust_date)
                     v_df = df_rev_copy.dropna(subset=['date_parsed'])
-                    if v_df.empty:
-                        df_rev_copy['date_parsed'] = datetime.date.today()
-                        v_df = df_rev_copy
+                    total_rev_all = len(df_reviewed_final)
+                    valid_date_cnt = len(v_df)
+                    missing_date_cnt = total_rev_all - valid_date_cnt
 
-                    df_trend = v_df.groupby(['date_parsed', 'sentiment_label']).size().reset_index(name='count')
-                    if not df_trend.empty:
-                        fig_tr = px.line(
-                            df_trend, x='date_parsed', y='count', color='sentiment_label',
-                            color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'},
-                            line_shape='spline', height=260
-                        )
-                        fig_tr.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-                        st.plotly_chart(fig_tr, use_container_width=True, key="chart_tab3_trend")
+                    if not v_df.empty:
+                        df_trend = v_df.groupby(['date_parsed', 'sentiment_label']).size().reset_index(name='count')
+                        if not df_trend.empty:
+                            fig_tr = px.line(
+                                df_trend, x='date_parsed', y='count', color='sentiment_label',
+                                color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'},
+                                line_shape='spline', height=260
+                            )
+                            fig_tr.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+                            st.plotly_chart(fig_tr, use_container_width=True, key="chart_tab3_trend")
+                            st.caption(f"ℹ️ *Informasi Tanggal: Dari total {total_rev_all:,} data, {valid_date_cnt:,} data memiliki tanggal valid dan {missing_date_cnt:,} data tanpa tanggal (diabaikan pada grafik tren).*")
+                        else:
+                            st.info("Belum ada data tren sentimen terklasifikasi.")
                     else:
-                        st.info("Belum ada data tren sentimen terklasifikasi.")
+                        st.info(f"Tidak ada data dengan tanggal pembuatan valid untuk grafik tren ({total_rev_all:,} data diabaikan).")
                 except Exception as e_tr:
                     st.info(f"Format tanggal belum dapat diproses untuk grafik tren: {e_tr}")
             else:
@@ -1500,12 +1504,21 @@ with tab_viz:
     with col_chart_l:
         st.markdown("**📈 Tren Sentimen Publik Harian**")
         if 'date_parsed' in df_viz_cleaned.columns and not df_viz_cleaned.empty:
-            df_tr = df_viz_cleaned.groupby(['date_parsed', 'sentiment_label']).size().reset_index(name='count')
-            fig_tr = px.line(df_tr, x='date_parsed', y='count', color='sentiment_label',
-                             color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'},
-                             line_shape='spline', height=260)
-            fig_tr.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-            st.plotly_chart(fig_tr, use_container_width=True, key="chart_tab4_trend")
+            v_df_viz = df_viz_cleaned.dropna(subset=['date_parsed'])
+            tot_viz_all = len(df_viz_cleaned)
+            valid_viz_cnt = len(v_df_viz)
+            missing_viz_cnt = tot_viz_all - valid_viz_cnt
+
+            if not v_df_viz.empty:
+                df_tr = v_df_viz.groupby(['date_parsed', 'sentiment_label']).size().reset_index(name='count')
+                fig_tr = px.line(df_tr, x='date_parsed', y='count', color='sentiment_label',
+                                 color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'},
+                                 line_shape='spline', height=260)
+                fig_tr.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+                st.plotly_chart(fig_tr, use_container_width=True, key="chart_tab4_trend")
+                st.caption(f"ℹ️ *Informasi Tanggal: Dari total {tot_viz_all:,} data cleaned, {valid_viz_cnt:,} data memiliki tanggal valid dan {missing_viz_cnt:,} data tanpa tanggal (diabaikan pada grafik tren).*")
+            else:
+                st.info("Belum ada data dengan tanggal valid untuk membentuk grafik tren.")
         else:
             st.info("Belum ada data sentimen terklasifikasi untuk membentuk grafik tren.")
             
