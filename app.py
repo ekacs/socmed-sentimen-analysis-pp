@@ -470,6 +470,65 @@ if check_apify_quota_exhausted():
 if check_gemini_quota_exhausted():
     st.sidebar.error("🚨 Status Gemini AI: Quota Token Habis (Hubungi Developer / Top-up Token)")
 
+# 📌 Sidebar: Manajer Bookmark Keysearch
+st.sidebar.divider()
+st.sidebar.markdown("### 📌 Manajer Bookmark Keysearch")
+
+try:
+    if hasattr(db_manager, 'ambil_riwayat_gabungan'):
+        raw_history_sb = db_manager.ambil_riwayat_gabungan()
+    else:
+        raw_history_sb = []
+except Exception:
+    raw_history_sb = []
+
+try:
+    if hasattr(db_manager, 'ambil_semua_bookmark'):
+        existing_bookmarks_sb = db_manager.ambil_semua_bookmark()
+    else:
+        existing_bookmarks_sb = []
+except Exception:
+    existing_bookmarks_sb = []
+
+with st.sidebar.expander("➕ Buat / Rename Bookmark Baru", expanded=False):
+    bm_selected_terms = st.multiselect(
+        "Pilih Kata/Istilah Riwayat:",
+        options=raw_history_sb,
+        key="sb_bm_multiselect",
+        help="Pilih satu atau beberapa istilah kata kunci untuk digabungkan menjadi bookmark."
+    )
+    bm_custom_name = st.text_input(
+        "Nama Bookmark (Bebas / Rename):",
+        placeholder="misal: Isu MBG, Monitoring IKN",
+        key="sb_bm_textinput",
+        help="Beri nama unik untuk bookmark ini."
+    )
+    if st.sidebar.button("📌 Simpan Bookmark", type="primary", use_container_width=True, key="btn_save_bookmark"):
+        if not bm_selected_terms:
+            st.sidebar.warning("⚠️ Silakan pilih minimal 1 istilah.")
+        elif not bm_custom_name.strip():
+            st.sidebar.warning("⚠️ Masukkan nama bookmark terlebih dahulu.")
+        else:
+            ok_bm, msg_bm = db_manager.simpan_bookmark(bm_custom_name, bm_selected_terms)
+            if ok_bm:
+                st.sidebar.success(f"✅ {msg_bm}")
+                st.rerun()
+            else:
+                st.sidebar.error(f"❌ {msg_bm}")
+
+if existing_bookmarks_sb:
+    st.sidebar.markdown("**Daftar Bookmark Aktif:**")
+    for bm in existing_bookmarks_sb:
+        col_bmn, col_bmd = st.sidebar.columns([3, 1])
+        with col_bmn:
+            st.markdown(f"**{bm['bookmark_name']}**")
+            st.caption(f"_{bm['terms_str']}_")
+        with col_bmd:
+            if st.button("🗑️", key=f"del_bm_{bm['id']}", help=f"Hapus {bm['bookmark_name']}"):
+                ok_del, msg_del = db_manager.hapus_bookmark(bm['id'])
+                if ok_del:
+                    st.rerun()
+
 st.sidebar.divider()
 st.sidebar.info("💡 **Tips Tema:** Klik ikon **⋮** di sudut kanan atas layar > **Settings > Theme** untuk memilih *Light* atau *Dark Mode*.")
 
@@ -1344,7 +1403,7 @@ with tab_viz:
     # 6.1 Pengaturan Analisis
     st.markdown("### ⚙️ Pengaturan Parameter Analisis")
     
-    # Ambil riwayat gabungan unik untuk 1 Searchbar Tunggal
+    # Ambil riwayat gabungan unik dan daftar bookmark
     try:
         if hasattr(db_manager, 'ambil_riwayat_gabungan'):
             unified_history = db_manager.ambil_riwayat_gabungan()
@@ -1356,13 +1415,26 @@ with tab_viz:
     except Exception:
         unified_history = []
 
-    keysearch_options = ["ALL (Semua Data)"] + [str(term) for term in unified_history if str(term) != "ALL (Semua Data)"]
+    try:
+        if hasattr(db_manager, 'ambil_semua_bookmark'):
+            bookmarks_list = db_manager.ambil_semua_bookmark()
+        else:
+            bookmarks_list = []
+    except Exception:
+        bookmarks_list = []
+
+    bookmark_map = {bm['bookmark_name']: bm['terms'] for bm in bookmarks_list}
+    bm_names = list(bookmark_map.keys())
+
+    # Opsi dropdown: ALL + Bookmark Aktif + Istilah Riwayat Unik (tanpa duplikasi dengan nama bookmark)
+    raw_term_options = [str(term) for term in unified_history if str(term) != "ALL (Semua Data)" and str(term) not in bm_names]
+    keysearch_options = ["ALL (Semua Data)"] + bm_names + raw_term_options
 
     selected_keysearch = st.multiselect(
-        "🔍 Riwayat Keysearch (Kata Kunci, Tagar, & Profil):",
+        "🔍 Riwayat Keysearch (Kata Kunci, Tagar, Profil & Bookmark):",
         options=keysearch_options,
         default=["ALL (Semua Data)"],
-        help="Pilih satu atau beberapa istilah riwayat pencarian (Kata Kunci, Hashtag, Username), atau pilih 'ALL (Semua Data)'."
+        help="Pilih istilah riwayat, 'ALL (Semua Data)', atau Bookmark kustom yang Anda buat di Sidebar."
     )
 
     # Validasi Pemilihan Target Analisis
@@ -1407,7 +1479,7 @@ with tab_viz:
         st.divider()
         st.warning(
             "⚠️ **Analisis belum dapat dikerjakan.** Silakan pilih minimal salah satu target pencarian "
-            "(Kata Kunci, Tagar, atau Profil Akun) atau pilih **'ALL (Semua Data)'** untuk melakukan "
+            "(Kata Kunci, Tagar, Profil Akun, atau Bookmark) atau pilih **'ALL (Semua Data)'** untuk melakukan "
             "analisis komprehensif yang merepresentasikan seluruh data."
         )
     else:
@@ -1419,12 +1491,19 @@ with tab_viz:
             ) | df_viz_filtered['date_parsed'].isna()
             df_viz_filtered = df_viz_filtered[date_mask]
 
-        # Gabungkan istilah pencarian spesifik jika 'ALL' tidak dipilih sendiri
+        # Gabungkan istilah pencarian spesifik (termasuk membongkar istilah di dalam bookmark)
         if has_specific_selected and not is_all_selected:
             for term in specific_terms:
-                ck = str(term).strip().lower().lstrip("#@")
-                if ck and ck not in selected_search_terms:
-                    selected_search_terms.append(ck)
+                if str(term).startswith("📌") and term in bookmark_map:
+                    # Urai istilah di dalam bookmark
+                    for sub_t in bookmark_map[term]:
+                        ck = str(sub_t).strip().lower().lstrip("#@")
+                        if ck and ck not in selected_search_terms:
+                            selected_search_terms.append(ck)
+                else:
+                    ck = str(term).strip().lower().lstrip("#@")
+                    if ck and ck not in selected_search_terms:
+                        selected_search_terms.append(ck)
 
         if selected_search_terms and not df_viz_filtered.empty:
             def _matches_keysearch(row):

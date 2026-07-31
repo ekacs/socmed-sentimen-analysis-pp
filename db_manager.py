@@ -90,11 +90,27 @@ def buat_tabel():
                     created_at TEXT NOT NULL
                 )
             ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS keysearch_bookmarks (
+                    id SERIAL PRIMARY KEY,
+                    bookmark_name TEXT UNIQUE NOT NULL,
+                    terms TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            ''')
         else:
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS keysearch_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     search_term TEXT UNIQUE NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS keysearch_bookmarks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    bookmark_name TEXT UNIQUE NOT NULL,
+                    terms TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 )
             ''')
@@ -342,6 +358,114 @@ def ambil_keysearch_history():
         return result
     except Exception as e:
         print(f"[ERROR] Gagal mengambil keysearch_history: {e}")
+        return []
+    finally:
+        conn.close()
+
+def simpan_bookmark(bookmark_name: str, terms: list):
+    """
+    Menyimpan atau memperbarui bookmark kata kunci ke database.
+    terms: list string istilah (misal: ['mbg', 'makan bergizi gratis'])
+    Return: (success: bool, message: str)
+    """
+    if not bookmark_name or not str(bookmark_name).strip():
+        return False, "Nama bookmark tidak boleh kosong."
+    if not terms:
+        return False, "Istilah kata kunci untuk bookmark tidak boleh kosong."
+
+    b_name = str(bookmark_name).strip()
+    if not b_name.startswith("📌"):
+        b_name = f"📌 {b_name}"
+
+    clean_t_list = []
+    seen = set()
+    for item in terms:
+        s_clean = str(item).strip()
+        if s_clean and s_clean != "ALL (Semua Data)" and s_clean.lower() not in seen:
+            seen.add(s_clean.lower())
+            clean_t_list.append(s_clean)
+
+    if not clean_t_list:
+        return False, "Istilah kata kunci tidak valid."
+
+    terms_str = ", ".join(clean_t_list)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    placeholder = get_placeholder()
+    db_type = get_db_type()
+    created_at = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    try:
+        if db_type == "postgresql":
+            query = f"""
+                INSERT INTO keysearch_bookmarks (bookmark_name, terms, created_at)
+                VALUES ({placeholder}, {placeholder}, {placeholder})
+                ON CONFLICT (bookmark_name) DO UPDATE SET
+                    terms = EXCLUDED.terms,
+                    created_at = EXCLUDED.created_at
+            """
+            cursor.execute(query, (b_name, terms_str, created_at))
+        else:
+            query = f"""
+                INSERT OR REPLACE INTO keysearch_bookmarks (bookmark_name, terms, created_at)
+                VALUES ({placeholder}, {placeholder}, {placeholder})
+            """
+            cursor.execute(query, (b_name, terms_str, created_at))
+        conn.commit()
+        return True, f"Bookmark '{b_name}' berhasil disimpan!"
+    except Exception as e:
+        print(f"[ERROR] Gagal menyimpan bookmark: {e}")
+        return False, f"Gagal menyimpan bookmark: {e}"
+    finally:
+        conn.close()
+
+def hapus_bookmark(bookmark_id_or_name):
+    """
+    Menghapus bookmark berdasarkan ID atau nama bookmark.
+    Return: (success: bool, message: str)
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    placeholder = get_placeholder()
+    try:
+        if isinstance(bookmark_id_or_name, int) or str(bookmark_id_or_name).isdigit():
+            query = f"DELETE FROM keysearch_bookmarks WHERE id = {placeholder}"
+            cursor.execute(query, (int(bookmark_id_or_name),))
+        else:
+            query = f"DELETE FROM keysearch_bookmarks WHERE bookmark_name = {placeholder}"
+            cursor.execute(query, (str(bookmark_id_or_name),))
+        conn.commit()
+        return True, "Bookmark berhasil dihapus."
+    except Exception as e:
+        print(f"[ERROR] Gagal menghapus bookmark: {e}")
+        return False, f"Gagal menghapus bookmark: {e}"
+    finally:
+        conn.close()
+
+def ambil_semua_bookmark():
+    """
+    Mengambil seluruh daftar bookmark dari database.
+    Return: list of dict [{'id': 1, 'bookmark_name': '📌 Isu MBG', 'terms': ['mbg', 'makan bergizi gratis'], 'terms_str': 'mbg, makan bergizi gratis'}]
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id, bookmark_name, terms, created_at FROM keysearch_bookmarks ORDER BY id DESC")
+        rows = cursor.fetchall()
+        result = []
+        for r in rows:
+            t_list = [t.strip() for t in str(r[2] or "").split(",") if t.strip()]
+            result.append({
+                "id": r[0],
+                "bookmark_name": r[1],
+                "terms": t_list,
+                "terms_str": r[2] or "",
+                "created_at": r[3]
+            })
+        return result
+    except Exception as e:
+        print(f"[WARNING] Gagal mengambil keysearch_bookmarks: {e}")
         return []
     finally:
         conn.close()
