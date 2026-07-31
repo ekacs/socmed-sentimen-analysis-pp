@@ -1713,12 +1713,22 @@ with tab_viz:
                     story_p.append(Spacer(1, 0.8*cm))
                     
                     t_m = Table([
-                        ['Total Volume Data', 'Sentimen Dominan', 'Total Engagement'],
-                        [f"{total_volume_viz:,}", dominant_viz, f"{tot_engagement_v:,}"]
-                    ], colWidths=[5.5*cm]*3, style=TableStyle([
-                        ('BACKGROUND',(0,0),(-1,0),colors.HexColor('#1a365d')),('TEXTCOLOR',(0,0),(-1,0),colors.white),
-                        ('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),('ALIGN',(0,0),(-1,-1),'CENTER'),
-                        ('GRID',(0,0),(-1,-1),0.3,colors.lightgrey)
+                        ['Total Volume Data', 'Jumlah Akun Unik', 'Total Engagement'],
+                        [f"{total_volume_viz:,}", f"{unique_users_v:,}", f"{tot_engagement_v:,}"],
+                        ['Sentimen Positif', 'Sentimen Negatif', 'Sentimen Netral'],
+                        [f"{persen_pos_v:.1f}% ({pos_cnt_v:,} data)", f"{persen_neg_v:.1f}% ({neg_cnt_v:,} data)", f"{persen_neu_v:.1f}% ({neu_cnt_v:,} data)"]
+                    ], colWidths=[5.5*cm, 5.5*cm, 5.5*cm], style=TableStyle([
+                        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1a365d')),
+                        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+                        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                        ('BACKGROUND', (0,2), (-1,2), colors.HexColor('#1a365d')),
+                        ('TEXTCOLOR', (0,2), (-1,2), colors.white),
+                        ('FONTNAME', (0,2), (-1,2), 'Helvetica-Bold'),
+                        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                        ('GRID', (0,0), (-1,-1), 0.3, colors.lightgrey),
+                        ('FONTSIZE', (0,0), (-1,-1), 9),
+                        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+                        ('TOPPADDING', (0,0), (-1,-1), 5)
                     ]))
                     story_p.append(t_m)
 
