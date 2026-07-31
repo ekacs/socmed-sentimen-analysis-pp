@@ -45,6 +45,7 @@ desktop.ini
 # ─── Script Verifikasi (hanya untuk pengembangan lokal) ──────────────────────
 test_supabase_connection.py
 
-# ─── folder kertas kerja ──────────────────────
+# ─── workpapers ──────────────────────
 catatan_pengerjaan/
 revisi_dokumen/
+.agents/
