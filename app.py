@@ -1702,6 +1702,7 @@ with tab_viz:
 
                     sTitle = ParagraphStyle('DocTitle', parent=styles_p['Heading1'], fontSize=16, leading=20, alignment=1, textColor=colors.HexColor('#1a365d'))
                     sH1 = ParagraphStyle('SectionH1', parent=styles_p['Heading2'], fontSize=12, leading=16, textColor=colors.HexColor('#1a365d'), spaceBefore=10, spaceAfter=6)
+                    sH2 = ParagraphStyle('SectionH2', parent=styles_p['Heading3'], fontSize=10, leading=14, textColor=colors.HexColor('#2c5282'), spaceBefore=8, spaceAfter=4)
                     sB = ParagraphStyle('BodyTextCustom', parent=styles_p['Normal'], fontSize=9, leading=13)
                     sBodyJustified = ParagraphStyle('BodyJustified', parent=styles_p['Normal'], fontSize=9, leading=14, alignment=4)
 
@@ -1734,10 +1735,10 @@ with tab_viz:
                     story_p.append(t_cfg_p)
 
                     story_p.append(Paragraph('BAB II — RINGKASAN REVIEW DATA', sH1))
-                    story_p.append(Paragraph(f'Hasil review data live: <b>{len(df_base_viz):,}</b> data diterima, <b>{pdf_metrics["total_sentiment_labelled"]:,}</b> terlabel sentimen.', sB))
+                    story_p.append(Paragraph(f'Hasil review data live: <b>{len(df_base_viz):,}</b> data diterima, <b>{total_labelled_viz:,}</b> terlabel sentimen.', sB))
                     story_p.append(Spacer(1, 0.2*cm))
                     
-                    pie_bytes_p = _chart_pie_sentimen_pdf(pdf_metrics['pos_count'], pdf_metrics['neu_count'], pdf_metrics['neg_count'])
+                    pie_bytes_p = _chart_pie_sentimen_pdf(pos_cnt_v, neu_cnt_v, neg_cnt_v)
                     if pie_bytes_p:
                         story_p.append(Image(pie_bytes_p, width=12*cm, height=9*cm, hAlign='CENTER'))
                     story_p.append(PageBreak())
