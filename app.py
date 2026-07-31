@@ -1686,8 +1686,8 @@ with tab_viz:
     st.markdown("Ekspor dokumen laporan analisis sentimen publik lengkap dalam bentuk file PDF yang siap dicetak dan didistribusikan.")
 
     if st.button("📥 Download Laporan Eksekutif PDF", type="primary", key="btn_gen_pdf_tab4"):
-        if not REPORTLAB_OK:
-            st.error("🚨 Modul ReportLab belum terinstall. Silakan install dengan `pip install reportlab`.")
+        if not PDF_LIBS_OK:
+            st.error(f"🚨 Modul ReportLab/Matplotlib belum siap di server: {PDF_IMPORT_ERROR_MSG}")
         else:
             with st.spinner("Menyusun dokumen PDF eksekutif..."):
                 try:
