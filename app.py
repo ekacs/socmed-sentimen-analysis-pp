@@ -1729,9 +1729,18 @@ with tab_viz:
                     clean_ks_list = []
                     if selected_keysearch:
                         for item in selected_keysearch:
-                            s_clean = str(item).replace("📌", "").strip()
-                            if s_clean and s_clean not in clean_ks_list:
-                                clean_ks_list.append(s_clean)
+                            item_str = str(item).strip()
+                            if item_str in bookmark_map:
+                                bm_title = item_str.replace("📌", "").strip()
+                                sub_terms = ", ".join([str(t).strip() for t in bookmark_map[item_str] if str(t).strip()])
+                                display_entry = f"{bm_title} ({sub_terms})" if sub_terms else bm_title
+                            elif item_str.startswith("📌"):
+                                display_entry = item_str.replace("📌", "").strip()
+                            else:
+                                display_entry = item_str
+
+                            if display_entry and display_entry not in clean_ks_list:
+                                clean_ks_list.append(display_entry)
 
                     ks_disp = ", ".join(clean_ks_list) if clean_ks_list else ("ALL (Semua Data)" if is_all_selected else "-")
 
