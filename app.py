@@ -1794,9 +1794,18 @@ with tab_viz:
                             else:
                                 story_p.append(Paragraph(formatted_block, sBodyJustified))
 
-                    doc_p.build(story_p, onFirstPage=_pn, onLaterPages=_pn)
-                    buf_p.seek(0)
-                    _pdf_report_buf = buf_p
+                    def _pn(canvas, doc):
+                        canvas.saveState()
+                        canvas.setFont('Helvetica', 8)
+                        canvas.setFillColor(colors.HexColor('#718096'))
+                        page_num = canvas.getPageNumber()
+                        canvas.drawRightString(A4[0] - 1.5*cm, 1.0*cm, f"Halaman {page_num}")
+                        canvas.drawString(1.5*cm, 1.0*cm, "Laporan Hasil Analisis Sentimen Publik")
+                        canvas.restoreState()
+
+                    doc_pdf.build(story_p, onFirstPage=_pn, onLaterPages=_pn)
+                    pdf_buf.seek(0)
+                    _pdf_report_buf = pdf_buf
                 except Exception as e_pdf_gen:
                     st.error(f"❌ Gagal menyusun PDF: {e_pdf_gen}")
                     _pdf_report_buf = None
