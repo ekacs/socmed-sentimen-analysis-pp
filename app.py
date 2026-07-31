@@ -1166,6 +1166,125 @@ with tab_review:
             }
         )
 
+def _fallback_import_backup(file_obj, file_format: str = "csv"):
+    """Fungsi cadangan impor file backup jika modul db_manager di memori belum ter-refresh."""
+    try:
+        if file_format == "csv":
+            df = pd.read_csv(file_obj)
+        elif file_format in ["xlsx", "xls"]:
+            df = pd.read_excel(file_obj)
+        elif file_format == "sql":
+            content = file_obj.read().decode("utf-8") if hasattr(file_obj, "read") else str(file_obj)
+            conn = db_manager.get_connection()
+            cursor = conn.cursor()
+            statements = [s.strip() for s in content.split(";") if s.strip()]
+            cnt = 0
+            for stmt in statements:
+                cursor.execute(stmt)
+                cnt += 1
+            conn.commit()
+            conn.close()
+            return True, cnt, f"Berhasil mengeksekusi {cnt} perintah SQL backup ke basis data."
+        else:
+            return False, 0, f"Format file '{file_format}' tidak didukung."
+
+        if df.empty:
+            return False, 0, "File cadangan kosong / tidak memiliki baris data."
+
+        _all_cols = [
+            'platform_id', 'date', 'username', 'raw_text', 'cleaned_text',
+            'sentiment_label', 'confidence_score', 'likes', 'retweets', 'views',
+            'status', 'source_platform', 'log_activity', 'user_app'
+        ]
+
+        column_map = {
+            'tweet_id': 'platform_id', 'ID Platform': 'platform_id', 'Username': 'username',
+            'Tanggal Pembuatan': 'date', 'Teks Mentah': 'raw_text', 'Teks Baku (EYD)': 'cleaned_text',
+            'Label Sentimen': 'sentiment_label', 'Skor Keyakinan': 'confidence_score',
+            'Platform': 'source_platform', 'Likes': 'likes', 'Retweets': 'retweets',
+            'Tayangan': 'views', 'Log Aktivitas Scraping': 'log_activity', 'User Aplikasi': 'user_app'
+        }
+        df.rename(columns=column_map, inplace=True)
+
+        for col in _all_cols:
+            if col not in df.columns:
+                if col in ['likes', 'retweets', 'views']:
+                    df[col] = 0
+                elif col == 'status':
+                    df[col] = 'RAW'
+                elif col == 'source_platform':
+                    df[col] = 'Imported'
+                else:
+                    df[col] = None
+
+        df_to_import = df[_all_cols].copy()
+        df_to_import['likes'] = df_to_import['likes'].fillna(0).astype(int)
+        df_to_import['retweets'] = df_to_import['retweets'].fillna(0).astype(int)
+        df_to_import['views'] = df_to_import['views'].fillna(0).astype(int)
+        df_to_import['status'] = df_to_import['status'].fillna('RAW')
+        df_to_import['source_platform'] = df_to_import['source_platform'].fillna('Imported')
+
+        conn = db_manager.get_connection()
+        cursor = conn.cursor()
+        placeholder = db_manager.get_placeholder()
+        db_type = db_manager.get_db_type()
+
+        records = df_to_import.to_dict(orient='records')
+        inserted_count = 0
+
+        for r in records:
+            p_id = r.get('platform_id')
+            if not p_id or str(p_id).strip() in ['', 'None', 'nan']:
+                import hashlib
+                raw_t = str(r.get('raw_text') or '')
+                u_name = str(r.get('username') or '')
+                p_id = f"IMP_{hashlib.md5((raw_t + u_name).encode('utf-8')).hexdigest()}"
+
+            if db_type == "postgresql":
+                q = f"""
+                    INSERT INTO log_cuitan (
+                        platform_id, date, username, raw_text, cleaned_text,
+                        sentiment_label, confidence_score, likes, retweets, views,
+                        status, source_platform, log_activity, user_app
+                    ) VALUES (
+                        {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
+                        {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
+                        {placeholder}, {placeholder}, {placeholder}, {placeholder}
+                    )
+                    ON CONFLICT (platform_id) DO UPDATE SET
+                        cleaned_text = EXCLUDED.cleaned_text,
+                        sentiment_label = EXCLUDED.sentiment_label,
+                        confidence_score = EXCLUDED.confidence_score,
+                        status = EXCLUDED.status
+                """
+            else:
+                q = f"""
+                    INSERT OR REPLACE INTO log_cuitan (
+                        platform_id, date, username, raw_text, cleaned_text,
+                        sentiment_label, confidence_score, likes, retweets, views,
+                        status, source_platform, log_activity, user_app
+                    ) VALUES (
+                        {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
+                        {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
+                        {placeholder}, {placeholder}, {placeholder}, {placeholder}
+                    )
+                """
+            
+            cursor.execute(q, (
+                str(p_id), str(r.get('date') or ''), str(r.get('username') or ''),
+                str(r.get('raw_text') or ''), r.get('cleaned_text'), r.get('sentiment_label'),
+                r.get('confidence_score'), int(r.get('likes') or 0), int(r.get('retweets') or 0),
+                int(r.get('views') or 0), str(r.get('status') or 'RAW'), str(r.get('source_platform') or 'Imported'),
+                r.get('log_activity'), r.get('user_app')
+            ))
+            inserted_count += 1
+
+        conn.commit()
+        conn.close()
+        return True, inserted_count, f"Berhasil mengimpor {inserted_count:,} baris data cadangan ke basis data ({db_type})."
+    except Exception as e:
+        return False, 0, f"Gagal mengimpor file cadangan: {e}"
+
     # 5.3 Modul Restore / Import Backup Data Log Cuitan ke Database Supabase
     st.markdown("<br>", unsafe_allow_html=True)
     with st.expander("📦 Restore Backup & Impor Data ke Basis Data Supabase (.csv, .xlsx, .sql)", expanded=False):
@@ -1187,7 +1306,18 @@ with tab_review:
             else:
                 ext = up_backup_file.name.split(".")[-1].lower()
                 with st.spinner("Memproses impor data cadangan ke basis data Supabase..."):
-                    ok_imp, cnt_imp, msg_imp = db_manager.import_backup_log_cuitan(up_backup_file, ext)
+                    try:
+                        import importlib
+                        importlib.reload(db_manager)
+                    except Exception:
+                        pass
+
+                    if hasattr(db_manager, 'import_backup_log_cuitan'):
+                        ok_imp, cnt_imp, msg_imp = db_manager.import_backup_log_cuitan(up_backup_file, ext)
+                    else:
+                        # Fallback jika modul db_manager di memori belum ter-refresh
+                        ok_imp, cnt_imp, msg_imp = _fallback_import_backup(up_backup_file, ext)
+
                     if ok_imp:
                         st.success(f"✅ {msg_imp}")
                         st.rerun()
