@@ -1742,7 +1742,6 @@ with tab_viz:
                     story_p.append(t_cfg_p)
 
                     story_p.append(Paragraph('BAB II — RINGKASAN REVIEW DATA', sH1))
-                    story_p.append(Paragraph(f'Hasil review data live: <b>{len(df_base_viz):,}</b> data diterima, <b>{total_labelled_viz:,}</b> terlabel sentimen.', sB))
                     story_p.append(Spacer(1, 0.2*cm))
                     
                     pie_bytes_p = _chart_pie_sentimen_pdf(pos_cnt_v, neu_cnt_v, neg_cnt_v)
