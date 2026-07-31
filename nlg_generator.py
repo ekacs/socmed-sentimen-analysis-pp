@@ -30,16 +30,16 @@ def generate_executive_summary(
             f"**Rekomendasi:** Silakan lakukan penarikan data baru atau sesuaikan filter kriteria analisis Anda."
         )
 
-    # 2. Validasi Kunci API Gemini secara aman
+    # 2. Validasi Kunci API LLM secara aman
     if not api_key:
         api_key = os.getenv("GEMINI_API_KEY")
     if not api_key or api_key == "YOUR_GEMINI_API_KEY_HERE":
         return (
-            "### ⚠️ Kunci API Gemini Belum Dikonfigurasi\n\n"
+            "### ⚠️ Kunci API LLM Belum Dikonfigurasi\n\n"
             "Fitur **Penyusunan Ringkasan Eksekutif berbasis AI (NLG)** saat ini dinonaktifkan "
             "karena kunci API `GEMINI_API_KEY` tidak ditemukan di sesi atau di file `.env`.\n\n"
             "**Langkah Pengaktifan:**\n"
-            "1. Masukkan kunci API Gemini Anda pada sidebar **🔐 Pengaturan Kredensial API** atau file `.env`.\n"
+            "1. Masukkan kunci API LLM Anda pada sidebar **🔐 Pengaturan API Key Sesi** atau file `.env`.\n"
             "2. Klik tombol **🔄 Perbarui Analisis Narasi** kembali."
         )
 
@@ -103,7 +103,7 @@ def generate_executive_summary(
         if "429" in err_str or "quota" in err_str or "resourceexhausted" in err_str or "rate limit" in err_str:
             import db_manager
             db_manager.set_gemini_quota_flag(True)
-        return f"### ❌ Kesalahan API Gemini\n\nGagal menghubungi server AI Gemini. Detail kesalahan: {e}"
+        return f"### ❌ Kesalahan API LLM\n\nGagal menghubungi server AI LLM. Detail kesalahan: {e}"
 
 if __name__ == "__main__":
     print("--- Memulai Simulasi Pengujian NLG Generator ---")

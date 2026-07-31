@@ -390,7 +390,7 @@ with st.sidebar.popover("🔒 Disclaimer Keamanan & Kerahasiaan Data", use_conta
         "1. **Hak Cipta & Privasi:** Seluruh data yang ditarik berasal dari ruang publik media sosial dan portal berita. Data digunakan semata-mata untuk kepentingan penelitian dan analisis sentimen kebijakan publik.\n"
         "2. **Kerahasiaan Identitas:** Sistem tidak menyimpan kredensial akun pribadi pengguna. Identitas publik hanya berupa username publik yang dikumpulkan sesuai ketersediaan API.\n"
         "3. **Penyimpanan:** Data tersimpan secara aman di Supabase PostgreSQL dengan enkripsi standar industri.\n"
-        "4. **Penggunaan AI:** Pembersihan teks oleh Gemini AI dilakukan tanpa menyimpan histori pribadi pengguna luar."
+        "4. **Penggunaan AI:** Pembersihan teks oleh LLM AI dilakukan tanpa menyimpan histori pribadi pengguna luar."
     )
 
 # 1b. Popover Pengaturan API Key Sesi Pengguna
@@ -412,7 +412,7 @@ with st.sidebar.popover("🔐 Pengaturan API Key Sesi", use_container_width=True
     
     st.markdown("**Status Kredensial Sesi Aktif:**")
     st.text(f"• Apify: {'🟢 Kustom Sesi (' + session_credentials.mask_credential(cur_apify) + ')' if has_custom_apify else '⚪ Default (.env)'}")
-    st.text(f"• Gemini: {'🟢 Kustom Sesi (' + session_credentials.mask_credential(cur_gemini) + ')' if has_custom_gemini else '⚪ Default (.env)'}")
+    st.text(f"• LLM: {'🟢 Kustom Sesi (' + session_credentials.mask_credential(cur_gemini) + ')' if has_custom_gemini else '⚪ Default (.env)'}")
     st.text(f"• Supabase: {'🟢 Kustom Sesi (' + session_credentials.mask_credential(cur_supabase) + ')' if has_custom_supabase else '⚪ Default (.env)'}")
     
     st.divider()
@@ -420,7 +420,7 @@ with st.sidebar.popover("🔐 Pengaturan API Key Sesi", use_container_width=True
     with st.form("form_session_credentials", clear_on_submit=True):
         st.markdown("**Update Kredensial Sesi (Input Tersamarkan):**")
         input_apify = st.text_input("🔑 Apify API Token:", type="password", placeholder="Masukkan Apify Token kustom...", help="Token Apify untuk penarikan data publik.")
-        input_gemini = st.text_input("🧠 Gemini API Key:", type="password", placeholder="Masukkan Gemini API Key kustom...", help="Kunci API Gemini untuk pembersihan EYD dan NLG Laporan.")
+        input_gemini = st.text_input("🧠 LLM API Key:", type="password", placeholder="Masukkan LLM API Key kustom...", help="Kunci API LLM untuk pembersihan EYD dan NLG Laporan.")
         input_supabase = st.text_input("🗄️ Supabase DATABASE_URL:", type="password", placeholder="postgresql://postgres:...@db...supabase.co:5432/postgres", help="URL PostgreSQL Supabase kustom.")
         
         c_btn_cred1, c_btn_cred2 = st.columns([1, 1])
@@ -468,7 +468,7 @@ if check_apify_quota_exhausted():
     st.sidebar.error("🚨 Status APIFY: Quota/Saldo Habis (Hubungi Developer / Top-up Quota)")
 
 if check_gemini_quota_exhausted():
-    st.sidebar.error("🚨 Status Gemini AI: Quota Token Habis (Hubungi Developer / Top-up Token)")
+    st.sidebar.error("🚨 Status LLM AI: Quota Token Habis (Hubungi Developer / Top-up Token)")
 
 # 📌 Sidebar: Manajer Bookmark Keysearch
 st.sidebar.divider()
@@ -894,7 +894,7 @@ with tab_ml:
     gemini_is_out = check_gemini_quota_exhausted()
     if gemini_is_out:
         st.error(
-            "🚨 **Mohon maaf untuk sementara waktu fitur pemrosesan AI tidak dapat digunakan karena kuota token Gemini AI telah HABIS "
+            "🚨 **Mohon maaf untuk sementara waktu fitur pemrosesan AI tidak dapat digunakan karena kuota token LLM AI telah HABIS "
             "untuk penggunaan lebih lanjut dapat menghubungi Mrs Prof. Tuti Rachmawati, PhD - Universitas Parahyangan**"
         )
 
@@ -904,7 +904,7 @@ with tab_ml:
         btn_stop_s2 = st.button("🛑 STOP / Hentikan Paksa", key="btn_stop_pipeline_s2", use_container_width=True, help="Hentikan proses AI & ML yang sedang berjalan secara paksa.")
     with c_s2_run:
         if gemini_is_out:
-            st.button("🧠 Jalankan Proses AI & ML Sekarang", type="primary", disabled=True, use_container_width=True, help="Kuota token Gemini AI habis. Pemrosesan AI dinonaktifkan sementara.")
+            st.button("🧠 Jalankan Proses AI & ML Sekarang", type="primary", disabled=True, use_container_width=True, help="Kuota token LLM AI habis. Pemrosesan AI dinonaktifkan sementara.")
             btn_run_pipeline = False
         else:
             btn_run_pipeline = st.button("🧠 Jalankan Proses AI & ML Sekarang", type="primary", use_container_width=True, key="btn_run_pipeline_tab2")
@@ -919,7 +919,7 @@ with tab_ml:
             st.info("ℹ️ Tidak ada proses AI & ML yang sedang berjalan.")
     
     if btn_run_pipeline:
-        with st.status("🧠 Melakukan pembersihan duplikat RAW, standardisasi EYD (Gemini), & klasifikasi SVM...", expanded=True) as status_ml:
+        with st.status("🧠 Melakukan pembersihan duplikat RAW, standardisasi EYD (LLM), & klasifikasi SVM...", expanded=True) as status_ml:
             try:
                 proc = subprocess.Popen(
                     [sys.executable, "01_pipeline_data.py"],
@@ -1655,12 +1655,12 @@ with tab_viz:
 
         if gemini_is_out:
             st.error(
-                "🚨 **Mohon maaf untuk sementara waktu fitur pemrosesan AI tidak dapat digunakan karena kuota token Gemini AI telah HABIS "
+                "🚨 **Mohon maaf untuk sementara waktu fitur pemrosesan AI tidak dapat digunakan karena kuota token LLM AI telah HABIS "
                 "untuk penggunaan lebih lanjut dapat menghubungi Mrs Prof. Tuti Rachmawati, PhD - Universitas Parahyangan**"
             )
-            st.button("🔄 Perbarui Analisis Narasi (Gemini AI)", type="primary", disabled=True, help="Kuota token Gemini AI habis. Fitur AI dinonaktifkan sementara.")
+            st.button("🔄 Perbarui Analisis Narasi (AI)", type="primary", disabled=True, help="Kuota token LLM AI habis. Fitur AI dinonaktifkan sementara.")
         else:
-            if st.button("🔄 Perbarui Analisis Narasi (Gemini AI)", type="primary", key="btn_gen_nlg_tab4"):
+            if st.button("🔄 Perbarui Analisis Narasi (AI)", type="primary", key="btn_gen_nlg_tab4"):
                 with st.spinner(f"Menganalisis isu '{fokus_kebijakan_txt}' & menyusun narasi minimal 250 kata..."):
                     narrative_res = generate_executive_summary(
                         total_data=total_cleaned_viz,

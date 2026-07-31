@@ -59,7 +59,7 @@ def buat_tabel():
                 date TEXT NOT NULL,                     -- Tanggal pembuatan konten (dari created_at platform)
                 username TEXT NOT NULL,                 -- Nama akun pembuat konten (screen_name untuk Twitter)
                 raw_text TEXT NOT NULL,                 -- Teks mentah asli dari platform
-                cleaned_text TEXT,                      -- Teks hasil standardisasi EYD oleh Gemini API
+                cleaned_text TEXT,                      -- Teks hasil standardisasi EYD oleh LLM API
                 sentiment_label TEXT,                   -- Hasil klasifikasi: 'Positif', 'Negatif', atau 'Netral'
                 confidence_score REAL,                  -- Tingkat akurasi/keyakinan model klasifikasi (0.0 - 1.0)
                 likes INTEGER DEFAULT 0,                -- Jumlah suka/reaksi

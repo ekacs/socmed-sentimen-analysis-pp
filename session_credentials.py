@@ -2,7 +2,7 @@
 session_credentials.py
 ----------------------
 Modul pembantu untuk mengelola API Key & Kredensial berbasis sesi pengguna (Session-Only).
-Memungkinkan setiap pengguna memasukkan API Key Apify, Supabase, dan Gemini kustom.
+Memungkinkan setiap pengguna memasukkan API Key Apify, Supabase, dan LLM kustom.
 Jika pengguna tidak memasukkan API Key (kosong), sistem secara otomatis mengembalikan
 kunci default dari variabel lingkungan (.env).
 """
@@ -34,7 +34,7 @@ def get_active_supabase_url() -> str:
     return custom if custom else os.getenv("DATABASE_URL", "")
 
 def get_active_gemini_key() -> str:
-    """Mengembalikan Gemini API Key kustom pengguna jika ada, jika tidak fallback ke .env."""
+    """Mengembalikan LLM API Key kustom pengguna jika ada, jika tidak fallback ke .env."""
     custom = st.session_state.get(KEY_GEMINI, "").strip() if hasattr(st, "session_state") else ""
     return custom if custom else os.getenv("GEMINI_API_KEY", "")
 
