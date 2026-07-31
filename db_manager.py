@@ -8,12 +8,24 @@ load_dotenv(override=False)
 
 DB_FILE = 'sentimen_kebijakan.db'
 
+def resolve_db_url(db_url=None):
+    """
+    Menentukan URL database aktif dengan mengecek parameter eksplisit, session_credentials, atau os.getenv.
+    """
+    if db_url is not None:
+        return db_url
+    try:
+        import session_credentials
+        return session_credentials.get_active_database_url()
+    except Exception:
+        pass
+    return os.getenv("DATABASE_URL", "")
+
 def get_db_type(db_url=None):
     """
     Menentukan tipe database yang digunakan berdasarkan ketersediaan DATABASE_URL.
     """
-    if not db_url:
-        db_url = os.getenv("DATABASE_URL", "")
+    db_url = resolve_db_url(db_url)
     if db_url and ("postgresql://" in db_url or "postgres://" in db_url) and "YOUR_DATABASE_URL" not in db_url:
         return "postgresql"
     return "sqlite"
@@ -22,8 +34,7 @@ def get_connection(db_url=None):
     """
     Mendapatkan koneksi database yang sesuai (sqlite3 atau psycopg2).
     """
-    if not db_url:
-        db_url = os.getenv("DATABASE_URL", "")
+    db_url = resolve_db_url(db_url)
     db_type = get_db_type(db_url)
     
     if db_type == "postgresql":
@@ -922,4 +933,203 @@ def hapus_duplikasi_data_raw():
         return 0
     finally:
         conn.close()
+
+
+def test_db_connection(db_url):
+    """
+    Menguji koneksi ke database PostgreSQL berdasarkan db_url.
+    Returns: (success: bool, message: str)
+    """
+    if not db_url or not isinstance(db_url, str):
+        return False, "URL database kosong atau tidak valid."
+    
+    db_url_clean = db_url.strip()
+    if "[" in db_url_clean and "]" in db_url_clean:
+        db_url_clean = db_url_clean.replace("[", "").replace("]", "")
+    if db_url_clean.startswith("postgres://"):
+        db_url_clean = "postgresql://" + db_url_clean[len("postgres://"):]
+        
+    if not db_url_clean.startswith("postgresql://"):
+        return False, "Format URL harus diawali dengan 'postgresql://' atau 'postgres://'."
+        
+    try:
+        import psycopg2
+        conn = psycopg2.connect(db_url_clean, connect_timeout=5)
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1;")
+        res = cursor.fetchone()
+        conn.close()
+        if res and res[0] == 1:
+            return True, "Koneksi ke PostgreSQL cloud berhasil!"
+        else:
+            return False, "Koneksi berhasil tetapi query uji 'SELECT 1' gagal."
+    except Exception as e:
+        return False, f"Gagal terhubung ke database cloud: {str(e)}"
+
+
+def migrate_database(source_url, target_url):
+    """
+    Mengisi/menyalin seluruh record dari database sumber (source_url) ke database tujuan (target_url).
+    Mendukung migrasi SQLite ↔ PostgreSQL.
+    Returns: (success: bool, stats: dict, message: str)
+    """
+    try:
+        conn_src = get_connection(source_url)
+        conn_tgt = get_connection(target_url)
+        
+        db_type_tgt = get_db_type(target_url)
+        cursor_tgt = conn_tgt.cursor()
+        
+        if db_type_tgt == "postgresql":
+            cursor_tgt.execute('''
+                CREATE TABLE IF NOT EXISTS log_cuitan (
+                    platform_id TEXT PRIMARY KEY,
+                    date TEXT NOT NULL,
+                    username TEXT NOT NULL,
+                    raw_text TEXT NOT NULL,
+                    cleaned_text TEXT,
+                    sentiment_label TEXT,
+                    confidence_score REAL,
+                    likes INTEGER DEFAULT 0,
+                    retweets INTEGER DEFAULT 0,
+                    views INTEGER DEFAULT 0,
+                    status TEXT DEFAULT 'RAW',
+                    source_platform TEXT NOT NULL,
+                    log_activity TEXT,
+                    user_app TEXT
+                )
+            ''')
+            cursor_tgt.execute('''
+                CREATE TABLE IF NOT EXISTS system_config (
+                    config_key TEXT PRIMARY KEY,
+                    config_value TEXT NOT NULL
+                )
+            ''')
+            cursor_tgt.execute('''
+                CREATE TABLE IF NOT EXISTS keysearch_history (
+                    id SERIAL PRIMARY KEY,
+                    search_term TEXT UNIQUE NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            ''')
+            cursor_tgt.execute('''
+                CREATE TABLE IF NOT EXISTS keysearch_bookmarks (
+                    id SERIAL PRIMARY KEY,
+                    bookmark_name TEXT UNIQUE NOT NULL,
+                    terms TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            ''')
+        else:
+            cursor_tgt.execute('''
+                CREATE TABLE IF NOT EXISTS log_cuitan (
+                    platform_id TEXT PRIMARY KEY,
+                    date TEXT NOT NULL,
+                    username TEXT NOT NULL,
+                    raw_text TEXT NOT NULL,
+                    cleaned_text TEXT,
+                    sentiment_label TEXT,
+                    confidence_score REAL,
+                    likes INTEGER DEFAULT 0,
+                    retweets INTEGER DEFAULT 0,
+                    views INTEGER DEFAULT 0,
+                    status TEXT DEFAULT 'RAW',
+                    source_platform TEXT NOT NULL,
+                    log_activity TEXT,
+                    user_app TEXT
+                )
+            ''')
+            cursor_tgt.execute('''
+                CREATE TABLE IF NOT EXISTS system_config (
+                    config_key TEXT PRIMARY KEY,
+                    config_value TEXT NOT NULL
+                )
+            ''')
+            cursor_tgt.execute('''
+                CREATE TABLE IF NOT EXISTS keysearch_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    search_term TEXT UNIQUE NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            ''')
+            cursor_tgt.execute('''
+                CREATE TABLE IF NOT EXISTS keysearch_bookmarks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    bookmark_name TEXT UNIQUE NOT NULL,
+                    terms TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            ''')
+        conn_tgt.commit()
+        
+        # Pindahkan data log_cuitan
+        df_log = pd.read_sql_query("SELECT * FROM log_cuitan", conn_src)
+        inserted_log = 0
+        if not df_log.empty:
+            ph_tgt = get_placeholder(target_url)
+            cols = list(df_log.columns)
+            cols_str = ", ".join(cols)
+            placeholders_str = ", ".join([ph_tgt] * len(cols))
+            
+            if db_type_tgt == "postgresql":
+                sql_insert = f"INSERT INTO log_cuitan ({cols_str}) VALUES ({placeholders_str}) ON CONFLICT (platform_id) DO NOTHING"
+            else:
+                sql_insert = f"INSERT OR IGNORE INTO log_cuitan ({cols_str}) VALUES ({placeholders_str})"
+                
+            for _, row in df_log.iterrows():
+                vals = tuple(None if pd.isna(v) else v for v in row.values)
+                cursor_tgt.execute(sql_insert, vals)
+                inserted_log += 1
+                
+        # Pindahkan system_config
+        df_cfg = pd.read_sql_query("SELECT * FROM system_config", conn_src)
+        if not df_cfg.empty:
+            ph_tgt = get_placeholder(target_url)
+            if db_type_tgt == "postgresql":
+                sql_cfg = f"INSERT INTO system_config (config_key, config_value) VALUES ({ph_tgt}, {ph_tgt}) ON CONFLICT (config_key) DO UPDATE SET config_value = EXCLUDED.config_value"
+            else:
+                sql_cfg = f"INSERT OR REPLACE INTO system_config (config_key, config_value) VALUES ({ph_tgt}, {ph_tgt})"
+            for _, row in df_cfg.iterrows():
+                cursor_tgt.execute(sql_cfg, (row['config_key'], row['config_value']))
+                
+        # Pindahkan keysearch_history
+        try:
+            df_hist = pd.read_sql_query("SELECT search_term, created_at FROM keysearch_history", conn_src)
+            if not df_hist.empty:
+                ph_tgt = get_placeholder(target_url)
+                if db_type_tgt == "postgresql":
+                    sql_h = f"INSERT INTO keysearch_history (search_term, created_at) VALUES ({ph_tgt}, {ph_tgt}) ON CONFLICT (search_term) DO NOTHING"
+                else:
+                    sql_h = f"INSERT OR IGNORE INTO keysearch_history (search_term, created_at) VALUES ({ph_tgt}, {ph_tgt})"
+                for _, row in df_hist.iterrows():
+                    cursor_tgt.execute(sql_h, (row['search_term'], row['created_at']))
+        except Exception:
+            pass
+            
+        # Pindahkan keysearch_bookmarks
+        try:
+            df_bm = pd.read_sql_query("SELECT bookmark_name, terms, created_at FROM keysearch_bookmarks", conn_src)
+            if not df_bm.empty:
+                ph_tgt = get_placeholder(target_url)
+                if db_type_tgt == "postgresql":
+                    sql_b = f"INSERT INTO keysearch_bookmarks (bookmark_name, terms, created_at) VALUES ({ph_tgt}, {ph_tgt}, {ph_tgt}) ON CONFLICT (bookmark_name) DO NOTHING"
+                else:
+                    sql_b = f"INSERT OR IGNORE INTO keysearch_bookmarks (bookmark_name, terms, created_at) VALUES ({ph_tgt}, {ph_tgt}, {ph_tgt})"
+                for _, row in df_bm.iterrows():
+                    cursor_tgt.execute(sql_b, (row['bookmark_name'], row['terms'], row['created_at']))
+        except Exception:
+            pass
+            
+        conn_tgt.commit()
+        conn_src.close()
+        conn_tgt.close()
+        
+        stats = {
+            "log_cuitan_total": len(df_log),
+            "log_cuitan_inserted": inserted_log
+        }
+        return True, stats, f"Migrasi data berhasil! {len(df_log)} data cuitan diproses."
+    except Exception as e:
+        return False, {}, f"Gagal migrasi database: {str(e)}"
+
 

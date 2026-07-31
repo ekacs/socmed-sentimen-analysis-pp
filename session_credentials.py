@@ -13,6 +13,7 @@ import streamlit as st
 KEY_APIFY = "user_apify_api_token"
 KEY_SUPABASE = "user_supabase_db_url"
 KEY_GEMINI = "user_gemini_api_key"
+KEY_DB_MODE = "user_db_mode"
 
 def init_session_credentials():
     """Inisialisasi variabel st.session_state untuk kredensial jika belum ada."""
@@ -22,6 +23,22 @@ def init_session_credentials():
         st.session_state[KEY_SUPABASE] = ""
     if KEY_GEMINI not in st.session_state:
         st.session_state[KEY_GEMINI] = ""
+    if KEY_DB_MODE not in st.session_state:
+        # Default mode: jika DATABASE_URL ada di .env, default 'postgresql', jika tidak 'sqlite'
+        env_url = os.getenv("DATABASE_URL", "").strip()
+        if env_url and ("postgresql://" in env_url or "postgres://" in env_url) and "YOUR_DATABASE_URL" not in env_url:
+            st.session_state[KEY_DB_MODE] = "postgresql"
+        else:
+            st.session_state[KEY_DB_MODE] = "sqlite"
+
+def get_active_db_mode() -> str:
+    """Mengembalikan mode DB aktif ('sqlite' atau 'postgresql')."""
+    if hasattr(st, "session_state") and KEY_DB_MODE in st.session_state:
+        return st.session_state[KEY_DB_MODE]
+    env_url = os.getenv("DATABASE_URL", "").strip()
+    if env_url and ("postgresql://" in env_url or "postgres://" in env_url) and "YOUR_DATABASE_URL" not in env_url:
+        return "postgresql"
+    return "sqlite"
 
 def get_active_apify_token() -> str:
     """Mengembalikan Apify token kustom pengguna jika ada, jika tidak fallback ke .env."""
@@ -32,6 +49,17 @@ def get_active_supabase_url() -> str:
     """Mengembalikan Database URL kustom pengguna jika ada, jika tidak fallback ke .env."""
     custom = st.session_state.get(KEY_SUPABASE, "").strip() if hasattr(st, "session_state") else ""
     return custom if custom else os.getenv("DATABASE_URL", "")
+
+def get_active_database_url() -> str:
+    """
+    Mengembalikan URL koneksi database aktif berdasarkan DB_MODE.
+    Jika mode 'sqlite', kembalikan string kosong (menggunakan SQLite file lokal).
+    Jika mode 'postgresql', kembalikan Database URL aktif.
+    """
+    mode = get_active_db_mode()
+    if mode == "sqlite":
+        return ""
+    return get_active_supabase_url()
 
 def get_active_gemini_key() -> str:
     """Mengembalikan LLM API Key kustom pengguna jika ada, jika tidak fallback ke .env."""
@@ -61,13 +89,13 @@ def get_session_env_dict() -> dict:
     env_dict = os.environ.copy()
     apify_tok = get_active_apify_token()
     gemini_key = get_active_gemini_key()
-    supabase_url = get_active_supabase_url()
+    active_db_url = get_active_database_url()
     
     if apify_tok:
         env_dict["APIFY_API_TOKEN"] = apify_tok
     if gemini_key:
         env_dict["GEMINI_API_KEY"] = gemini_key
-    if supabase_url:
-        env_dict["DATABASE_URL"] = supabase_url
+    # Set DATABASE_URL sesuai mode aktif (kosong untuk SQLite, postgresql://... untuk Cloud DB)
+    env_dict["DATABASE_URL"] = active_db_url
         
     return env_dict

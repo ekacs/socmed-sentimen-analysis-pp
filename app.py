@@ -393,62 +393,132 @@ with st.sidebar.popover("🔒 Disclaimer Keamanan & Kerahasiaan Data", use_conta
         "4. **Penggunaan AI:** Pembersihan teks oleh LLM AI dilakukan tanpa menyimpan histori pribadi pengguna luar."
     )
 
-# 1b. Popover Pengaturan API Key Sesi Pengguna
-with st.sidebar.popover("🔐 Pengaturan API Key Sesi", use_container_width=True):
-    st.markdown("### 🔐 Pengaturan API Key Sesi Pengguna")
+# 1b. Popover Pengaturan API Key & Storage Database
+with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=True):
+    st.markdown("### 🔐 Pengaturan API Key & Storage Database")
     st.caption(
-        "Kunci API yang Anda masukkan di sini hanya tersimpan dalam memori sesi browser Anda "
-        "(Session-Only) dan **otomatis terhapus** saat tab browser ditutup. Nilai kunci tersamarkan dengan **asterisk/bullet** (`••••••••`). "
+        "Kunci API dan pengaturan database yang Anda masukkan di sini tersimpan dalam memori sesi browser Anda "
+        "(Session-Only) dan **otomatis terhapus** saat tab browser ditutup. "
         "Jika dikosongkan/di-reset, sistem secara otomatis menggunakan kunci bawaan dari file `.env`."
     )
     
     cur_apify = session_credentials.get_active_apify_token()
     cur_gemini = session_credentials.get_active_gemini_key()
     cur_supabase = session_credentials.get_active_supabase_url()
+    cur_db_mode = session_credentials.get_active_db_mode()
     
     has_custom_apify = bool(st.session_state.get(session_credentials.KEY_APIFY, "").strip())
     has_custom_gemini = bool(st.session_state.get(session_credentials.KEY_GEMINI, "").strip())
     has_custom_supabase = bool(st.session_state.get(session_credentials.KEY_SUPABASE, "").strip())
     
-    st.markdown("**Status Kredensial Sesi Aktif:**")
+    st.markdown("**Status Kredensial & Storage Aktif:**")
     st.text(f"• Apify: {'🟢 Kustom Sesi (' + session_credentials.mask_credential(cur_apify) + ')' if has_custom_apify else '⚪ Default (.env)'}")
     st.text(f"• LLM: {'🟢 Kustom Sesi (' + session_credentials.mask_credential(cur_gemini) + ')' if has_custom_gemini else '⚪ Default (.env)'}")
-    st.text(f"• Supabase: {'🟢 Kustom Sesi (' + session_credentials.mask_credential(cur_supabase) + ')' if has_custom_supabase else '⚪ Default (.env)'}")
+    st.text(f"• Storage DB: {'🔵 Lokal (SQLite)' if cur_db_mode == 'sqlite' else '🟢 Awan (PostgreSQL / Supabase)'}")
+    if cur_db_mode == "postgresql":
+        st.text(f"  URL Cloud DB: {'🟢 Kustom Sesi (' + session_credentials.mask_credential(cur_supabase) + ')' if has_custom_supabase else '⚪ Default (.env)'}")
     
     st.divider()
     
-    with st.form("form_session_credentials", clear_on_submit=True):
+    with st.form("form_session_credentials", clear_on_submit=False):
+        st.markdown("**Pilihan Mode Database & Storage:**")
+        selected_db_mode = st.radio(
+            "Mode Penyimpanan Data:",
+            options=["Lokal (SQLite)", "Awan (PostgreSQL / Supabase)"],
+            index=0 if cur_db_mode == "sqlite" else 1,
+            help="Lokal: simpan ke sentimen_kebijakan.db. Awan: simpan ke database PostgreSQL cloud."
+        )
+        
         st.markdown("**Update Kredensial Sesi (Input Tersamarkan):**")
         input_apify = st.text_input("🔑 Apify API Token:", type="password", placeholder="Masukkan Apify Token kustom...", help="Token Apify untuk penarikan data publik.")
         input_gemini = st.text_input("🧠 LLM API Key:", type="password", placeholder="Masukkan LLM API Key kustom...", help="Kunci API LLM untuk pembersihan EYD dan NLG Laporan.")
-        input_supabase = st.text_input("🗄️ Supabase DATABASE_URL:", type="password", placeholder="postgresql://postgres:...@db...supabase.co:5432/postgres", help="URL PostgreSQL Supabase kustom.")
+        input_supabase = st.text_input("🗄️ Cloud PostgreSQL DATABASE_URL:", type="password", placeholder="postgresql://postgres:...@db...supabase.co:5432/postgres", help="URL PostgreSQL kustom.")
         
-        c_btn_cred1, c_btn_cred2 = st.columns([1, 1])
+        c_btn_cred1, c_btn_cred2, c_btn_cred3 = st.columns([1.2, 1, 1])
         with c_btn_cred1:
-            btn_save_cred = st.form_submit_button("💾 Simpan Sesi", use_container_width=True)
+            btn_test_db = st.form_submit_button("🧪 Uji Koneksi DB", use_container_width=True)
         with c_btn_cred2:
-            btn_reset_cred = st.form_submit_button("🗑️ Reset Default", use_container_width=True)
+            btn_save_cred = st.form_submit_button("💾 Simpan Sesi", use_container_width=True)
+        with c_btn_cred3:
+            btn_reset_cred = st.form_submit_button("🗑️ Reset", use_container_width=True)
             
+        if btn_test_db:
+            target_test_url = input_supabase.strip() if input_supabase.strip() else cur_supabase
+            if not target_test_url:
+                st.warning("⚠️ Silakan masukkan URL PostgreSQL Cloud terlebih dahulu untuk diuji.")
+            else:
+                ok_conn, msg_conn = db_manager.test_db_connection(target_test_url)
+                if ok_conn:
+                    st.success(f"✅ {msg_conn}")
+                else:
+                    st.error(f"❌ {msg_conn}")
+
         if btn_save_cred:
+            new_db_mode = "sqlite" if selected_db_mode == "Lokal (SQLite)" else "postgresql"
+            st.session_state[session_credentials.KEY_DB_MODE] = new_db_mode
             if input_apify.strip():
                 st.session_state[session_credentials.KEY_APIFY] = input_apify.strip()
             if input_gemini.strip():
                 st.session_state[session_credentials.KEY_GEMINI] = input_gemini.strip()
             if input_supabase.strip():
                 st.session_state[session_credentials.KEY_SUPABASE] = input_supabase.strip()
-            st.success("✅ Kredensial sesi berhasil diperbarui!")
+            
+            # Pastikan tabel terinisialisasi untuk database yang baru dipilih
+            try:
+                db_manager.buat_tabel()
+            except Exception:
+                pass
+                
+            st.success("✅ Pengaturan database & kredensial berhasil diperbarui!")
             st.rerun()
             
         if btn_reset_cred:
             st.session_state[session_credentials.KEY_APIFY] = ""
             st.session_state[session_credentials.KEY_GEMINI] = ""
             st.session_state[session_credentials.KEY_SUPABASE] = ""
-            st.info("ℹ️ Kredensial dikembalikan ke nilai default (.env).")
+            st.session_state[session_credentials.KEY_DB_MODE] = "sqlite"
+            st.info("ℹ️ Pengaturan dikembalikan ke nilai default (.env / SQLite Lokal).")
             st.rerun()
+
+# 1c. Popover Tools Migrasi Data (Lokal ↔ Cloud)
+with st.sidebar.popover("🔄 Migrasi Data (Lokal ↔ Cloud)", use_container_width=True):
+    st.markdown("### 🔄 Tools Migrasi Data")
+    st.caption("Menyalin seluruh record (log cuitan, sistem konfigurasi, riwayat keysearch) antara SQLite Lokal dan Cloud PostgreSQL.")
+    
+    cloud_url_for_mig = session_credentials.get_active_supabase_url()
+    
+    if not cloud_url_for_mig:
+        st.warning("⚠️ Database URL Cloud belum dikonfigurasi. Atur DATABASE_URL di menu Pengaturan API & Database terlebih dahulu.")
+    else:
+        st.info(f"Target Cloud DB: `{session_credentials.mask_credential(cloud_url_for_mig)}`")
+        
+        c_mig1, c_mig2 = st.columns(2)
+        with c_mig1:
+            btn_mig_to_cloud = st.button("📤 Lokal ➔ Cloud", use_container_width=True, help="Unggah seluruh data SQLite lokal ke Cloud PostgreSQL.")
+        with c_mig2:
+            btn_mig_to_local = st.button("📥 Cloud ➔ Lokal", use_container_width=True, help="Unduh seluruh data Cloud PostgreSQL ke SQLite lokal.")
+            
+        if btn_mig_to_cloud:
+            with st.spinner("Mengunggah data dari SQLite lokal ke Cloud PostgreSQL..."):
+                ok_m, stats_m, msg_m = db_manager.migrate_database("", cloud_url_for_mig)
+                if ok_m:
+                    st.success(f"✅ {msg_m}")
+                    st.rerun()
+                else:
+                    st.error(f"❌ {msg_m}")
+                    
+        if btn_mig_to_local:
+            with st.spinner("Mengunduh data dari Cloud PostgreSQL ke SQLite lokal..."):
+                ok_m, stats_m, msg_m = db_manager.migrate_database(cloud_url_for_mig, "")
+                if ok_m:
+                    st.success(f"✅ {msg_m}")
+                    st.rerun()
+                else:
+                    st.error(f"❌ {msg_m}")
 
 # 2. Akses Database Awan
 st.sidebar.divider()
-st.sidebar.markdown("### 🗄️ Akses Database Awan")
+st.sidebar.markdown("### 🗄️ Status & Akses Database")
 col_db1, col_db2 = st.sidebar.columns([1, 1])
 with col_db1:
     st.link_button(
