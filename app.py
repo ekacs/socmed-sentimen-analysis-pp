@@ -903,12 +903,52 @@ with tab_review:
     c_tab3_h1, c_tab3_h2 = st.columns([4, 1])
     with c_tab3_h1:
         st.subheader("📋 Tahapan 3: Review Data & Kontrol Kualitas")
-        st.markdown("Transparansi data lengkap dari platform sumber beserta filter batas skor keyakinan (*confidence score*) dan fasilitas ekspor/impor Excel terkoreksi.")
+        st.markdown("Transparansi data lengkap dari platform sumber beserta fasilitas pemulihan (*restore*) file cadangan data database.")
     with c_tab3_h2:
         if st.button("🔄 Muat Ulang Data", key="btn_refresh_tab3_top", use_container_width=True, help="Segarkan seluruh data live dari database"):
             st.rerun()
-    
-    # 5.0 Formasi Tabel Live Lengkap (13 Kolom)
+
+    # 5.0 Modul Utama Restore / Import Backup Data ke Database Supabase (Selalu Terlihat di Paling Atas)
+    st.divider()
+    st.markdown("### 📦 Restore Backup & Memulihkan Data ke Basis Data Supabase")
+    st.info("💡 **Gunakan fitur ini untuk memulihkan (*restore*) file cadangan data `log_cuitan` hasil backup lokal (.csv, .xlsx, .sql) langsung ke tabel database Supabase/SQLite.**")
+
+    col_b1, col_b2 = st.columns([3, 1])
+    with col_b1:
+        up_backup_file = st.file_uploader(
+            "Upload File Backup (Format: CSV, XLSX, atau SQL Insert):",
+            type=['csv', 'xlsx', 'xls', 'sql'],
+            key="up_backup_db_file_top",
+            help="Pilih file backup lokal yang berisi data log_cuitan."
+        )
+    with col_b2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        btn_restore_db = st.button("📥 Import Data ke Database", type="primary", key="btn_restore_db_exec_top", use_container_width=True)
+
+    if btn_restore_db:
+        if up_backup_file is None:
+            st.warning("⚠️ Silakan pilih file cadangan (.csv, .xlsx, atau .sql) terlebih dahulu.")
+        else:
+            ext = up_backup_file.name.split(".")[-1].lower()
+            with st.spinner("Memproses impor data cadangan ke basis data Supabase..."):
+                try:
+                    import importlib
+                    importlib.reload(db_manager)
+                except Exception:
+                    pass
+
+                if hasattr(db_manager, 'import_backup_log_cuitan'):
+                    ok_imp, cnt_imp, msg_imp = db_manager.import_backup_log_cuitan(up_backup_file, ext)
+                else:
+                    ok_imp, cnt_imp, msg_imp = _fallback_import_backup(up_backup_file, ext)
+
+                if ok_imp:
+                    st.success(f"✅ {msg_imp}")
+                    st.rerun()
+                else:
+                    st.error(f"❌ {msg_imp}")
+
+    # Formasi Tabel Live Lengkap (13 Kolom)
     _all_cols_needed = [
         'platform_id', 'username', 'date', 'raw_text', 'cleaned_text',
         'sentiment_label', 'confidence_score', 'source_platform',
@@ -1285,44 +1325,6 @@ def _fallback_import_backup(file_obj, file_format: str = "csv"):
     except Exception as e:
         return False, 0, f"Gagal mengimpor file cadangan: {e}"
 
-    # 5.3 Modul Restore / Import Backup Data Log Cuitan ke Database Supabase
-    st.markdown("<br>", unsafe_allow_html=True)
-    with st.expander("📦 Restore Backup & Impor Data ke Basis Data Supabase (.csv, .xlsx, .sql)", expanded=False):
-        st.markdown("Fitur ini memungkinkan Anda memulihkan (*restore*) file cadangan data `log_cuitan` hasil backup lokal langsung ke tabel Supabase/SQLite.")
-        col_b1, col_b2 = st.columns([3, 1])
-        with col_b1:
-            up_backup_file = st.file_uploader(
-                "Upload File Backup (Format: CSV, XLSX, atau SQL Insert):",
-                type=['csv', 'xlsx', 'xls', 'sql'],
-                key="up_backup_db_file"
-            )
-        with col_b2:
-            st.markdown("<br>", unsafe_allow_html=True)
-            btn_restore_db = st.button("📥 Import Data ke Database", type="primary", key="btn_restore_db_exec", use_container_width=True)
-
-        if btn_restore_db:
-            if up_backup_file is None:
-                st.warning("⚠️ Silakan pilih file cadangan (.csv, .xlsx, atau .sql) terlebih dahulu.")
-            else:
-                ext = up_backup_file.name.split(".")[-1].lower()
-                with st.spinner("Memproses impor data cadangan ke basis data Supabase..."):
-                    try:
-                        import importlib
-                        importlib.reload(db_manager)
-                    except Exception:
-                        pass
-
-                    if hasattr(db_manager, 'import_backup_log_cuitan'):
-                        ok_imp, cnt_imp, msg_imp = db_manager.import_backup_log_cuitan(up_backup_file, ext)
-                    else:
-                        # Fallback jika modul db_manager di memori belum ter-refresh
-                        ok_imp, cnt_imp, msg_imp = _fallback_import_backup(up_backup_file, ext)
-
-                    if ok_imp:
-                        st.success(f"✅ {msg_imp}")
-                        st.rerun()
-                    else:
-                        st.error(f"❌ {msg_imp}")
 
 # =====================================================================
 # TAB 4: VISUALISASI & ANALISIS DASHBOARD
