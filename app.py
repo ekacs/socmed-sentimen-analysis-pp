@@ -1726,7 +1726,14 @@ with tab_viz:
                     story_p.append(Paragraph('Ringkasan konfigurasi target scraping dan pilihan riwayat keysearch:', sB))
                     story_p.append(Spacer(1, 0.2*cm))
                     
-                    ks_disp = ", ".join(selected_keysearch) if selected_keysearch else ("ALL (Semua Data)" if is_all_selected else "-")
+                    clean_ks_list = []
+                    if selected_keysearch:
+                        for item in selected_keysearch:
+                            s_clean = str(item).replace("📌", "").strip()
+                            if s_clean and s_clean not in clean_ks_list:
+                                clean_ks_list.append(s_clean)
+
+                    ks_disp = ", ".join(clean_ks_list) if clean_ks_list else ("ALL (Semua Data)" if is_all_selected else "-")
 
                     t_cfg_p = Table([
                         [Paragraph('<b>Target Keysearch / Riwayat</b>', sB), Paragraph(ks_disp, sB)],
@@ -1748,6 +1755,15 @@ with tab_viz:
                     if tr_bytes_p:
                         story_p.append(Paragraph('3.1 Grafik Tren Sentimen Harian', sH2))
                         story_p.append(Image(tr_bytes_p, width=16*cm, height=7.5*cm, hAlign='CENTER'))
+                        
+                        v_df_pdf_cnt = len(df_viz_cleaned.dropna(subset=['date_parsed'])) if 'date_parsed' in df_viz_cleaned.columns else 0
+                        tot_pdf_cnt = len(df_viz_cleaned)
+                        no_date_pdf_cnt = tot_pdf_cnt - v_df_pdf_cnt
+                        story_p.append(Spacer(1, 0.1*cm))
+                        story_p.append(Paragraph(
+                            f'<i>Informasi Tanggal: Dari total {tot_pdf_cnt:,} data cleaned, {v_df_pdf_cnt:,} data memiliki tanggal valid dan {no_date_pdf_cnt:,} data tanpa tanggal (diabaikan pada grafik tren).</i>',
+                            ParagraphStyle('CaptionPDF', parent=styles_p['Italic'], fontSize=8, leading=11, textColor=colors.HexColor('#4a5568'), alignment=1)
+                        ))
                     pl_bytes_p = _chart_platform_pdf(df_viz_cleaned)
                     if pl_bytes_p:
                         story_p.append(Paragraph('3.2 Volume Data per Platform', sH2))
