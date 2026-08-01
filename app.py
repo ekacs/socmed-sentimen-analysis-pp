@@ -276,10 +276,6 @@ def check_gemini_quota_exhausted():
         pass
     return False
 
-# Dashboard Header
-st.title("🏛️ Aplikasi Analisis Sentimen Publik (v1.1)")
-st.markdown("Dasbor eksekutif berbasis AI untuk merangkum sentimen publik sebagai bahan pertimbangan kebijakan.")
-st.divider()
 
 # Set Stopwords Lengkap Bahasa Indonesia & Artefak Web / URL Noise
 STOPWORDS_INDONESIA = {
