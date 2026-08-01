@@ -28,10 +28,21 @@ def init_session_credentials():
         st.session_state[KEY_DB_MODE] = "postgresql"
 
 def get_active_db_mode() -> str:
-    """Mengembalikan mode DB aktif ('sqlite' atau 'postgresql'). Default: 'postgresql' (Supabase Cloud)."""
-    if hasattr(st, "session_state") and KEY_DB_MODE in st.session_state and st.session_state[KEY_DB_MODE]:
-        return st.session_state[KEY_DB_MODE]
-    return "postgresql"
+    """
+    Mengembalikan mode DB aktif ('sqlite' atau 'postgresql').
+    Jika pengguna memilih 'sqlite' atau alamat Supabase kosong/tidak ada, gunakan penyimpanan lokal (sqlite).
+    Jika alamat Supabase terisi/tersedia, gunakan cloud (postgresql).
+    """
+    if hasattr(st, "session_state"):
+        explicit_mode = st.session_state.get(KEY_DB_MODE, "")
+        if explicit_mode == "sqlite":
+            return "sqlite"
+        if explicit_mode == "postgresql":
+            url = get_active_supabase_url()
+            return "postgresql" if url else "sqlite"
+            
+    url = get_active_supabase_url()
+    return "postgresql" if url else "sqlite"
 
 def get_active_apify_token() -> str:
     """Mengembalikan Apify token kustom pengguna jika ada, jika tidak fallback ke .env."""
