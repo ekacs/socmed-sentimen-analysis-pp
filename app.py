@@ -540,9 +540,9 @@ if check_apify_quota_exhausted():
 if check_gemini_quota_exhausted():
     st.sidebar.error("🚨 Status LLM AI: Quota Token Habis (Hubungi Developer / Top-up Token)")
 
-# 📌 Sidebar: Manajer Bookmark Keysearch
+# 📌 Sidebar: Pengelolaan Topik Sentimen
 st.sidebar.divider()
-st.sidebar.markdown("### 📌 Manajer Bookmark Keysearch")
+st.sidebar.markdown("### 📌 Pengelolaan Topik Sentimen")
 
 try:
     if hasattr(db_manager, 'ambil_riwayat_gabungan'):
@@ -560,24 +560,24 @@ try:
 except Exception:
     existing_bookmarks_sb = []
 
-with st.sidebar.expander("➕ Buat / Rename Bookmark Baru", expanded=False):
+with st.sidebar.expander("➕ Buat / Rename Topik Sentimen Baru", expanded=False):
     bm_selected_terms = st.multiselect(
         "Pilih Kata/Istilah Riwayat:",
         options=raw_history_sb,
         key="sb_bm_multiselect",
-        help="Pilih satu atau beberapa istilah kata kunci untuk digabungkan menjadi bookmark."
+        help="Pilih satu atau beberapa istilah kata kunci untuk digabungkan menjadi Topik."
     )
     bm_custom_name = st.text_input(
-        "Nama Bookmark (Bebas / Rename):",
+        "Nama Topik Sentimen:",
         placeholder="misal: Isu MBG, Monitoring IKN",
         key="sb_bm_textinput",
-        help="Beri nama unik untuk bookmark ini."
+        help="Beri nama unik untuk Topik Sentimen ini."
     )
-    if st.sidebar.button("📌 Simpan Bookmark", type="primary", use_container_width=True, key="btn_save_bookmark"):
+    if st.sidebar.button("📌 Simpan Topik Sentimen", type="primary", use_container_width=True, key="btn_save_bookmark"):
         if not bm_selected_terms:
             st.sidebar.warning("⚠️ Silakan pilih minimal 1 istilah.")
         elif not bm_custom_name.strip():
-            st.sidebar.warning("⚠️ Masukkan nama bookmark terlebih dahulu.")
+            st.sidebar.warning("⚠️ Masukkan nama Topik Sentimen terlebih dahulu.")
         else:
             ok_bm, msg_bm = db_manager.simpan_bookmark(bm_custom_name, bm_selected_terms)
             if ok_bm:
@@ -587,7 +587,7 @@ with st.sidebar.expander("➕ Buat / Rename Bookmark Baru", expanded=False):
                 st.sidebar.error(f"❌ {msg_bm}")
 
 if existing_bookmarks_sb:
-    st.sidebar.markdown("**Daftar Bookmark Aktif:**")
+    st.sidebar.markdown("**Daftar Topik Sentimen Aktif:**")
     for bm in existing_bookmarks_sb:
         col_bmn, col_bmd = st.sidebar.columns([3, 1])
         with col_bmn:
@@ -1473,7 +1473,7 @@ with tab_viz:
     # 6.1 Pengaturan Analisis
     st.markdown("### ⚙️ Pengaturan Parameter Analisis")
     
-    # Ambil riwayat gabungan unik dan daftar bookmark
+    # Ambil riwayat gabungan unik dan daftar Topik (bookmark)
     try:
         if hasattr(db_manager, 'ambil_riwayat_gabungan'):
             unified_history = db_manager.ambil_riwayat_gabungan()
@@ -1496,15 +1496,15 @@ with tab_viz:
     bookmark_map = {bm['bookmark_name']: bm['terms'] for bm in bookmarks_list}
     bm_names = list(bookmark_map.keys())
 
-    # Opsi dropdown: ALL + Bookmark Aktif + Istilah Riwayat Unik (tanpa duplikasi dengan nama bookmark)
+    # Opsi dropdown: ALL + Topik Sentimen Aktif + Istilah Riwayat Unik (tanpa duplikasi dengan nama topik)
     raw_term_options = [str(term) for term in unified_history if str(term) != "ALL (Semua Data)" and str(term) not in bm_names]
     keysearch_options = ["ALL (Semua Data)"] + bm_names + raw_term_options
 
     selected_keysearch = st.multiselect(
-        "🔍 Riwayat Keysearch (Kata Kunci, Tagar, Profil & Bookmark):",
+        "🔍 Riwayat Keysearch (Kata Kunci, Tagar, Profil & Topik Sentimen):",
         options=keysearch_options,
         default=["ALL (Semua Data)"],
-        help="Pilih istilah riwayat, 'ALL (Semua Data)', atau Bookmark kustom yang Anda buat di Sidebar."
+        help="Pilih istilah riwayat, 'ALL (Semua Data)', atau Topik Sentimen yang Anda buat di Sidebar."
     )
 
     # Validasi Pemilihan Target Analisis
@@ -1549,7 +1549,7 @@ with tab_viz:
         st.divider()
         st.warning(
             "⚠️ **Analisis belum dapat dikerjakan.** Silakan pilih minimal salah satu target pencarian "
-            "(Kata Kunci, Tagar, Profil Akun, atau Bookmark) atau pilih **'ALL (Semua Data)'** untuk melakukan "
+            "(Kata Kunci, Tagar, Profil Akun, atau Topik Sentimen) atau pilih **'ALL (Semua Data)'** untuk melakukan "
             "analisis komprehensif yang merepresentasikan seluruh data."
         )
     else:
