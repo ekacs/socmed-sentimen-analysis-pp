@@ -1,0 +1,75 @@
+PolyForm Noncommercial License 1.0.0 & Patent Reservation Notice
+
+Copyright (c) 2026 Universitas Parahyangan & Research Contributors (Prof. Tuti)
+All Rights Reserved.
+
+===============================================================================
+1. NONCOMMERCIAL LICENSE GRANT (IZIN PENGGUNAAN NON-KOMERSIAL)
+===============================================================================
+Subject to the terms of this license, the copyright holders grant you a 
+worldwide, non-exclusive, royalty-free license to use, copy, modify, display, 
+and distribute this software and documentation ONLY FOR NONCOMMERCIAL PURPOSES 
+(such as academic research, educational use, personal study, or non-profit 
+public policy analysis).
+
+Sesuai dengan ketentuan lisensi ini, pemegang hak cipta memberikan Anda izin 
+nirlaba di seluruh dunia, non-eksklusif, dan bebas royalti untuk menggunakan, 
+menyalin, memodifikasi, menampilkan, dan mendistribusikan perangkat lunak serta 
+dokumentasi ini HANYA UNTUK TUJUAN NON-KOMERSIAL (seperti riset akademis, 
+pendidikan, studi pribadi, atau analisis kebijakan publik nirlaba).
+
+===============================================================================
+2. COMMERCIAL RESTRICTION (BATASAN MUTLAK PENGGUNAAN KOMERSIAL)
+===============================================================================
+Commercial use is STRICTLY PROHIBITED. "Commercial use" includes, but is 
+not limited to:
+a) Selling, sublicensing, renting, leasing, or monetizing the software or any 
+   derivative works.
+b) Using the software to provide paid services, commercial SaaS/PaaS 
+   products, or fee-based public sentiment analytical tools.
+c) Incorporating the software or its algorithms into proprietary commercial 
+   products, platforms, or enterprise services.
+
+Penggunaan secara komersial DILARANG KERAS. Penggunaan komersial mencakup:
+a) Menjual, menyewakan, mentransfer, atau memonetisasi perangkat lunak ini 
+   maupun karya turunannya.
+b) Menggunakan perangkat lunak untuk menyediakan layanan berbayar, produk 
+   SaaS komersial, atau alat analisis sentimen publik bertarif.
+c) Mengintegrasikan perangkat lunak atau algoritmanya ke dalam produk komersial 
+   hak milik (proprietary).
+
+Untuk pengajuan lisensi komersial khusus, silakan hubungi tim pemegang hak cipta.
+
+===============================================================================
+3. PATENT PROTECTION & RESERVATION (PERLINDUNGAN & HAK PATEN)
+===============================================================================
+a) NO EXPRESS OR IMPLIED PATENT LICENSE IS GRANTED HEREUNDER. All patent rights, 
+   inventions, proprietary hardware-fingerprinting logic, model pipeline 
+   architectures, and analytical methodology embodied by this software remain 
+   the sole and exclusive property of the copyright holders (Universitas 
+   Parahyangan & Research Contributors).
+b) Any attempt by a licensee or recipient to file patent applications based on 
+   or derived from this codebase, software architecture, or algorithms without 
+   express written authorization from the copyright holders is strictly 
+   prohibited and shall automatically terminate all rights granted hereunder.
+
+a) TIDAK ADA LISENSI PATEN TERSURAT MAUPUN TERSIRAT YANG DIBERIKAN DI BAWAH 
+   LISENSI INI. Seluruh hak paten, invensi, logika identifikasi perangkat, 
+   arsitektur pipa pemrosesan data, dan metodologi analitis yang terkandung 
+   dalam perangkat lunak ini tetap menjadi hak milik tunggal dan eksklusif dari 
+   pemegang hak cipta (Universitas Parahyangan & Tim Peneliti).
+b) Setiap upaya oleh penerima lisensi untuk mendaftarkan permohonan paten yang 
+   didasarkan pada atau diturunkan dari basis kode, arsitektur, atau algoritma 
+   ini tanpa izin tertulis dari pemegang hak cipta DILARANG KERAS dan secara 
+   otomatis membatalkan seluruh hak penggunaan lisensi ini.
+
+===============================================================================
+4. DISCLAIMER OF WARRANTY & LIMITATION OF LIABILITY
+===============================================================================
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+SOFTWARE.
