@@ -386,6 +386,10 @@ Aplikasi memiliki antarmuka yang terbagi ke dalam 5 Tab Utama dan 1 Sidebar Peng
 5. **Dinamika Struktur Platform Sumber**:
    - Proses scraping bergantung pada kestabilan Aktor Apify dan struktur halaman target. Perubahan besar pada API atau layout antarmuka platform (Twitter, Instagram, LinkedIn, Portal Berita) dapat mempengaruhi kelancaran penarikan data.
 
+6. **Pemberitahuan Keamanan Windows (Smart App Control / SmartScreen)**:
+   - File executable (`SocMedSentimentAnalysis.exe`) yang dibentuk via PyInstaller/PyArmor bersifat *unsigned* (belum memiliki sertifikat digital komersial *Code Signing*). Di Windows 11, fitur **Smart App Control** dapat memblokir eksekusi aplikasi secara otomatis. Pengguna dapat membuka blokir melalui `Properties` ➔ centang `Unblock`, atau menjalankan aplikasi via skrip `python desktop_launcher.py`.
+
+
 ---
 
 ## Lisensi & Kontribusi
