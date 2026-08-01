@@ -8,6 +8,7 @@ dan membungkus aplikasi menjadi berkas desktop executable (.exe) di Windows.
 import os
 import sys
 import shutil
+import time
 import subprocess
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -183,16 +184,17 @@ coll = COLLECT(
 
 def build_executable(spec_path):
     """Menjalankan PyInstaller untuk membentuk file .exe."""
-    print("[BUILD] Menjalankan PyInstaller untuk menyusun paket Desktop...")
-    cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", spec_path]
+    print("[BUILD] Menjalankan PyInstaller untuk menyusun paket Desktop v1.1...")
+    dist_dir = os.path.join(PROJECT_ROOT, "dist")
+    cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--distpath", dist_dir, spec_path]
     res = subprocess.run(cmd)
     
-    dist_app_path = os.path.join(PROJECT_ROOT, "dist", "SocMedSentimentAnalysis")
+    dist_app_path = os.path.join(dist_dir, "SocMedSentimentAnalysis")
     exe_file = os.path.join(dist_app_path, "SocMedSentimentAnalysis.exe")
     
     if res.returncode == 0 and os.path.exists(exe_file):
         print("\n=======================================================")
-        print("[SUCCESS] PENGEMASAN APLIKASI DESKTOP BERHASIL SELESAI!")
+        print("[SUCCESS] PENGEMASAN APLIKASI DESKTOP VERSI 1.1 BERHASIL!")
         print(f"Lokasi Output Aplikasi: {dist_app_path}")
         print(f"Berkas Utama: {exe_file}")
         print("=======================================================\n")

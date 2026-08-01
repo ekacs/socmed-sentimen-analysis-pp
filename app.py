@@ -83,7 +83,7 @@ def get_supabase_dashboard_url():
 
 # 1. Konfigurasi Halaman Streamlit
 st.set_page_config(
-    page_title="Analisis Sentimen Kebijakan Publik berbasis AI (v1.1)",
+    page_title="Analisis Sentimen Publik berbasis AI (v1.1)",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -392,7 +392,7 @@ with st.sidebar.popover("🔒 Disclaimer Keamanan & Kerahasiaan Data", use_conta
     st.markdown("### 🛡️ Disclaimer Keamanan dan Kerahasiaan Data")
     st.info(
         "**Keamanan & Etika Data:**\n\n"
-        "1. **Hak Cipta & Privasi:** Seluruh data yang ditarik berasal dari ruang publik media sosial dan portal berita. Data digunakan semata-mata untuk kepentingan penelitian dan analisis sentimen kebijakan publik.\n"
+        "1. **Hak Cipta & Privasi:** Seluruh data yang ditarik berasal dari ruang publik media sosial dan portal berita. Data digunakan semata-mata untuk kepentingan penelitian dan analisis sentimen publik.\n"
         "2. **Kerahasiaan Identitas:** Sistem tidak menyimpan kredensial akun pribadi pengguna. Identitas publik hanya berupa username publik yang dikumpulkan sesuai ketersediaan API.\n"
         "3. **Penyimpanan:** Data tersimpan secara aman di Supabase PostgreSQL dengan enkripsi standar industri.\n"
         "4. **Penggunaan AI:** Pembersihan teks oleh LLM AI dilakukan tanpa menyimpan histori pribadi pengguna luar."
@@ -1923,7 +1923,7 @@ with tab_viz:
             st.download_button(
                 label="⬇️ Unduh PDF Laporan Resmi",
                 data=_pdf_report_buf.getvalue(),
-                file_name=f"Laporan_Sentimen_Kebijakan_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                file_name=f"Laporan_Sentimen_Publik_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
                 mime="application/pdf",
                 type="primary",
                 key="btn_dl_pdf_tab4_final"
