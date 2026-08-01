@@ -37,6 +37,14 @@ def check_and_install_packages():
             print(f"  [INSTALL] Menginstall {pkg}...")
             subprocess.run([sys.executable, "-m", "pip", "install", pkg], check=True)
 
+def remove_readonly(func, path, exc_info):
+    import stat
+    os.chmod(path, stat.S_IWRITE)
+    try:
+        func(path)
+    except Exception:
+        pass
+
 def clean_previous_builds():
     """Membersihkan direktori build lama."""
     print("[BUILD] Membersihkan direktori build lama...")
@@ -44,10 +52,16 @@ def clean_previous_builds():
         path = os.path.join(PROJECT_ROOT, folder)
         if os.path.exists(path):
             try:
-                shutil.rmtree(path)
+                shutil.rmtree(path, onexc=remove_readonly)
                 print(f"  [OK] Dihapus: {folder}/")
             except Exception as e:
-                print(f"  [WARNING] Gagal menghapus {folder}: {e}")
+                try:
+                    temp_name = f"{path}_old_{int(time.time())}"
+                    os.rename(path, temp_name)
+                    shutil.rmtree(temp_name, ignore_errors=True)
+                except Exception:
+                    pass
+                print(f"  [WARNING] Menghapus {folder}: {e}")
 
 def run_pyarmor_obfuscation():
     """Mengacak dan mengenkripsi kode Python menggunakan PyArmor (Anti-Decompilation)."""
@@ -76,8 +90,8 @@ def run_pyarmor_obfuscation():
 
 def create_pyinstaller_spec(src_dir):
     """Membuat file spesifikasi PyInstaller (.spec)."""
-    p_root = PROJECT_ROOT.replace("\\", "/")
-    s_dir = src_dir.replace("\\", "/")
+    rel_entry = os.path.relpath(os.path.join(src_dir, "desktop_launcher.py"), PROJECT_ROOT).replace("\\", "/")
+    rel_src_dir = os.path.relpath(src_dir, PROJECT_ROOT).replace("\\", "/")
     
     spec_content = f"""# -*- mode: python ; coding: utf-8 -*-
 
@@ -88,12 +102,12 @@ from PyInstaller.utils.hooks import copy_metadata, collect_data_files
 block_cipher = None
 
 datas = [
-    (r'{p_root}/target_config.json', '.'),
-    (r'{p_root}/models', 'models'),
+    ('target_config.json', '.'),
+    ('models', 'models'),
 ]
 
-if os.path.exists(r'{p_root}/sentimen_kebijakan.db'):
-    datas.append((r'{p_root}/sentimen_kebijakan.db', '.'))
+if os.path.exists('sentimen_kebijakan.db'):
+    datas.append(('sentimen_kebijakan.db', '.'))
 
 datas += copy_metadata('streamlit')
 datas += collect_data_files('streamlit')
@@ -119,8 +133,8 @@ hidden_imports = [
 ]
 
 a = Analysis(
-    [r'{s_dir}/desktop_launcher.py'],
-    pathex=[r'{s_dir}'],
+    ['{rel_entry}'],
+    pathex=['{rel_src_dir}', '.'],
     binaries=[],
     datas=datas,
     hiddenimports=hidden_imports,
@@ -146,7 +160,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,  # Set True untuk memudahkan debugging/log terminal saat testing
+    console=True,
     icon=None
 )
 
@@ -171,16 +185,23 @@ def build_executable(spec_path):
     """Menjalankan PyInstaller untuk membentuk file .exe."""
     print("[BUILD] Menjalankan PyInstaller untuk menyusun paket Desktop...")
     cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", spec_path]
-    res = subprocess.run(cmd)
-    if res.returncode == 0:
-        dist_app_path = os.path.join(PROJECT_ROOT, "dist", "SocMedSentimentAnalysis")
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    
+    dist_app_path = os.path.join(PROJECT_ROOT, "dist", "SocMedSentimentAnalysis")
+    exe_file = os.path.join(dist_app_path, "SocMedSentimentAnalysis.exe")
+    
+    if res.returncode == 0 and os.path.exists(exe_file):
         print("\n=======================================================")
         print("[SUCCESS] PENGEMASAN APLIKASI DESKTOP BERHASIL SELESAI!")
         print(f"Lokasi Output Aplikasi: {dist_app_path}")
-        print(f"Berkas Utama: {os.path.join(dist_app_path, 'SocMedSentimentAnalysis.exe')}")
+        print(f"Berkas Utama: {exe_file}")
         print("=======================================================\n")
     else:
-        print("[ERROR] Terjadi kesalahan saat kompilasi PyInstaller.")
+        print("[ERROR] Terjadi kesalahan saat kompilasi PyInstaller!")
+        if res.stderr:
+            print(f"Detail error: {res.stderr[-1000:]}")
+        elif res.stdout:
+            print(f"Detail log: {res.stdout[-1000:]}")
 
 if __name__ == "__main__":
     check_and_install_packages()

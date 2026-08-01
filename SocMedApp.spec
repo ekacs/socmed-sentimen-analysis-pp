@@ -7,12 +7,12 @@ from PyInstaller.utils.hooks import copy_metadata, collect_data_files
 block_cipher = None
 
 datas = [
-    (r'D:/Documents/#ptincap/socmed-sentimen-analysis-pp/target_config.json', '.'),
-    (r'D:/Documents/#ptincap/socmed-sentimen-analysis-pp/models', 'models'),
+    ('target_config.json', '.'),
+    ('models', 'models'),
 ]
 
-if os.path.exists(r'D:/Documents/#ptincap/socmed-sentimen-analysis-pp/sentimen_kebijakan.db'):
-    datas.append((r'D:/Documents/#ptincap/socmed-sentimen-analysis-pp/sentimen_kebijakan.db', '.'))
+if os.path.exists('sentimen_kebijakan.db'):
+    datas.append(('sentimen_kebijakan.db', '.'))
 
 datas += copy_metadata('streamlit')
 datas += collect_data_files('streamlit')
@@ -38,8 +38,8 @@ hidden_imports = [
 ]
 
 a = Analysis(
-    [r'D:/Documents/#ptincap/socmed-sentimen-analysis-pp/desktop_launcher.py'],
-    pathex=[r'D:/Documents/#ptincap/socmed-sentimen-analysis-pp'],
+    ['desktop_launcher.py'],
+    pathex=['.', '.'],
     binaries=[],
     datas=datas,
     hiddenimports=hidden_imports,
@@ -65,7 +65,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,  # Set True untuk memudahkan debugging/log terminal saat testing
+    console=True,
     icon=None
 )
 
