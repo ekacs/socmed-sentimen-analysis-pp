@@ -480,41 +480,41 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
             st.info("ℹ️ Pengaturan dikembalikan ke nilai default (.env / SQLite Lokal).")
             st.rerun()
 
-# 1c. Popover Tools Migrasi Data (Lokal ↔ Cloud)
-with st.sidebar.popover("🔄 Migrasi Data (Lokal ↔ Cloud)", use_container_width=True):
-    st.markdown("### 🔄 Tools Migrasi Data")
-    st.caption("Menyalin seluruh record (log cuitan, sistem konfigurasi, riwayat keysearch) antara SQLite Lokal dan Cloud PostgreSQL.")
-    
-    cloud_url_for_mig = session_credentials.get_active_supabase_url()
-    
-    if not cloud_url_for_mig:
-        st.warning("⚠️ Database URL Cloud belum dikonfigurasi. Atur DATABASE_URL di menu Pengaturan API & Database terlebih dahulu.")
-    else:
-        st.info(f"Target Cloud DB: `{session_credentials.mask_credential(cloud_url_for_mig)}`")
-        
-        c_mig1, c_mig2 = st.columns(2)
-        with c_mig1:
-            btn_mig_to_cloud = st.button("📤 Lokal ➔ Cloud", use_container_width=True, help="Unggah seluruh data SQLite lokal ke Cloud PostgreSQL.")
-        with c_mig2:
-            btn_mig_to_local = st.button("📥 Cloud ➔ Lokal", use_container_width=True, help="Unduh seluruh data Cloud PostgreSQL ke SQLite lokal.")
-            
-        if btn_mig_to_cloud:
-            with st.spinner("Mengunggah data dari SQLite lokal ke Cloud PostgreSQL..."):
-                ok_m, stats_m, msg_m = db_manager.migrate_database("", cloud_url_for_mig)
-                if ok_m:
-                    st.success(f"✅ {msg_m}")
-                    st.rerun()
-                else:
-                    st.error(f"❌ {msg_m}")
-                    
-        if btn_mig_to_local:
-            with st.spinner("Mengunduh data dari Cloud PostgreSQL ke SQLite lokal..."):
-                ok_m, stats_m, msg_m = db_manager.migrate_database(cloud_url_for_mig, "")
-                if ok_m:
-                    st.success(f"✅ {msg_m}")
-                    st.rerun()
-                else:
-                    st.error(f"❌ {msg_m}")
+# # 1c. Popover Tools Migrasi Data (Lokal ↔ Cloud)
+# with st.sidebar.popover("🔄 Migrasi Data (Lokal ↔ Cloud)", use_container_width=True):
+#     st.markdown("### 🔄 Tools Migrasi Data")
+#     st.caption("Menyalin seluruh record (log cuitan, sistem konfigurasi, riwayat keysearch) antara SQLite Lokal dan Cloud PostgreSQL.")
+#     
+#     cloud_url_for_mig = session_credentials.get_active_supabase_url()
+#     
+#     if not cloud_url_for_mig:
+#         st.warning("⚠️ Database URL Cloud belum dikonfigurasi. Atur DATABASE_URL di menu Pengaturan API & Database terlebih dahulu.")
+#     else:
+#         st.info(f"Target Cloud DB: `{session_credentials.mask_credential(cloud_url_for_mig)}`")
+#         
+#         c_mig1, c_mig2 = st.columns(2)
+#         with c_mig1:
+#             btn_mig_to_cloud = st.button("📤 Lokal ➔ Cloud", use_container_width=True, help="Unggah seluruh data SQLite lokal ke Cloud PostgreSQL.")
+#         with c_mig2:
+#             btn_mig_to_local = st.button("📥 Cloud ➔ Lokal", use_container_width=True, help="Unduh seluruh data Cloud PostgreSQL ke SQLite lokal.")
+#             
+#         if btn_mig_to_cloud:
+#             with st.spinner("Mengunggah data dari SQLite lokal ke Cloud PostgreSQL..."):
+#                 ok_m, stats_m, msg_m = db_manager.migrate_database("", cloud_url_for_mig)
+#                 if ok_m:
+#                     st.success(f"✅ {msg_m}")
+#                     st.rerun()
+#                 else:
+#                     st.error(f"❌ {msg_m}")
+#                     
+#         if btn_mig_to_local:
+#             with st.spinner("Mengunduh data dari Cloud PostgreSQL ke SQLite lokal..."):
+#                 ok_m, stats_m, msg_m = db_manager.migrate_database(cloud_url_for_mig, "")
+#                 if ok_m:
+#                     st.success(f"✅ {msg_m}")
+#                     st.rerun()
+#                 else:
+#                     st.error(f"❌ {msg_m}")
 
 # 2. Akses Database Awan
 st.sidebar.divider()
