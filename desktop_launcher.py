@@ -98,7 +98,7 @@ def main():
         has_webview = True
         print("[LAUNCHER] Membuka jendela aplikasi desktop via PyWebView...")
         webview.create_window(
-            title="Social Media Sentiment Analysis for Public Policy",
+            title="Social Media Sentiment Analysis for Public Policy (v1.1)",
             url=target_url,
             width=1340,
             height=860,

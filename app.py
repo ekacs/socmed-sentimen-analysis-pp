@@ -83,7 +83,7 @@ def get_supabase_dashboard_url():
 
 # 1. Konfigurasi Halaman Streamlit
 st.set_page_config(
-    page_title="Analisis Sentimen Kebijakan Publik berbasis AI",
+    page_title="Analisis Sentimen Kebijakan Publik berbasis AI (v1.1)",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -275,6 +275,11 @@ def check_gemini_quota_exhausted():
     except Exception as _e:
         pass
     return False
+
+# Dashboard Header
+st.title("🏛️ Aplikasi Analisis Sentimen Publik (v1.1)")
+st.markdown("Dasbor eksekutif berbasis AI untuk merangkum sentimen publik sebagai bahan pertimbangan kebijakan.")
+st.divider()
 
 # Set Stopwords Lengkap Bahasa Indonesia & Artefak Web / URL Noise
 STOPWORDS_INDONESIA = {

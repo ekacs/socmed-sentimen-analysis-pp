@@ -185,7 +185,7 @@ def build_executable(spec_path):
     """Menjalankan PyInstaller untuk membentuk file .exe."""
     print("[BUILD] Menjalankan PyInstaller untuk menyusun paket Desktop...")
     cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", spec_path]
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    res = subprocess.run(cmd)
     
     dist_app_path = os.path.join(PROJECT_ROOT, "dist", "SocMedSentimentAnalysis")
     exe_file = os.path.join(dist_app_path, "SocMedSentimentAnalysis.exe")
@@ -198,10 +198,6 @@ def build_executable(spec_path):
         print("=======================================================\n")
     else:
         print("[ERROR] Terjadi kesalahan saat kompilasi PyInstaller!")
-        if res.stderr:
-            print(f"Detail error: {res.stderr[-1000:]}")
-        elif res.stdout:
-            print(f"Detail log: {res.stdout[-1000:]}")
 
 if __name__ == "__main__":
     check_and_install_packages()
