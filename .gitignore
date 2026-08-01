@@ -49,3 +49,8 @@ test_supabase_connection.py
 catatan_pengerjaan/
 revisi_dokumen/
 .agents/
+
+# ─── File Distribusi Executable ──────────────────────────────────────────────
+download_exe/
+*.zip
+
