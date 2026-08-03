@@ -139,7 +139,7 @@ cd socmed-sentimen-analysis-pp
 
 ##### 2. Buat & Aktifkan Virtual Environment
 
-Pastikan komputer sudah tersintall Python library, jika belum harap lihat video tutorial ini **[How easy to Install Python in Windows 11 today](https://youtu.be/b_kLEm5vE0k)**
+###### Pastikan komputer sudah tersintall Python library, jika belum harap lihat video tutorial ini **[How easy to Install Python in Windows 11 today](https://youtu.be/b_kLEm5vE0k)**
 
 ```PowerShell
 # Windows
