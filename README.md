@@ -9,7 +9,7 @@
 
 **Aplikasi Analisis Sentimen Publik terintegrasi AI** adalah platform analitik komprehensif yang dirancang untuk mengumpulkan, memproses, mengklasifikasikan, dan menganalisis persepsi masyarakat di media sosial serta media berita daring terkait isu dan kebijakan publik di Indonesia.
 
-Platform ini mengintegrasikan teknologi **Artificial Intelligence (Google Gemini LLM)** dan **Machine Learning (Support Vector Machine / SVM)** untuk menghasilkan wawasan kebijakan (*policy insights*) yang cepat, akurat, dan bebas dari bias subjektif.
+Platform ini mengintegrasikan teknologi **Large Language Model (LLM)** dan **Machine Learning (Support Vector Machine / SVM)** untuk menghasilkan wawasan kebijakan (*policy insights*) yang cepat, akurat, dan bebas dari bias subjektif.
 
 **Demo aplikasi (hosted by Streamlit Cloud Community):**
 
