@@ -11,6 +11,10 @@
 
 Platform ini mengintegrasikan teknologi **Artificial Intelligence (Google Gemini LLM)** dan **Machine Learning (Support Vector Machine / SVM)** untuk menghasilkan wawasan kebijakan (*policy insights*) yang cepat, akurat, dan bebas dari bias subjektif.
 
+**Demo aplikasi:**
+
+[socmed-sentimen-analysis-pp.streamlit.app](https://socmed-sentimen-analysis-pp.streamlit.app/) 
+
 ### Fitur Utama
 
 - **Penarikan Data Multi-Platform (Multi-Source Scraping)**: Mengambil data percakapan publik secara otomatis dari Twitter/X, Instagram, LinkedIn, dan Portal Berita Utama Indonesia (Kompas, CNN Indonesia, Katadata, Detik, Tribunnews, Liputan6, Tempo, Republika, dll.) via Apify API.
