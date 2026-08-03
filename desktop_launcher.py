@@ -105,7 +105,9 @@ def main():
             resizable=True,
             min_size=(1024, 720)
         )
-        webview.start()
+        cache_dir = os.path.join(os.getenv('LOCALAPPDATA', base_dir), "SocMedApp", "WebViewCache")
+        os.makedirs(cache_dir, exist_ok=True)
+        webview.start(private_mode=False, storage_path=cache_dir)
     except Exception as e:
         print(f"[WARNING] PyWebView tidak tersedia atau bermasalah: {e}. Menggunakan peramban default.")
         webbrowser.open(target_url)
