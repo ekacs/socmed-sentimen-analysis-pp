@@ -193,8 +193,26 @@ def build_executable(spec_path):
     exe_file = os.path.join(dist_app_path, "SocMedSentimentAnalysis.exe")
     
     if res.returncode == 0 and os.path.exists(exe_file):
+        # Jalankan pembuatan sertifikat & batch installer di dist/SocMedSentimentAnalysis
+        try:
+            import export_cert_and_batch
+            export_cert_and_batch.setup_security_trust()
+        except Exception as e:
+            print(f"[WARNING] Gagal menyiapkan sertifikat batch: {e}")
+            
+        # Menandatangani biner secara digital
+        try:
+            ps_sign_cmd = [
+                "powershell", "-ExecutionPolicy", "Bypass",
+                "-File", os.path.join(PROJECT_ROOT, "sign_target.ps1"),
+                "-TargetPath", exe_file
+            ]
+            subprocess.run(ps_sign_cmd)
+        except Exception as e:
+            print(f"[WARNING] Gagal menandatangani exe: {e}")
+
         print("\n=======================================================")
-        print("[SUCCESS] PENGEMASAN APLIKASI DESKTOP VERSI 1.1 BERHASIL!")
+        print("[SUCCESS] PENGEMASAN APLIKASI DESKTOP BERHASIL SELESAI!")
         print(f"Lokasi Output Aplikasi: {dist_app_path}")
         print(f"Berkas Utama: {exe_file}")
         print("=======================================================\n")

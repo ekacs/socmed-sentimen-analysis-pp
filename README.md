@@ -21,7 +21,7 @@ Platform ini mengintegrasikan teknologi **Artificial Intelligence (Google Gemini
   - **Local SQLite** (`sentimen_kebijakan.db`): Penyimpanan mandiri secara offline.
   - **Cloud PostgreSQL (Supabase)**: Sinkronisasi data multi-pengguna di awan.
 - **Antarmuka Dashboard Interaktif (Streamlit)**: Visualisasi data real-time dengan diagram donat, tren waktu interaktif, top kata kunci, breakdown engagement (likes, retweets, views), filter dinamis, dan manajemen dataset.
-- **Ekspor Laporan Publikasi (PDF & Excel)**: Membentuk laporan formal berformat PDF siap cetak (dilengkapi grafik matplotlib) dan file Excel (.xlsx).
+- **Ekspor Laporan Publikasi (PDF)**: Membentuk laporan formal berformat PDF siap cetak (dilengkapi grafik matplotlib) d
 - **Pengemasan Aplikasi Desktop (.exe Windows)**: Dilengkapi proteksi enkripsi kode anti-dekompilasi (PyArmor) dan pengemasan executable mandiri (PyInstaller + PyWebView).
 
 ---
@@ -47,7 +47,7 @@ graph TD
     DB -->|Aggregated Metrics| NLG
     NLG -->|Generate Narrative| Gemini
   
-    UI --> Export[Report Exporter Engine<br/>PDF ReportLab & Excel Pandas]
+    UI --> Export[Report Exporter Engine<br/>PDF ReportLab]
 ```
 
 ### Komponen Utama Sistem
@@ -106,7 +106,7 @@ Pipa pemrosesan data berjalan dalam 6 tahapan utama secara terstruktur dari hulu
 
    - Data `CLEANED` ditayangkan pada Dashboard Streamlit.
    - Mengagregasi metrik sentimen dan memicu `nlg_generator.py` untuk menyusun Ringkasan Eksekutif.
-   - Memungkinkan pengguna mengunduh laporan berformat PDF atau Excel.
+   - Memungkinkan pengguna mengunduh laporan berformat PDF.
 
 ---
 
@@ -128,14 +128,16 @@ Pipa pemrosesan data berjalan dalam 6 tahapan utama secara terstruktur dari hulu
 
 ##### 1. Clone Repositori
 
-```bash
+```PowerShell
 git clone https://github.com/username/socmed-sentimen-analysis-pp.git
 cd socmed-sentimen-analysis-pp
 ```
 
 ##### 2. Buat & Aktifkan Virtual Environment
 
-```bash
+    Pastikan komputer sudah tersintall Python library, jika belum harap lihat video tutorial ini**[How easy to Install Python in Windows 11 today](https://youtu.be/b_kLEm5vE0k)**
+
+```PowerShell
 # Windows
 python -m venv venv
 venv\Scripts\activate
@@ -147,7 +149,7 @@ source venv/bin/activate
 
 ##### 3. Instal Dependensi
 
-```bash
+```PowerShell
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
@@ -166,7 +168,7 @@ DATABASE_URL=postgresql://postgres.xxx:password@aws-0-region.pooler.supabase.com
 
 Jika file model di folder `models/` belum tersedia, jalankan skrip berikut:
 
-```bash
+```PowerShell
 # 1. Generasi dataset pelatihan sintetis/mock (dataset_pelatihan.csv)
 python generate_mock_training_data.py
 
@@ -176,27 +178,36 @@ python 02_train_model.py
 
 ##### 6. Menjalankan Aplikasi Web (Mode Streamlit Local)
 
-```bash
+```PowerShell
 streamlit run app.py
 ```
 
 Aplikasi dapat diakses melalui peramban web di `http://localhost:8501`.
 
-##### 7. Menjalankan Aplikasi Desktop (Mode GUI Local)
+##### 7. Menjalankan Aplikasi Desktop (Mode GUI Local) (unstable)
 
-```bash
+```PowerShell
 python desktop_launcher.py
 ```
 
-##### 8. Membangun Paket Aplikasi Desktop Executable (.exe Windows)
+atau jalankan (klik) file *'Jalankan_Aplikasi_Desktop.bat'*
 
-Untuk meng-obfuscate kode Python dengan PyArmor dan membungkusnya menjadi satu paket executable `.exe`:
+##### 8. Membangun Paket Aplikasi Desktop Executable (.exe Windows) (unstable)
 
-```bash
+1. Buat sertifikasi keamanan software secara mandiri, untuk bypass windows security (windows defender)
+2. ```PowerShell
+   python build_msi_installer.py
+   ```
+
+   atau jalankan (klik) file *create_internal_ceet.ps1'*
+3. Lalu meng-obfuscate kode Python dengan PyArmor dan membungkusnya menjadi satu paket executable `.exe`:
+
+```PowerShell
+python 
 python build_desktop.py
 ```
 
-Hasil kompilasi akan berada di folder `dist/SocMedSentimentAnalysis/SocMedSentimentAnalysis.exe`.
+Hasil kompilasi akan berada di folder `dist/SocMedSentimentAnalysis/`terdiri dari file: Install_Certificate_Admin `Install_Certificate_Admin.bat`, `SocMedInternalC.cer` dan`SocMedSentimentAnalysis.exe`, jalankan (klik) ketiganya secara berurutan.
 
 ---
 
@@ -215,14 +226,14 @@ Untuk menjalankan aplikasi secara terpusat (*cloud server*) agar dapat diakses o
 
 ##### 1. Pembaruan Paket Sistem & Instalasi Prasyarat
 
-```bash
+```Shell
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y python3-pip python3-venv git nginx certbot python3-certbot-nginx ufw
 ```
 
 ##### 2. Clone Repositori & Setup Environment di Server
 
-```bash
+```Shell
 cd /var/www
 sudo git clone https://github.com/username/socmed-sentimen-analysis-pp.git
 sudo chown -R $USER:$USER /var/www/socmed-sentimen-analysis-pp
@@ -239,7 +250,7 @@ pip install -r requirements.txt
 
 Buat file `.env` pada server:
 
-```bash
+```Shell
 nano .env
 ```
 
@@ -253,7 +264,7 @@ DATABASE_URL=postgresql://postgres.xxx:password@aws-0-region.pooler.supabase.com
 
 ##### 4. Jalankan Pelatihan Model SVM di Server
 
-```bash
+```Shell
 python3 generate_mock_training_data.py
 python3 02_train_model.py
 ```
@@ -262,7 +273,7 @@ python3 02_train_model.py
 
 Buat file layanan systemd agar Streamlit berjalan otomatis saat server *booting*:
 
-```bash
+```Shell
 sudo nano /etc/systemd/system/socmed-app.service
 ```
 
@@ -288,7 +299,7 @@ WantedBy=multi-user.target
 
 Aktifkan dan jalankan service:
 
-```bash
+```Shell
 sudo systemctl daemon-reload
 sudo systemctl enable socmed-app
 sudo systemctl start socmed-app
@@ -299,7 +310,7 @@ sudo systemctl status socmed-app
 
 Streamlit membutuhkan koneksi WebSocket. Buat konfigurasi Nginx:
 
-```bash
+```Shell
 sudo nano /etc/nginx/sites-available/socmed-app
 ```
 
@@ -328,7 +339,7 @@ server {
 
 Aktifkan konfigurasi Nginx & jalankan pengujian:
 
-```bash
+```Shell
 sudo ln -s /etc/nginx/sites-available/socmed-app /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
@@ -336,13 +347,13 @@ sudo systemctl restart nginx
 
 ##### 7. Pengaktifan SSL/TLS (HTTPS) dengan Certbot
 
-```bash
+```Shell
 sudo certbot --nginx -d sentimen-kebijakan.domain.com
 ```
 
 ##### 8. Konfigurasi Firewall Server (UFW)
 
-```bash
+```Shell
 sudo ufw allow 'Nginx Full'
 sudo ufw allow OpenSSH
 sudo ufw enable
@@ -352,7 +363,7 @@ sudo ufw enable
 
 Jika terdapat pembaruan kode di repositori Git, jalankan perintah berikut di server:
 
-```bash
+```Shell
 cd /var/www/socmed-sentimen-analysis-pp
 git pull origin main
 source venv/bin/activate
@@ -404,12 +415,12 @@ Aplikasi memiliki antarmuka yang terbagi ke dalam 5 Tab Utama dan 1 Sidebar Peng
 
 - Eksplorasi tabel data secara menyeluruh dengan fitur pencarian dan filter cepat.
 - Edit label sentimen manual atau hapus baris data.
-- Impor data baru dari file CSV/Excel atau Ekspor dataset saat ini.
+- Impor data baru dari file CSV/Exc atau Ekspor dataset saat ini.
 - Kelola **Bookmark Kueri Pencarian** untuk pengulangan analisis di masa mendatang.
 
 ### 6. Tab 5: Ekspor Laporan PDF
 
-- Mengompilasi seluruh hasil analisis, grafik visualisasi sentimen (Matplotlib), dan narasi Ringkasan Eksekutif menjadi dokumen PDF siap cetak berstandar formal.
+- Mengompilasi seluruh hasil analisis, grafik visualisasi sentimen (Matplotlib), dan narasi Ringkasan Eksekutif menjadi dokumen PDF siap cetak.
 
 ---
 
