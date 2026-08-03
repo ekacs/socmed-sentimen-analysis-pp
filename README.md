@@ -11,7 +11,7 @@
 
 Platform ini mengintegrasikan teknologi **Artificial Intelligence (Google Gemini LLM)** dan **Machine Learning (Support Vector Machine / SVM)** untuk menghasilkan wawasan kebijakan (*policy insights*) yang cepat, akurat, dan bebas dari bias subjektif.
 
-**Demo aplikasi (hosted by Streamlit Clud Community):**
+**Demo aplikasi (hosted by Streamlit Cloud Community):**
 
 [socmed-sentimen-analysis-pp.streamlit.app](https://socmed-sentimen-analysis-pp.streamlit.app/) 
 
