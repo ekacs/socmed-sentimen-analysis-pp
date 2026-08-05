@@ -1012,7 +1012,9 @@ with tab_scrape:
         import queue
         import threading
         import time
+        import re
 
+        initial_raw_count = len(db_manager.ambil_cuitan_mentah())
         start_time = datetime.datetime.now()
         start_str = start_time.strftime("%H:%M:%S WIB")
 
@@ -1093,26 +1095,60 @@ with tab_scrape:
 
                 full_log_str = "".join(log_lines) or stderr_text
 
+                # Parse log untuk ekstrak jumlah data per platform & total data ditarik
+                platform_counts = {}
+                for line_str in log_lines:
+                    m_p = re.search(r"Platform '([^']+)'[^\d]+(\d+)\s+baris data", line_str, re.IGNORECASE)
+                    if m_p:
+                        p_name = m_p.group(1).lower()
+                        p_count = int(m_p.group(2))
+                        platform_counts[p_name] = p_count
+
+                m_tot = re.search(r"Total gabungan (\d+) baris data", full_log_str, re.IGNORECASE)
+                if m_tot:
+                    total_data_fetched = int(m_tot.group(1))
+                else:
+                    total_data_fetched = sum(platform_counts.values())
+
                 if proc.returncode == 0:
-                    status_s.update(label=f"✅ Penarikan data selesai! Total durasi: {dur_str}", state="complete", expanded=False)
+                    status_s.update(label=f"✅ Penarikan data selesai! Total durasi: {dur_str} | Data ditarik: {total_data_fetched:,} baris", state="complete", expanded=False)
                     
-                    st.success("✅ **Penarikan data mentah selesai!** Data berhasil ditarik dan siap diproses di Tahapan 2.")
+                    st.success(f"✅ **Penarikan data mentah selesai!** Berhasil menarik total **{total_data_fetched:,} baris data** dalam waktu **{dur_str}**.")
                     
-                    c_res1, c_res2, c_res3 = st.columns(3)
-                    c_res1.metric("🕒 Waktu Mulai", start_str)
-                    c_res2.metric("🏁 Waktu Selesai", end_str)
-                    c_res3.metric("⏱️ Total Durasi Eksekusi", dur_str)
+                    m_res1, m_res2, m_res3, m_res4 = st.columns(4)
+                    m_res1.metric("🕒 Waktu Mulai", start_str)
+                    m_res2.metric("🏁 Waktu Selesai", end_str)
+                    m_res3.metric("⏱️ Total Durasi", dur_str)
+                    m_res4.metric("📦 Total Data Ditarik", f"{total_data_fetched:,} Baris")
                     
-                    st.info(f"📊 **Ringkasan Penarikan:** Scraping secara simultan untuk platform **{', '.join(selected_platforms)}** telah selesai tanpa kendala.")
+                    with st.container(border=True):
+                        st.markdown("#### 📊 Rincian Perolehan Data Per Platform")
+                        cols_p = st.columns(len(selected_platforms))
+                        for idx, sp in enumerate(selected_platforms):
+                            with cols_p[idx]:
+                                if sp == "Twitter (X)":
+                                    cnt = platform_counts.get("twitter", 0)
+                                    st.metric("🐦 Twitter (X)", f"{cnt:,} cuitan")
+                                elif sp == "Instagram":
+                                    cnt = platform_counts.get("instagram", 0)
+                                    st.metric("📸 Instagram", f"{cnt:,} posting")
+                                elif sp == "LinkedIn":
+                                    cnt = platform_counts.get("linkedin", 0)
+                                    st.metric("💼 LinkedIn", f"{cnt:,} posting")
+                                elif sp == "Website / Dokumen Publik":
+                                    cnt = platform_counts.get("website", platform_counts.get("portal_berita", 0))
+                                    st.metric("🌐 Website", f"{cnt:,} artikel")
+
                     with st.expander("📋 Log Lengkap Scraper"):
                         st.code(full_log_str, language="text")
                 else:
                     status_s.update(label=f"❌ Penarikan Data Dihentikan / Gagal (Exit code: {proc.returncode})", state="error", expanded=True)
                     
-                    c_res1, c_res2, c_res3 = st.columns(3)
-                    c_res1.metric("🕒 Waktu Mulai", start_str)
-                    c_res2.metric("🏁 Waktu Selesai (Dihentikan)", end_str)
-                    c_res3.metric("⏱️ Total Durasi Berjalan", dur_str)
+                    m_res1, m_res2, m_res3, m_res4 = st.columns(4)
+                    m_res1.metric("🕒 Waktu Mulai", start_str)
+                    m_res2.metric("🏁 Waktu Selesai", end_str)
+                    m_res3.metric("⏱️ Durasi Berjalan", dur_str)
+                    m_res4.metric("📦 Total Data Ditarik", f"{total_data_fetched:,} Baris")
 
                     if proc.returncode in [-9, 15, 1] and ("taskkill" in stderr_text.lower() or "keyboardinterrupt" in stderr_text.lower()):
                         st.warning("⏹️ Penarikan data dihentikan secara paksa oleh pengguna.")
