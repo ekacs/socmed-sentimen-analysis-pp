@@ -1221,7 +1221,7 @@ with tab_ml:
         import threading
         import time
 
-        initial_clean_count = len(db_manager.ambil_cuitan_terolah())
+        initial_clean_count = len(db_manager.baca_data_untuk_streamlit())
         start_time_ml = datetime.datetime.now()
         start_str_ml = start_time_ml.strftime("%H:%M:%S WIB")
 
@@ -1300,7 +1300,7 @@ with tab_ml:
                 log_placeholder_ml.empty()
 
                 full_log_ml = "".join(log_lines_ml) or stderr_text
-                final_clean_count = len(db_manager.ambil_cuitan_terolah())
+                final_clean_count = len(db_manager.baca_data_untuk_streamlit())
                 processed_count = max(0, final_clean_count - initial_clean_count)
 
                 if proc.returncode == 0:
