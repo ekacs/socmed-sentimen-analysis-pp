@@ -731,8 +731,73 @@ with tab_scrape:
     # -----------------------------------------------------------------
     # 1. FORM TWITTER (X)
     # -----------------------------------------------------------------
+    # Helper untuk simpan semua konfigurasi platform aktif saat ini
+    def do_save_all_current_configs(show_toast=False):
+        saved_count = 0
+        try:
+            if "Twitter (X)" in selected_platforms and 'tw_kw_input' in locals():
+                tw_obj = {
+                    "start_date": tw_start_input.strftime("%Y-%m-%d") if tw_start_input else "",
+                    "end_date": tw_end_input.strftime("%Y-%m-%d") if tw_end_input else "",
+                    "keywords": [k.strip() for k in tw_kw_input.split(",") if k.strip()],
+                    "profiles": [p.strip() for p in tw_prof_input.split(",") if p.strip()],
+                    "hashtags": [h.strip() for h in tw_hash_input.split(",") if h.strip()],
+                    "max_results": tw_max_input,
+                    "max_results_twitter": tw_max_input
+                }
+                if save_platform_config("twitter", tw_obj):
+                    saved_count += 1
+
+            if "Instagram" in selected_platforms and 'ig_kw_input' in locals():
+                ig_prof_list = [p.strip() for p in ig_prof_input.split(",") if p.strip()]
+                ig_kw_list = [k.strip() for k in ig_kw_input.split(",") if k.strip()]
+                ig_obj = {
+                    "start_date": ig_start_input.strftime("%Y-%m-%d") if ig_start_input else "",
+                    "keywords": ig_kw_list,
+                    "hashtags": [k.lstrip("#") for k in ig_kw_list],
+                    "profiles": ig_prof_list,
+                    "profile_mode": ig_profile_mode,
+                    "max_results": ig_max_input,
+                    "max_results_instagram": ig_max_input
+                }
+                if save_platform_config("instagram", ig_obj):
+                    saved_count += 1
+
+            if "LinkedIn" in selected_platforms and 'li_kw_input' in locals():
+                li_obj = {
+                    "start_date": li_start_input.strftime("%Y-%m-%d") if li_start_input else "",
+                    "keywords": [k.strip() for k in li_kw_input.split(",") if k.strip()],
+                    "max_results": li_max_input,
+                    "max_results_linkedin": li_max_input
+                }
+                if save_platform_config("linkedin", li_obj):
+                    saved_count += 1
+
+            if "Website / Dokumen Publik" in selected_platforms and 'web_kw_input' in locals():
+                web_urls_list = [u.strip() for u in web_url_input.split(",") if u.strip()]
+                web_obj = {
+                    "start_date": web_start_input.strftime("%Y-%m-%d") if web_start_input else "",
+                    "end_date": web_end_input.strftime("%Y-%m-%d") if web_end_input else "",
+                    "website_urls": web_urls_list,
+                    "start_urls": web_urls_list,
+                    "keywords": [k.strip() for k in web_kw_input.split(",") if k.strip()],
+                    "max_results": web_max_input,
+                    "max_results_website": web_max_input
+                }
+                if save_platform_config("website", web_obj):
+                    saved_count += 1
+
+            if show_toast and saved_count > 0:
+                st.success(f"✅ Seluruh konfigurasi ({saved_count} platform) berhasil disimpan!")
+        except Exception as _e_save:
+            if show_toast:
+                st.error(f"❌ Gagal menyimpan konfigurasi: {_e_save}")
+
+    # -----------------------------------------------------------------
+    # 1. KONFIGURASI TWITTER (X)
+    # -----------------------------------------------------------------
     if "Twitter (X)" in selected_platforms:
-        with st.form("form_config_twitter"):
+        with st.container(border=True):
             st.markdown("### 🐦 Konfigurasi Penarikan Twitter (X)")
             col_tw1, col_tw2 = st.columns(2)
             with col_tw1:
@@ -752,25 +817,11 @@ with tab_scrape:
             tw_hash_input = st.text_input("Target Tagar/Hashtag (Twitter):", value=tw_hash_val, key="tw_hash")
             tw_max_input = st.slider("Batas maksimal cuitan (Twitter):", 10, 5000, tw_max_val, 10, key="tw_max")
 
-            btn_save_tw = st.form_submit_button("💾 Simpan Konfigurasi Twitter (X)")
-            if btn_save_tw:
-                tw_obj = {
-                    "start_date": tw_start_input.strftime("%Y-%m-%d"),
-                    "end_date": tw_end_input.strftime("%Y-%m-%d"),
-                    "keywords": [k.strip() for k in tw_kw_input.split(",") if k.strip()],
-                    "profiles": [p.strip() for p in tw_prof_input.split(",") if p.strip()],
-                    "hashtags": [h.strip() for h in tw_hash_input.split(",") if h.strip()],
-                    "max_results": tw_max_input,
-                    "max_results_twitter": tw_max_input
-                }
-                if save_platform_config("twitter", tw_obj):
-                    st.success("✅ Konfigurasi Twitter (X) berhasil disimpan!")
-
     # -----------------------------------------------------------------
-    # 2. FORM INSTAGRAM
+    # 2. KONFIGURASI INSTAGRAM
     # -----------------------------------------------------------------
     if "Instagram" in selected_platforms:
-        with st.form("form_config_instagram"):
+        with st.container(border=True):
             st.markdown("### 📸 Konfigurasi Penarikan Instagram")
             ig_start_val = _parse_date(instagram_cfg.get("start_date"), 14)
             ig_start_input = st.date_input("Tanggal Posting Terlama (Instagram) — Mandatory jika Username diisi", value=ig_start_val, key="ig_start")
@@ -795,30 +846,11 @@ with tab_scrape:
 
             ig_max_input = st.slider("Batas maksimal data yang discrape (Instagram):", 5, 500, ig_max_val, 5, key="ig_max")
 
-            btn_save_ig = st.form_submit_button("💾 Simpan Konfigurasi Instagram")
-            if btn_save_ig:
-                ig_prof_list = [p.strip() for p in ig_prof_input.split(",") if p.strip()]
-                if ig_prof_list and not ig_start_input:
-                    st.error("⚠️ Input 'Tanggal Posting Terlama' wajib diisi apabila Username Instagram diisi!")
-                else:
-                    ig_kw_list = [k.strip() for k in ig_kw_input.split(",") if k.strip()]
-                    ig_obj = {
-                        "start_date": ig_start_input.strftime("%Y-%m-%d") if ig_start_input else "",
-                        "keywords": ig_kw_list,
-                        "hashtags": [k.lstrip("#") for k in ig_kw_list],
-                        "profiles": ig_prof_list,
-                        "profile_mode": ig_profile_mode,
-                        "max_results": ig_max_input,
-                        "max_results_instagram": ig_max_input
-                    }
-                    if save_platform_config("instagram", ig_obj):
-                        st.success("✅ Konfigurasi Instagram berhasil disimpan!")
-
     # -----------------------------------------------------------------
-    # 3. FORM LINKEDIN
+    # 3. KONFIGURASI LINKEDIN
     # -----------------------------------------------------------------
     if "LinkedIn" in selected_platforms:
-        with st.form("form_config_linkedin"):
+        with st.container(border=True):
             st.markdown("### 💼 Konfigurasi Penarikan LinkedIn")
             li_start_val = _parse_date(linkedin_cfg.get("start_date"), 30)
             li_start_input = st.date_input("Tanggal Posting Terlama (LinkedIn)", value=li_start_val, key="li_start")
@@ -829,22 +861,11 @@ with tab_scrape:
             li_kw_input = st.text_input("Kata Kunci / Search Terms (LinkedIn — Aktor: harvestapi/linkedin-post-search):", value=li_kw_val, key="li_kw")
             li_max_input = st.slider("Batas maksimal data yang discrape (LinkedIn):", 5, 500, li_max_val, 5, key="li_max")
 
-            btn_save_li = st.form_submit_button("💾 Simpan Konfigurasi LinkedIn")
-            if btn_save_li:
-                li_obj = {
-                    "start_date": li_start_input.strftime("%Y-%m-%d"),
-                    "keywords": [k.strip() for k in li_kw_input.split(",") if k.strip()],
-                    "max_results": li_max_input,
-                    "max_results_linkedin": li_max_input
-                }
-                if save_platform_config("linkedin", li_obj):
-                    st.success("✅ Konfigurasi LinkedIn berhasil disimpan!")
-
     # -----------------------------------------------------------------
-    # 4. FORM WEBSITE / DOKUMEN PUBLIK
+    # 4. KONFIGURASI WEBSITE / DOKUMEN PUBLIK
     # -----------------------------------------------------------------
     if "Website / Dokumen Publik" in selected_platforms:
-        with st.form("form_config_website"):
+        with st.container(border=True):
             st.markdown("### 🌐 Konfigurasi Penarikan Website / Dokumen Publik")
             col_w_d1, col_w_d2 = st.columns(2)
             with col_w_d1:
@@ -864,25 +885,12 @@ with tab_scrape:
             web_max_val = int(website_cfg.get("max_results_website") or website_cfg.get("max_results", 100))
             web_max_input = st.slider("Batas Maksimal Artikel Berita (Max Results):", 10, 1000, web_max_val, 10, key="web_max")
 
-            btn_save_web = st.form_submit_button("💾 Simpan Konfigurasi Website")
-            if btn_save_web:
-                web_urls_list = [u.strip() for u in web_url_input.split(",") if u.strip()]
-                web_obj = {
-                    "start_date": web_start_input.strftime("%Y-%m-%d"),
-                    "end_date": web_end_input.strftime("%Y-%m-%d"),
-                    "website_urls": web_urls_list,
-                    "start_urls": web_urls_list,
-                    "keywords": [k.strip() for k in web_kw_input.split(",") if k.strip()],
-                    "max_results": web_max_input,
-                    "max_results_website": web_max_input
-                }
-                if save_platform_config("website", web_obj):
-                    st.success("✅ Konfigurasi Website / Dokumen Publik berhasil disimpan!")
-
     st.divider()
-    st.markdown("### 🚀 Eksekusi Penarikan Data")
+    st.markdown("### 🚀 Eksekusi & Pengaturan Penarikan Data")
     
-    c_s1_run, c_s1_stop = st.columns([3, 1])
+    c_s1_save, c_s1_run, c_s1_stop = st.columns([2.5, 3.5, 2])
+    with c_s1_save:
+        btn_save_all = st.button("💾 Simpan Semua Konfigurasi", key="btn_save_all_configs", use_container_width=True, help="Simpan seluruh parameter tanpa menjalankan proses penarikan data.")
     with c_s1_stop:
         btn_stop_s1 = st.button("🛑 STOP / Hentikan Paksa", key="btn_stop_scraper_s1", use_container_width=True, help="Hentikan proses penarikan data yang sedang berjalan secara paksa.")
     with c_s1_run:
@@ -895,6 +903,9 @@ with tab_scrape:
         else:
             btn_run_s1 = st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", use_container_width=True, key="btn_run_scraper_main")
 
+    if btn_save_all:
+        do_save_all_current_configs(show_toast=True)
+
     if btn_stop_s1:
         proc_s1 = st.session_state.get("proc_scraper_obj")
         if proc_s1 and proc_s1.poll() is None:
@@ -905,37 +916,120 @@ with tab_scrape:
             st.info("ℹ️ Tidak ada proses penarikan data yang sedang berjalan.")
 
     if btn_run_s1:
-        with st.status("🚀 Menghubungkan ke Apify Cloud & menarik data mentah...", expanded=True) as status_s:
+        do_save_all_current_configs(show_toast=False)
+
+        import queue
+        import threading
+        import time
+
+        start_time = datetime.datetime.now()
+        start_str = start_time.strftime("%H:%M:%S WIB")
+
+        with st.status("⚡ Menghubungkan ke Apify Cloud & menarik data mentah (SIMULTAN)...", expanded=True) as status_s:
             try:
                 proc = subprocess.Popen(
                     [sys.executable, "01_run_scraper.py"],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
+                    bufsize=1,
                     env=session_credentials.get_session_env_dict()
                 )
                 st.session_state["proc_scraper_obj"] = proc
-                
-                import time
+
+                log_queue = queue.Queue()
+                log_lines = []
+
+                def enqueue_output(out_stream, q):
+                    for line in iter(out_stream.readline, ''):
+                        q.put(line)
+                    out_stream.close()
+
+                t_out = threading.Thread(target=enqueue_output, args=(proc.stdout, log_queue))
+                t_out.daemon = True
+                t_out.start()
+
+                info_placeholder = st.empty()
+                log_placeholder = st.empty()
+
                 while proc.poll() is None:
+                    # Ambil baris log baru dari queue
+                    while True:
+                        try:
+                            line = log_queue.get_nowait()
+                            log_lines.append(line)
+                        except queue.Empty:
+                            break
+
+                    now = datetime.datetime.now()
+                    elapsed_seconds = int((now - start_time).total_seconds())
+                    mins, secs = divmod(elapsed_seconds, 60)
+                    time_str = f"{mins:02d}:{secs:02d}"
+
+                    with info_placeholder.container():
+                        m1, m2, m3 = st.columns(3)
+                        m1.metric("🕒 Waktu Mulai", start_str)
+                        m2.metric("⏱️ Waktu Berjalan", f"{time_str} ({elapsed_seconds}s)")
+                        m3.metric("⚡ Status Mesin", "Proses Scraping Aktif...")
+                        st.caption(f"🎯 **Platform Target (Simultan):** {', '.join(selected_platforms)}")
+
+                    if log_lines:
+                        with log_placeholder.container():
+                            st.markdown("**📋 Live Terminal Output:**")
+                            st.code("".join(log_lines[-12:]), language="text")
+
                     time.sleep(0.5)
-                    
-                stdout, stderr = proc.communicate()
+
+                # Kuras sisa queue log
+                while True:
+                    try:
+                        line = log_queue.get_nowait()
+                        log_lines.append(line)
+                    except queue.Empty:
+                        break
+
+                stderr_text = proc.stderr.read() if proc.stderr else ""
                 st.session_state["proc_scraper_obj"] = None
-                
+
+                end_time = datetime.datetime.now()
+                end_str = end_time.strftime("%H:%M:%S WIB")
+                total_sec = (end_time - start_time).total_seconds()
+                t_mins, t_secs = divmod(int(total_sec), 60)
+                dur_str = f"{t_mins} menit {t_secs} detik" if t_mins > 0 else f"{total_sec:.1f} detik"
+
+                info_placeholder.empty()
+                log_placeholder.empty()
+
+                full_log_str = "".join(log_lines) or stderr_text
+
                 if proc.returncode == 0:
-                    status_s.update(label="✅ Penarikan data selesai!", state="complete", expanded=False)
-                    st.success("✅ Penarikan data mentah selesai. Data siap diproses di Tahapan 2.")
-                    with st.expander("📋 Log Scraper"):
-                        st.code(stdout, language="text")
+                    status_s.update(label=f"✅ Penarikan data selesai! Total durasi: {dur_str}", state="complete", expanded=False)
+                    
+                    st.success("✅ **Penarikan data mentah selesai!** Data berhasil ditarik dan siap diproses di Tahapan 2.")
+                    
+                    c_res1, c_res2, c_res3 = st.columns(3)
+                    c_res1.metric("🕒 Waktu Mulai", start_str)
+                    c_res2.metric("🏁 Waktu Selesai", end_str)
+                    c_res3.metric("⏱️ Total Durasi Eksekusi", dur_str)
+                    
+                    st.info(f"📊 **Ringkasan Penarikan:** Scraping secara simultan untuk platform **{', '.join(selected_platforms)}** telah selesai tanpa kendala.")
+                    with st.expander("📋 Log Lengkap Scraper"):
+                        st.code(full_log_str, language="text")
                 else:
-                    status_s.update(label=f"❌ Gagal / Dihentikan (Exit code: {proc.returncode})", state="error", expanded=True)
-                    if proc.returncode in [-9, 15, 1] and ("taskkill" in (stderr or "").lower() or "keyboardinterrupt" in (stderr or "").lower()):
+                    status_s.update(label=f"❌ Penarikan Data Dihentikan / Gagal (Exit code: {proc.returncode})", state="error", expanded=True)
+                    
+                    c_res1, c_res2, c_res3 = st.columns(3)
+                    c_res1.metric("🕒 Waktu Mulai", start_str)
+                    c_res2.metric("🏁 Waktu Selesai (Dihentikan)", end_str)
+                    c_res3.metric("⏱️ Total Durasi Berjalan", dur_str)
+
+                    if proc.returncode in [-9, 15, 1] and ("taskkill" in stderr_text.lower() or "keyboardinterrupt" in stderr_text.lower()):
                         st.warning("⏹️ Penarikan data dihentikan secara paksa oleh pengguna.")
                     else:
                         st.error("❌ Penarikan data gagal atau dihentikan. Cek token APIFY_API_TOKEN di sesi / file .env.")
+                    
                     with st.expander("📋 Log Kesalahan"):
-                        st.code(stdout or stderr, language="text")
+                        st.code(full_log_str, language="text")
             except Exception as e_s1:
                 status_s.update(label=f"❌ Gagal memproses: {e_s1}", state="error", expanded=True)
                 st.error(f"❌ Terjadi kesalahan saat menjalankan scraper: {e_s1}")

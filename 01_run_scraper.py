@@ -1035,31 +1035,48 @@ def main():
     # 3c. User app — belum ada sistem login, gunakan default hostname atau env var
     user_app = os.environ.get("STREAMLIT_USER_APP", "local_user")
         
-    # 4. Iterasi scraping untuk SETIAP platform yang dipilih (multi-platform sekaligus)
+    # 4. Eksekusi scraping SIMULTAN (paralel) untuk SETIAP platform yang dipilih
     all_results = []
-    for source_type in source_types:
+
+    def _run_single_scraper(source_type):
         print(f"\n{'='*60}")
-        print(f"[INFO] >>> Memulai proses scraping untuk platform: {source_type}")
+        print(f"[INFO] >>> Memulai proses scraping (SIMULTAN) untuk platform: {source_type}")
         print(f"{'='*60}")
         
         if source_type.startswith("twitter"):
             plat_cfg = cfg_base.get("twitter", general_cfg)
-            partial = scrape_twitter(client, plat_cfg, log_activity=log_activity, user_app=user_app)
+            return scrape_twitter(client, plat_cfg, log_activity=log_activity, user_app=user_app)
         elif source_type == "instagram":
             plat_cfg = cfg_base.get("instagram", general_cfg)
-            partial = scrape_instagram(client, plat_cfg, log_activity=log_activity, user_app=user_app)
+            return scrape_instagram(client, plat_cfg, log_activity=log_activity, user_app=user_app)
         elif source_type == "linkedin":
             plat_cfg = cfg_base.get("linkedin", general_cfg)
-            partial = scrape_linkedin(client, plat_cfg, log_activity=log_activity, user_app=user_app)
+            return scrape_linkedin(client, plat_cfg, log_activity=log_activity, user_app=user_app)
         elif source_type in ["website", "website_content_crawler", "website_crawler", "portal_berita", "news_portal", "news"]:
             plat_cfg = cfg_base.get("website", cfg_base.get("portal_berita", general_cfg))
-            partial = scrape_website_content(client, plat_cfg, log_activity=log_activity, user_app=user_app)
+            return scrape_website_content(client, plat_cfg, log_activity=log_activity, user_app=user_app)
         else:
             print(f"[WARNING] Tipe sumber '{source_type}' tidak dikenal. Dilewati.")
-            continue
-        
-        print(f"[INFO] Platform '{source_type}' menghasilkan {len(partial)} baris data.")
-        all_results.extend(partial)
+            return []
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    # Jika hanya 1 platform, jalankan langsung; jika > 1 platform, jalankan secara simultan (paralel)
+    if len(source_types) == 1:
+        res = _run_single_scraper(source_types[0])
+        all_results.extend(res)
+    else:
+        print(f"[INFO] Memulai {len(source_types)} tugas scraping secara SIMULTAN (paralel)...")
+        with ThreadPoolExecutor(max_workers=min(len(source_types), 4)) as executor:
+            future_to_type = {executor.submit(_run_single_scraper, stype): stype for stype in source_types}
+            for future in as_completed(future_to_type):
+                stype = future_to_type[future]
+                try:
+                    partial = future.result()
+                    print(f"[INFO] Platform '{stype}' selesai (simultan), menghasilkan {len(partial)} baris data.")
+                    all_results.extend(partial)
+                except Exception as exc:
+                    print(f"[ERROR] Platform '{stype}' mengalami kesalahan saat eksekusi simultan: {exc}")
         
     # 5. Simpan ke database jika ada hasil gabungan
     print(f"\n{'='*60}")
