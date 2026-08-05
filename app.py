@@ -551,6 +551,50 @@ if check_gemini_quota_exhausted():
 st.sidebar.divider()
 st.sidebar.markdown("### 📌 Pengelolaan Topik Sentimen")
 
+def get_all_combined_history_terms():
+    """
+    Mengambil gabungan seluruh istilah kata kunci/profil/tagar dari:
+    1. Database keysearch_history
+    2. File target_config.json
+    3. Session state input saat ini (tw_kw, ig_kw, li_kw, web_kw, dll)
+    """
+    terms_set = set()
+    
+    # 1. Dari database
+    try:
+        if hasattr(db_manager, 'ambil_riwayat_gabungan'):
+            for t in db_manager.ambil_riwayat_gabungan():
+                if t and t != "ALL (Semua Data)":
+                    terms_set.add(t)
+    except Exception:
+        pass
+        
+    # 2. Dari target_config.json
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f_cfg:
+                c_data = json.load(f_cfg)
+                c_root = c_data.get("config", {})
+                for sub_key in ["general", "twitter", "instagram", "linkedin", "portal_berita", "website"]:
+                    sub_c = c_root.get(sub_key, {})
+                    if isinstance(sub_c, dict):
+                        for item in sub_c.get("keywords", []) + sub_c.get("profiles", []) + sub_c.get("hashtags", []):
+                            if item and str(item).strip() and str(item).strip() != "ALL (Semua Data)":
+                                terms_set.add(str(item).strip())
+    except Exception:
+        pass
+
+    # 3. Dari session_state input aktif pengguna
+    for ss_key in ["tw_kw", "tw_prof", "tw_hash", "ig_kw", "ig_prof", "li_kw", "web_kw", "web_urls"]:
+        raw_val = str(st.session_state.get(ss_key, "")).strip()
+        if raw_val:
+            for sub in raw_val.split(","):
+                sub_clean = sub.strip()
+                if sub_clean and sub_clean != "ALL (Semua Data)":
+                    terms_set.add(sub_clean)
+
+    return sorted(list(terms_set))
+
 # Sinkronisasi otomatis kata kunci dari file konfigurasi tersimpan ke keysearch_history
 try:
     if os.path.exists(CONFIG_FILE):
@@ -569,13 +613,7 @@ try:
 except Exception:
     pass
 
-try:
-    if hasattr(db_manager, 'ambil_riwayat_gabungan'):
-        raw_history_sb = db_manager.ambil_riwayat_gabungan()
-    else:
-        raw_history_sb = []
-except Exception:
-    raw_history_sb = []
+raw_history_sb = get_all_combined_history_terms()
 
 try:
     if hasattr(db_manager, 'ambil_semua_bookmark'):
