@@ -846,6 +846,7 @@ with tab_scrape:
                 web_urls_list = [u.strip() for u in web_urls_raw.split(",") if u.strip()]
                 web_kw_list = [k.strip() for k in web_kw_raw.split(",") if k.strip()]
                 all_kw.extend(web_kw_list)
+                all_prof.extend(web_urls_list)
 
                 web_obj = {
                     "start_date": web_start_d.strftime("%Y-%m-%d") if hasattr(web_start_d, 'strftime') else str(web_start_d or ""),
