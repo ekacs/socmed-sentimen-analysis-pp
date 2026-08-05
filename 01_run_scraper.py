@@ -1064,6 +1064,7 @@ def main():
     # Jika hanya 1 platform, jalankan langsung; jika > 1 platform, jalankan secara simultan (paralel)
     if len(source_types) == 1:
         res = _run_single_scraper(source_types[0])
+        print(f"[INFO] Platform '{source_types[0]}' selesai, menghasilkan {len(res)} baris data.")
         all_results.extend(res)
     else:
         print(f"[INFO] Memulai {len(source_types)} tugas scraping secara SIMULTAN (paralel)...")

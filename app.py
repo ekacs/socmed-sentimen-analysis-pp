@@ -551,6 +551,24 @@ if check_gemini_quota_exhausted():
 st.sidebar.divider()
 st.sidebar.markdown("### 📌 Pengelolaan Topik Sentimen")
 
+# Sinkronisasi otomatis kata kunci dari file konfigurasi tersimpan ke keysearch_history
+try:
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, 'r') as f_cfg:
+            c_data = json.load(f_cfg)
+            c_root = c_data.get("config", {})
+            syn_kw, syn_prof, syn_hash = [], [], []
+            for sub_key in ["general", "twitter", "instagram", "linkedin", "portal_berita", "website"]:
+                sub_c = c_root.get(sub_key, {})
+                if isinstance(sub_c, dict):
+                    syn_kw.extend(sub_c.get("keywords", []))
+                    syn_prof.extend(sub_c.get("profiles", []))
+                    syn_hash.extend(sub_c.get("hashtags", []))
+            if syn_kw or syn_prof or syn_hash:
+                db_manager.simpan_keysearch_history(syn_kw, syn_prof, syn_hash)
+except Exception:
+    pass
+
 try:
     if hasattr(db_manager, 'ambil_riwayat_gabungan'):
         raw_history_sb = db_manager.ambil_riwayat_gabungan()
@@ -746,6 +764,7 @@ with tab_scrape:
     # Helper untuk simpan semua konfigurasi platform aktif saat ini dari session state
     def do_save_all_current_configs(show_toast=False):
         saved_count = 0
+        all_kw, all_prof, all_hash = [], [], []
         try:
             if "Twitter (X)" in selected_platforms:
                 tw_kw_raw = str(st.session_state.get("tw_kw", ""))
@@ -755,12 +774,20 @@ with tab_scrape:
                 tw_end_d = st.session_state.get("tw_end")
                 tw_max_num = int(st.session_state.get("tw_max", 500))
 
+                tw_kw_list = [k.strip() for k in tw_kw_raw.split(",") if k.strip()]
+                tw_prof_list = [p.strip() for p in tw_prof_raw.split(",") if p.strip()]
+                tw_hash_list = [h.strip() for h in tw_hash_raw.split(",") if h.strip()]
+
+                all_kw.extend(tw_kw_list)
+                all_prof.extend(tw_prof_list)
+                all_hash.extend(tw_hash_list)
+
                 tw_obj = {
                     "start_date": tw_start_d.strftime("%Y-%m-%d") if hasattr(tw_start_d, 'strftime') else str(tw_start_d or ""),
                     "end_date": tw_end_d.strftime("%Y-%m-%d") if hasattr(tw_end_d, 'strftime') else str(tw_end_d or ""),
-                    "keywords": [k.strip() for k in tw_kw_raw.split(",") if k.strip()],
-                    "profiles": [p.strip() for p in tw_prof_raw.split(",") if p.strip()],
-                    "hashtags": [h.strip() for h in tw_hash_raw.split(",") if h.strip()],
+                    "keywords": tw_kw_list,
+                    "profiles": tw_prof_list,
+                    "hashtags": tw_hash_list,
                     "max_results": tw_max_num,
                     "max_results_twitter": tw_max_num
                 }
@@ -776,6 +803,9 @@ with tab_scrape:
 
                 ig_kw_list = [k.strip() for k in ig_kw_raw.split(",") if k.strip()]
                 ig_prof_list = [p.strip() for p in ig_prof_raw.split(",") if p.strip()]
+
+                all_kw.extend(ig_kw_list)
+                all_prof.extend(ig_prof_list)
 
                 ig_obj = {
                     "start_date": ig_start_d.strftime("%Y-%m-%d") if hasattr(ig_start_d, 'strftime') else str(ig_start_d or ""),
@@ -794,9 +824,12 @@ with tab_scrape:
                 li_start_d = st.session_state.get("li_start")
                 li_max_num = int(st.session_state.get("li_max", 100))
 
+                li_kw_list = [k.strip() for k in li_kw_raw.split(",") if k.strip()]
+                all_kw.extend(li_kw_list)
+
                 li_obj = {
                     "start_date": li_start_d.strftime("%Y-%m-%d") if hasattr(li_start_d, 'strftime') else str(li_start_d or ""),
-                    "keywords": [k.strip() for k in li_kw_raw.split(",") if k.strip()],
+                    "keywords": li_kw_list,
                     "max_results": li_max_num,
                     "max_results_linkedin": li_max_num
                 }
@@ -811,20 +844,29 @@ with tab_scrape:
                 web_max_num = int(st.session_state.get("web_max", 100))
 
                 web_urls_list = [u.strip() for u in web_urls_raw.split(",") if u.strip()]
+                web_kw_list = [k.strip() for k in web_kw_raw.split(",") if k.strip()]
+                all_kw.extend(web_kw_list)
 
                 web_obj = {
                     "start_date": web_start_d.strftime("%Y-%m-%d") if hasattr(web_start_d, 'strftime') else str(web_start_d or ""),
                     "end_date": web_end_d.strftime("%Y-%m-%d") if hasattr(web_end_d, 'strftime') else str(web_end_d or ""),
                     "website_urls": web_urls_list,
                     "start_urls": web_urls_list,
-                    "keywords": [k.strip() for k in web_kw_raw.split(",") if k.strip()],
+                    "keywords": web_kw_list,
                     "max_results": web_max_num,
                     "max_results_website": web_max_num
                 }
                 if save_platform_config("website", web_obj):
                     saved_count += 1
 
-            st.session_state["config_saved_at"] = datetime.datetime.now().strftime("%H:%M:%S WIB")
+            # Simpan kata kunci/istilah pencarian ke tabel keysearch_history di database secara instan
+            if all_kw or all_prof or all_hash:
+                try:
+                    db_manager.simpan_keysearch_history(all_kw, all_prof, all_hash)
+                except Exception as _e_hist:
+                    pass
+
+            st.session_state["config_saved_at"] = datetime.datetime.now().strftime("%H:%M:%S UTC")
 
             if show_toast and saved_count > 0:
                 st.success(f"✅ Seluruh konfigurasi ({saved_count} platform) berhasil disimpan!")
@@ -1023,7 +1065,7 @@ with tab_scrape:
 
         initial_raw_count = len(db_manager.ambil_cuitan_mentah())
         start_time = datetime.datetime.now()
-        start_str = start_time.strftime("%H:%M:%S WIB")
+        start_str = start_time.strftime("%H:%M:%S UTC")
 
         with st.status("⚡ Menghubungkan ke Apify Cloud & menarik data mentah (SIMULTAN)...", expanded=True) as status_s:
             try:
@@ -1092,7 +1134,7 @@ with tab_scrape:
                 st.session_state["proc_scraper_obj"] = None
 
                 end_time = datetime.datetime.now()
-                end_str = end_time.strftime("%H:%M:%S WIB")
+                end_str = end_time.strftime("%H:%M:%S UTC")
                 total_sec = (end_time - start_time).total_seconds()
                 t_mins, t_secs = divmod(int(total_sec), 60)
                 dur_str = f"{t_mins} menit {t_secs} detik" if t_mins > 0 else f"{total_sec:.1f} detik"
@@ -1109,6 +1151,14 @@ with tab_scrape:
                     if m_p:
                         p_name = m_p.group(1).lower()
                         p_count = int(m_p.group(2))
+                        if "twitter" in p_name:
+                            p_name = "twitter"
+                        elif "instagram" in p_name:
+                            p_name = "instagram"
+                        elif "linkedin" in p_name:
+                            p_name = "linkedin"
+                        elif "website" in p_name or "news" in p_name or "berita" in p_name:
+                            p_name = "website"
                         platform_counts[p_name] = p_count
 
                 m_tot = re.search(r"Total gabungan (\d+) baris data", full_log_str, re.IGNORECASE)
@@ -1155,15 +1205,23 @@ with tab_scrape:
                         with cols_p[idx]:
                             if sp == "Twitter (X)":
                                 cnt = s1["platform_counts"].get("twitter", 0)
+                                if cnt == 0 and len(sp_list) == 1 and s1.get("total_data_fetched", 0) > 0:
+                                    cnt = s1["total_data_fetched"]
                                 st.metric("🐦 Twitter (X)", f"{cnt:,} cuitan")
                             elif sp == "Instagram":
                                 cnt = s1["platform_counts"].get("instagram", 0)
+                                if cnt == 0 and len(sp_list) == 1 and s1.get("total_data_fetched", 0) > 0:
+                                    cnt = s1["total_data_fetched"]
                                 st.metric("📸 Instagram", f"{cnt:,} posting")
                             elif sp == "LinkedIn":
                                 cnt = s1["platform_counts"].get("linkedin", 0)
+                                if cnt == 0 and len(sp_list) == 1 and s1.get("total_data_fetched", 0) > 0:
+                                    cnt = s1["total_data_fetched"]
                                 st.metric("💼 LinkedIn", f"{cnt:,} posting")
                             elif sp == "Website / Dokumen Publik":
                                 cnt = s1["platform_counts"].get("website", s1["platform_counts"].get("portal_berita", 0))
+                                if cnt == 0 and len(sp_list) == 1 and s1.get("total_data_fetched", 0) > 0:
+                                    cnt = s1["total_data_fetched"]
                                 st.metric("🌐 Website", f"{cnt:,} artikel")
 
             with st.expander("📋 Log Lengkap Scraper"):
@@ -1241,7 +1299,7 @@ with tab_ml:
 
         initial_clean_count = len(db_manager.baca_data_untuk_streamlit())
         start_time_ml = datetime.datetime.now()
-        start_str_ml = start_time_ml.strftime("%H:%M:%S WIB")
+        start_str_ml = start_time_ml.strftime("%H:%M:%S UTC")
 
         with st.status("🧠 Melakukan pembersihan duplikat RAW, standardisasi EYD (LLM), & klasifikasi SVM...", expanded=True) as status_ml:
             try:
@@ -1309,7 +1367,7 @@ with tab_ml:
                 st.session_state["proc_pipeline_obj"] = None
 
                 end_time_ml = datetime.datetime.now()
-                end_str_ml = end_time_ml.strftime("%H:%M:%S WIB")
+                end_str_ml = end_time_ml.strftime("%H:%M:%S UTC")
                 total_sec_ml = (end_time_ml - start_time_ml).total_seconds()
                 t_mins_ml, t_secs_ml = divmod(int(total_sec_ml), 60)
                 dur_str_ml = f"{t_mins_ml} menit {t_secs_ml} detik" if t_mins_ml > 0 else f"{total_sec_ml:.1f} detik"
