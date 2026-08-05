@@ -666,22 +666,28 @@ with tab_scrape:
 
     raw_source_list = current_config.get("source_types")
     if not raw_source_list:
-        single = current_config.get("source_type", "twitter_")
-        raw_source_list = [single] if single else ["twitter_"]
+        single = current_config.get("source_type", "")
+        raw_source_list = [single] if single else []
     elif isinstance(raw_source_list, str):
         raw_source_list = [raw_source_list]
     
     mapping_source_types = {
+        "twitter": "Twitter (X)",
         "twitter_": "Twitter (X)",
         "instagram": "Instagram",
         "linkedin": "LinkedIn",
         "website": "Website / Dokumen Publik"
     }
-    rev_mapping = {v: k for k, v in mapping_source_types.items()}
+    rev_mapping = {
+        "Twitter (X)": "twitter",
+        "Instagram": "instagram",
+        "LinkedIn": "linkedin",
+        "Website / Dokumen Publik": "website"
+    }
     platform_options = ["Twitter (X)", "Instagram", "LinkedIn", "Website / Dokumen Publik"]
     
-    default_selected = [mapping_source_types.get(s) for s in raw_source_list if mapping_source_types.get(s)]
-    if not default_selected: default_selected = ["Twitter (X)"]
+    # Default awal: Munculkan seluruh 4 platform sasaran secara otomatis
+    default_selected = platform_options
 
     selected_platforms = st.multiselect(
         "Pilih Platform Sasaran Scraping (bisa pilih lebih dari satu):",
@@ -787,11 +793,70 @@ with tab_scrape:
                 if save_platform_config("website", web_obj):
                     saved_count += 1
 
+            st.session_state["config_saved_at"] = datetime.datetime.now().strftime("%H:%M:%S WIB")
+
             if show_toast and saved_count > 0:
                 st.success(f"✅ Seluruh konfigurasi ({saved_count} platform) berhasil disimpan!")
+                st.rerun()
         except Exception as _e_save:
             if show_toast:
                 st.error(f"❌ Gagal menyimpan konfigurasi: {_e_save}")
+
+    def render_active_config_summary_card():
+        """Menampilkan rangkuman status konfigurasi aktif per platform secara konsisten dan meyakinkan."""
+        if not selected_platforms:
+            return
+        
+        last_saved = st.session_state.get("config_saved_at")
+        save_badge = f" (Tersimpan: {last_saved})" if last_saved else " (Siap Diberlakukan)"
+        
+        try:
+            if os.path.exists(CONFIG_FILE):
+                with open(CONFIG_FILE, 'r') as f:
+                    c_store = json.load(f)
+            else: c_store = {}
+        except Exception: c_store = {}
+        
+        c_root = c_store.get("config", {})
+        gen_c = c_root.get("general", {})
+        
+        tw_c = c_root.get("twitter", gen_c)
+        ig_c = c_root.get("instagram", gen_c)
+        li_c = c_root.get("linkedin", gen_c)
+        web_c = c_root.get("website", gen_c)
+
+        with st.container(border=True):
+            st.markdown(f"#### 📌 Status Konfigurasi Terpasang & Siap Digunakan {save_badge}")
+            st.caption("Berikut adalah rangkuman parameter pencarian per platform yang aktif dan tersimpan saat ini:")
+            
+            cols = st.columns(len(selected_platforms))
+            for idx, sp in enumerate(selected_platforms):
+                with cols[idx]:
+                    if sp == "Twitter (X)":
+                        st.markdown("##### 🐦 Twitter (X)")
+                        kw = ", ".join(tw_c.get("keywords", [])) or "*(Kosong)*"
+                        prof = ", ".join(tw_c.get("profiles", [])) or "*(Kosong)*"
+                        hash_t = ", ".join(tw_c.get("hashtags", [])) or "*(Kosong)*"
+                        mx = tw_c.get("max_results_twitter") or tw_c.get("max_results", 500)
+                        st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Profil:** `{prof}`\n• **Hashtag:** `{hash_t}`\n• **Batas Max:** `{mx}` cuitan")
+                    elif sp == "Instagram":
+                        st.markdown("##### 📸 Instagram")
+                        kw = ", ".join(ig_c.get("keywords", [])) or "*(Kosong)*"
+                        prof = ", ".join(ig_c.get("profiles", [])) or "*(Kosong)*"
+                        mode = ig_c.get("profile_mode", "username")
+                        mx = ig_c.get("max_results_instagram") or ig_c.get("max_results", 100)
+                        st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Username:** `{prof}`\n• **Mode:** `{mode}`\n• **Batas Max:** `{mx}` posting")
+                    elif sp == "LinkedIn":
+                        st.markdown("##### 💼 LinkedIn")
+                        kw = ", ".join(li_c.get("keywords", [])) or "*(Kosong)*"
+                        mx = li_c.get("max_results_linkedin") or li_c.get("max_results", 100)
+                        st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Batas Max:** `{mx}` posting")
+                    elif sp == "Website / Dokumen Publik":
+                        st.markdown("##### 🌐 Website")
+                        urls = ", ".join(web_c.get("website_urls", [])) or "Semua Portal Berita"
+                        kw = ", ".join(web_c.get("keywords", [])) or "*(Kosong)*"
+                        mx = web_c.get("max_results_website") or web_c.get("max_results", 100)
+                        st.markdown(f"• **Target Domain:** `{urls}`\n• **Frasa Cari:** `{kw}`\n• **Batas Max:** `{mx}` artikel")
 
     # -----------------------------------------------------------------
     # 1. KONFIGURASI TWITTER (X)
@@ -807,9 +872,9 @@ with tab_scrape:
                 tw_end_val = _parse_date(twitter_cfg.get("end_date"), 0)
                 tw_end_input = st.date_input("Tanggal Akhir Target (Twitter)", value=tw_end_val, key="tw_end")
 
-            tw_kw_val = ", ".join(twitter_cfg.get("keywords", ["mbg"]))
-            tw_prof_val = ", ".join(twitter_cfg.get("profiles", ["jokowi", "kemenpupr"]))
-            tw_hash_val = ", ".join(twitter_cfg.get("hashtags", ["#IKNNusantara"]))
+            tw_kw_val = ", ".join(twitter_cfg.get("keywords", []))
+            tw_prof_val = ", ".join(twitter_cfg.get("profiles", []))
+            tw_hash_val = ", ".join(twitter_cfg.get("hashtags", []))
             tw_max_val = int(twitter_cfg.get("max_results_twitter") or twitter_cfg.get("max_results", 500))
 
             tw_kw_input = st.text_input("Target Kata Kunci / Search Key (Twitter):", value=tw_kw_val, help="Dapat menggunakan operator pencarian lanjutan Twitter seperti tabel panduan di atas.", key="tw_kw")
@@ -826,8 +891,8 @@ with tab_scrape:
             ig_start_val = _parse_date(instagram_cfg.get("start_date"), 14)
             ig_start_input = st.date_input("Tanggal Posting Terlama (Instagram) — Mandatory jika Username diisi", value=ig_start_val, key="ig_start")
 
-            ig_kw_val = ", ".join(instagram_cfg.get("keywords", instagram_cfg.get("hashtags", ["#IKNNusantara"])))
-            ig_prof_val = ", ".join(instagram_cfg.get("profiles", ["jokowi"]))
+            ig_kw_val = ", ".join(instagram_cfg.get("keywords", instagram_cfg.get("hashtags", [])))
+            ig_prof_val = ", ".join(instagram_cfg.get("profiles", []))
             ig_max_val = int(instagram_cfg.get("max_results_instagram") or instagram_cfg.get("max_results", 100))
 
             ig_kw_input = st.text_input("Kata Kunci / Hashtag (Instagram):", value=ig_kw_val, key="ig_kw")
@@ -855,7 +920,7 @@ with tab_scrape:
             li_start_val = _parse_date(linkedin_cfg.get("start_date"), 30)
             li_start_input = st.date_input("Tanggal Posting Terlama (LinkedIn)", value=li_start_val, key="li_start")
 
-            li_kw_val = ", ".join(linkedin_cfg.get("keywords", ["kebijakan publik"]))
+            li_kw_val = ", ".join(linkedin_cfg.get("keywords", []))
             li_max_val = int(linkedin_cfg.get("max_results_linkedin") or linkedin_cfg.get("max_results", 100))
 
             li_kw_input = st.text_input("Kata Kunci / Search Terms (LinkedIn — Aktor: harvestapi/linkedin-post-search):", value=li_kw_val, key="li_kw")
@@ -875,17 +940,18 @@ with tab_scrape:
                 web_end_val = _parse_date(website_cfg.get("end_date"), 0)
                 web_end_input = st.date_input("Tanggal Akhir Target (Website):", value=web_end_val, key="web_end")
 
-            web_urls_raw = website_cfg.get("website_urls", website_cfg.get("start_urls", ["https://www.kompas.com"]))
+            web_urls_raw = website_cfg.get("website_urls", website_cfg.get("start_urls", []))
             web_urls_str = ", ".join(web_urls_raw) if isinstance(web_urls_raw, list) else str(web_urls_raw)
             web_url_input = st.text_input("Target Domain / URL Website (Opsional — pisahkan koma):", value=web_urls_str, help="Contoh: kompas.com, detik.com, kemendagri.go.id (Kosongkan jika ingin mencakup seluruh situs berita)", key="web_urls")
 
-            web_kw_val = ", ".join(website_cfg.get("keywords", ["kebijakan publik"]))
+            web_kw_val = ", ".join(website_cfg.get("keywords", []))
             web_kw_input = st.text_input("Kata Kunci / Frasa Pencarian (Searchbar — Mendukung sintaks Google Dork):", value=web_kw_val, help='Mendukung kaidah Google Dork! Contoh: "makan bergizi gratis", intitle:"stunting", inurl:nasional, atau -politik', key="web_kw")
 
             web_max_val = int(website_cfg.get("max_results_website") or website_cfg.get("max_results", 100))
             web_max_input = st.slider("Batas Maksimal Artikel Berita (Max Results):", 10, 1000, web_max_val, 10, key="web_max")
 
     st.divider()
+    render_active_config_summary_card()
     st.markdown("### 🚀 Eksekusi & Pengaturan Penarikan Data")
     
     c_s1_save, c_s1_run, c_s1_stop = st.columns([2.5, 3.5, 2])

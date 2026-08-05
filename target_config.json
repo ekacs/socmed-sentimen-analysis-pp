@@ -1,29 +1,35 @@
 {
     "source_types": [
-        "twitter_"
+        "twitter",
+        "instagram",
+        "linkedin",
+        "website"
     ],
     "config": {
-        "general": {
-            "start_date": "2026-07-06",
-            "end_date": "2026-07-13",
-            "keywords": [
-                "mbg"
-            ],
-            "profiles": [
-                "jokowi",
-                "kemenpupr"
-            ],
-            "hashtags": [
-                "#IKNNusantara"
-            ],
+        "twitter": {
+            "keywords": [],
+            "profiles": [],
+            "hashtags": [],
+            "max_results": 500,
+            "max_results_twitter": 500
+        },
+        "instagram": {
+            "keywords": [],
+            "profiles": [],
+            "profile_mode": "username",
             "max_results": 100,
-            "max_results_twitter": 500,
-            "max_results_instagram": 100,
-            "max_results_linkedin": 100,
-            "max_results_news": 50,
-            "news_portal_urls": [
-                "https://www.kompas.com/"
-            ]
+            "max_results_instagram": 100
+        },
+        "linkedin": {
+            "keywords": [],
+            "max_results": 100,
+            "max_results_linkedin": 100
+        },
+        "website": {
+            "website_urls": [],
+            "keywords": [],
+            "max_results": 100,
+            "max_results_website": 100
         }
     }
 }
