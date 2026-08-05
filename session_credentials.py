@@ -70,6 +70,21 @@ def get_active_gemini_key() -> str:
     custom = st.session_state.get(KEY_GEMINI, "").strip() if hasattr(st, "session_state") else ""
     return custom if custom else os.getenv("GEMINI_API_KEY", "")
 
+def is_custom_gemini() -> bool:
+    """Memeriksa apakah pengguna menginput LLM API Key kustom di sesi UI."""
+    custom = st.session_state.get(KEY_GEMINI, "").strip() if hasattr(st, "session_state") else ""
+    return bool(custom)
+
+def is_custom_apify() -> bool:
+    """Memeriksa apakah pengguna menginput Apify Token kustom di sesi UI."""
+    custom = st.session_state.get(KEY_APIFY, "").strip() if hasattr(st, "session_state") else ""
+    return bool(custom)
+
+def is_custom_supabase() -> bool:
+    """Memeriksa apakah pengguna menginput Database URL Supabase kustom di sesi UI."""
+    custom = st.session_state.get(KEY_SUPABASE, "").strip() if hasattr(st, "session_state") else ""
+    return bool(custom)
+
 def mask_credential(val: str, visible_suffix_len: int = 4) -> str:
     """
     Menyamarkan nilai kredensial dengan karakter asterisk.

@@ -253,6 +253,8 @@ def load_data_from_db():
     return db_manager.baca_data_untuk_streamlit()
 
 def check_db_storage_full():
+    if session_credentials.get_active_db_mode() == "sqlite" or session_credentials.is_custom_supabase():
+        return False
     try:
         if hasattr(db_manager, 'is_storage_full'):
             return db_manager.is_storage_full()
@@ -261,6 +263,8 @@ def check_db_storage_full():
     return False
 
 def check_apify_quota_exhausted():
+    if session_credentials.is_custom_apify():
+        return False
     try:
         if hasattr(db_manager, 'is_apify_quota_exhausted'):
             return db_manager.is_apify_quota_exhausted()
@@ -269,6 +273,8 @@ def check_apify_quota_exhausted():
     return False
 
 def check_gemini_quota_exhausted():
+    if session_credentials.is_custom_gemini():
+        return False
     try:
         if hasattr(db_manager, 'is_gemini_quota_exhausted'):
             return db_manager.is_gemini_quota_exhausted()
