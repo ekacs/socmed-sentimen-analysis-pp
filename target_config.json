@@ -1,10 +1,5 @@
 {
-    "source_types": [
-        "twitter",
-        "instagram",
-        "linkedin",
-        "website"
-    ],
+    "source_types": [],
     "config": {
         "twitter": {
             "keywords": [],

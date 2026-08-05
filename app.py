@@ -686,8 +686,8 @@ with tab_scrape:
     }
     platform_options = ["Twitter (X)", "Instagram", "LinkedIn", "Website / Dokumen Publik"]
     
-    # Default awal: Munculkan seluruh 4 platform sasaran secara otomatis
-    default_selected = platform_options
+    # Default awal: Ikuti konfigurasi tersimpan (kosong jika belum ada yang dipilih)
+    default_selected = [mapping_source_types.get(s) for s in raw_source_list if mapping_source_types.get(s)]
 
     selected_platforms = st.multiselect(
         "Pilih Platform Sasaran Scraping (bisa pilih lebih dari satu):",
