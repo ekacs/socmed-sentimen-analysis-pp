@@ -737,58 +737,83 @@ with tab_scrape:
     # -----------------------------------------------------------------
     # 1. FORM TWITTER (X)
     # -----------------------------------------------------------------
-    # Helper untuk simpan semua konfigurasi platform aktif saat ini
+    # Helper untuk simpan semua konfigurasi platform aktif saat ini dari session state
     def do_save_all_current_configs(show_toast=False):
         saved_count = 0
         try:
-            if "Twitter (X)" in selected_platforms and 'tw_kw_input' in locals():
+            if "Twitter (X)" in selected_platforms:
+                tw_kw_raw = str(st.session_state.get("tw_kw", ""))
+                tw_prof_raw = str(st.session_state.get("tw_prof", ""))
+                tw_hash_raw = str(st.session_state.get("tw_hash", ""))
+                tw_start_d = st.session_state.get("tw_start")
+                tw_end_d = st.session_state.get("tw_end")
+                tw_max_num = int(st.session_state.get("tw_max", 500))
+
                 tw_obj = {
-                    "start_date": tw_start_input.strftime("%Y-%m-%d") if tw_start_input else "",
-                    "end_date": tw_end_input.strftime("%Y-%m-%d") if tw_end_input else "",
-                    "keywords": [k.strip() for k in tw_kw_input.split(",") if k.strip()],
-                    "profiles": [p.strip() for p in tw_prof_input.split(",") if p.strip()],
-                    "hashtags": [h.strip() for h in tw_hash_input.split(",") if h.strip()],
-                    "max_results": tw_max_input,
-                    "max_results_twitter": tw_max_input
+                    "start_date": tw_start_d.strftime("%Y-%m-%d") if hasattr(tw_start_d, 'strftime') else str(tw_start_d or ""),
+                    "end_date": tw_end_d.strftime("%Y-%m-%d") if hasattr(tw_end_d, 'strftime') else str(tw_end_d or ""),
+                    "keywords": [k.strip() for k in tw_kw_raw.split(",") if k.strip()],
+                    "profiles": [p.strip() for p in tw_prof_raw.split(",") if p.strip()],
+                    "hashtags": [h.strip() for h in tw_hash_raw.split(",") if h.strip()],
+                    "max_results": tw_max_num,
+                    "max_results_twitter": tw_max_num
                 }
                 if save_platform_config("twitter", tw_obj):
                     saved_count += 1
 
-            if "Instagram" in selected_platforms and 'ig_kw_input' in locals():
-                ig_prof_list = [p.strip() for p in ig_prof_input.split(",") if p.strip()]
-                ig_kw_list = [k.strip() for k in ig_kw_input.split(",") if k.strip()]
+            if "Instagram" in selected_platforms:
+                ig_kw_raw = str(st.session_state.get("ig_kw", ""))
+                ig_prof_raw = str(st.session_state.get("ig_prof", ""))
+                ig_start_d = st.session_state.get("ig_start")
+                ig_mode_val = str(st.session_state.get("ig_profile_mode_radio", "username"))
+                ig_max_num = int(st.session_state.get("ig_max", 100))
+
+                ig_kw_list = [k.strip() for k in ig_kw_raw.split(",") if k.strip()]
+                ig_prof_list = [p.strip() for p in ig_prof_raw.split(",") if p.strip()]
+
                 ig_obj = {
-                    "start_date": ig_start_input.strftime("%Y-%m-%d") if ig_start_input else "",
+                    "start_date": ig_start_d.strftime("%Y-%m-%d") if hasattr(ig_start_d, 'strftime') else str(ig_start_d or ""),
                     "keywords": ig_kw_list,
                     "hashtags": [k.lstrip("#") for k in ig_kw_list],
                     "profiles": ig_prof_list,
-                    "profile_mode": ig_profile_mode,
-                    "max_results": ig_max_input,
-                    "max_results_instagram": ig_max_input
+                    "profile_mode": ig_mode_val,
+                    "max_results": ig_max_num,
+                    "max_results_instagram": ig_max_num
                 }
                 if save_platform_config("instagram", ig_obj):
                     saved_count += 1
 
-            if "LinkedIn" in selected_platforms and 'li_kw_input' in locals():
+            if "LinkedIn" in selected_platforms:
+                li_kw_raw = str(st.session_state.get("li_kw", ""))
+                li_start_d = st.session_state.get("li_start")
+                li_max_num = int(st.session_state.get("li_max", 100))
+
                 li_obj = {
-                    "start_date": li_start_input.strftime("%Y-%m-%d") if li_start_input else "",
-                    "keywords": [k.strip() for k in li_kw_input.split(",") if k.strip()],
-                    "max_results": li_max_input,
-                    "max_results_linkedin": li_max_input
+                    "start_date": li_start_d.strftime("%Y-%m-%d") if hasattr(li_start_d, 'strftime') else str(li_start_d or ""),
+                    "keywords": [k.strip() for k in li_kw_raw.split(",") if k.strip()],
+                    "max_results": li_max_num,
+                    "max_results_linkedin": li_max_num
                 }
                 if save_platform_config("linkedin", li_obj):
                     saved_count += 1
 
-            if "Website / Dokumen Publik" in selected_platforms and 'web_kw_input' in locals():
-                web_urls_list = [u.strip() for u in web_url_input.split(",") if u.strip()]
+            if "Website / Dokumen Publik" in selected_platforms:
+                web_urls_raw = str(st.session_state.get("web_urls", ""))
+                web_kw_raw = str(st.session_state.get("web_kw", ""))
+                web_start_d = st.session_state.get("web_start")
+                web_end_d = st.session_state.get("web_end")
+                web_max_num = int(st.session_state.get("web_max", 100))
+
+                web_urls_list = [u.strip() for u in web_urls_raw.split(",") if u.strip()]
+
                 web_obj = {
-                    "start_date": web_start_input.strftime("%Y-%m-%d") if web_start_input else "",
-                    "end_date": web_end_input.strftime("%Y-%m-%d") if web_end_input else "",
+                    "start_date": web_start_d.strftime("%Y-%m-%d") if hasattr(web_start_d, 'strftime') else str(web_start_d or ""),
+                    "end_date": web_end_d.strftime("%Y-%m-%d") if hasattr(web_end_d, 'strftime') else str(web_end_d or ""),
                     "website_urls": web_urls_list,
                     "start_urls": web_urls_list,
-                    "keywords": [k.strip() for k in web_kw_input.split(",") if k.strip()],
-                    "max_results": web_max_input,
-                    "max_results_website": web_max_input
+                    "keywords": [k.strip() for k in web_kw_raw.split(",") if k.strip()],
+                    "max_results": web_max_num,
+                    "max_results_website": web_max_num
                 }
                 if save_platform_config("website", web_obj):
                     saved_count += 1
