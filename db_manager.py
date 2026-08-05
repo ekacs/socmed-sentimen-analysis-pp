@@ -771,6 +771,28 @@ def ambil_cuitan_mentah():
     finally:
         conn.close()
 
+def ambil_eyd_cache():
+    """
+    Mengambil kamus pemetaan (raw_text -> cleaned_text) dari data yang sudah berstatus 'CLEANED'
+    untuk digunakan sebagai cache lokal agar tidak perlu memanggil API Gemini ulang.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT raw_text, cleaned_text FROM log_cuitan WHERE status = 'CLEANED' AND cleaned_text IS NOT NULL AND cleaned_text != ''")
+        rows = cursor.fetchall()
+        cache = {}
+        for raw, cleaned in rows:
+            if raw and cleaned and raw not in cache:
+                cache[raw] = cleaned
+        return cache
+    except Exception as e:
+        print(f"[WARNING] Gagal mengambil EYD cache: {e}")
+        return {}
+    finally:
+        conn.close()
+
+
 def perbarui_cuitan_setelah_proses(platform_id, cleaned_text, sentiment_label, confidence_score):
     """
     Memperbarui baris data cuitan setelah dibersihkan oleh Gemini dan diprediksi oleh SVM.

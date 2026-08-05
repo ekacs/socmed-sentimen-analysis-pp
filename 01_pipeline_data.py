@@ -51,16 +51,16 @@ def load_svm_model():
         print("[WARNING] Prediksi sentimen otomatis dilewati. Silakan jalankan '02_train_model.py' terlebih dahulu.")
         return None, None
 
-def clean_batch_with_gemini(client, batch_items):
+def clean_unique_texts_batch(client, batch_texts):
     """
-    Mengirimkan batch 25 teks sekaligus ke Gemini API dalam 1 panggil JSON prompt.
-    batch_items: list of (platform_id, raw_text)
-    Returns: dict mapping platform_id -> cleaned_text
+    Mengirimkan batch unik (maks 25-30 teks) ke Gemini API dalam 1 JSON prompt.
+    batch_texts: list of (idx, raw_text)
+    Returns: dict mapping idx -> cleaned_text
     """
     if not client:
-        return {pid: raw for pid, raw in batch_items}
+        return {idx: raw for idx, raw in batch_texts}
 
-    payload = [{"id": idx, "text": raw} for idx, (pid, raw) in enumerate(batch_items)]
+    payload = [{"id": idx, "text": raw} for idx, raw in batch_texts]
     payload_str = json.dumps(payload, ensure_ascii=False)
 
     system_prompt = (
@@ -91,13 +91,14 @@ def clean_batch_with_gemini(client, batch_items):
 
             parsed = json.loads(raw_resp)
             id_to_cleaned = {}
-            for item in parsed:
-                if isinstance(item, dict) and "id" in item and "cleaned" in item:
-                    id_to_cleaned[item["id"]] = str(item["cleaned"]).strip('"\'')
+            if isinstance(parsed, list):
+                for item in parsed:
+                    if isinstance(item, dict) and "id" in item and "cleaned" in item:
+                        id_to_cleaned[item["id"]] = str(item["cleaned"]).strip('"\'')
 
             result = {}
-            for idx, (pid, raw) in enumerate(batch_items):
-                result[pid] = id_to_cleaned.get(idx, raw)
+            for idx, raw in batch_texts:
+                result[idx] = id_to_cleaned.get(idx, raw)
             return result
         except Exception as e:
             err_str = str(e).lower()
@@ -106,44 +107,10 @@ def clean_batch_with_gemini(client, batch_items):
                 db_manager.set_gemini_quota_flag(True)
             if attempt == 2:
                 print(f"[WARNING] Batch cleaning fallback ke teks asli: {e}")
-                return {pid: raw for pid, raw in batch_items}
+                return {idx: raw for idx, raw in batch_texts}
             time.sleep(1.5 * (attempt + 1))
 
-    return {pid: raw for pid, raw in batch_items}
-
-def process_batch(batch_items, gemini_client, model, vectorizer):
-    """
-    Memproses 1 batch data (50 baris) secara ultra-cepat dengan Gemini AI & SVM.
-    """
-    cleaned_dict = clean_batch_with_gemini(gemini_client, batch_items)
-    
-    pids = [pid for pid, _ in batch_items]
-    cleaned_texts = [cleaned_dict.get(pid, raw) for pid, raw in batch_items]
-    
-    sentiment_labels = [None] * len(batch_items)
-    confidence_scores = [0.0] * len(batch_items)
-    
-    if model and vectorizer:
-        try:
-            vec_texts = vectorizer.transform(cleaned_texts)
-            preds = model.predict(vec_texts)
-            probs = model.predict_proba(vec_texts)
-            for i in range(len(batch_items)):
-                sentiment_labels[i] = preds[i]
-                confidence_scores[i] = float(np.max(probs[i]))
-        except Exception as e:
-            print(f"[ERROR] Inferensi SVM batch gagal: {e}")
-            
-    batch_updates = [
-        (cleaned_texts[i], sentiment_labels[i], confidence_scores[i], pids[i])
-        for i in range(len(pids))
-    ]
-    try:
-        db_manager.perbarui_cuitan_batch(batch_updates)
-        return len(batch_updates)
-    except Exception as e:
-        print(f"[ERROR] Bulk update DB batch gagal: {e}")
-        return 0
+    return {idx: raw for idx, raw in batch_texts}
 
 def process_pipeline():
     # 0. Deduplikasi Data RAW sebelum pemrosesan AI & ML
@@ -161,27 +128,76 @@ def process_pipeline():
         print("[HINT] Jalankan dulu Langkah 1: Penarikan Data (Scraper) untuk mendapatkan data RAW baru.")
         sys.exit(2)
         
-    batch_size = 50
-    batches = [rows[i:i + batch_size] for i in range(0, len(rows), batch_size)]
+    print(f"[INFO] Ditemukan {len(rows)} baris data RAW untuk diproses.")
     
-    print(f"[INFO] Memulai pemrosesan High-Speed Parallel Batching ({len(batches)} batch @ {batch_size} data/batch) untuk {len(rows)} data RAW...")
-    print(f"[INFO] Model SVM: {'TERSEDIA' if (model and vectorizer) else 'TIDAK DITEMUKAN'}")
-    print(f"[INFO] Gemini Client: {'TERSEDIA' if gemini_client else 'TIDAK ADA API KEY (copy teks asli)'}")
+    # 2. Caching & Deduplikasi Teks Mentah
+    eyd_cache = db_manager.ambil_eyd_cache()
+    if eyd_cache:
+        print(f"[INFO] Memuat {len(eyd_cache):,} pasangan EYD dari cache lokal.")
+
+    # Ekstrak teks mentah unik yang belum ada di cache
+    uncached_unique_texts = list(set([raw for _, raw in rows if raw and raw not in eyd_cache]))
+    cache_hits = len(rows) - len(uncached_unique_texts)
     
-    success_count = 0
-    max_workers = 10
+    if cache_hits > 0:
+        print(f"[INFO] ⚡ Caching Hit: {cache_hits} baris data langsung menggunakan hasil EYD dari cache (bebas API token).")
+        
+    if gemini_client and uncached_unique_texts:
+        batch_size = 25
+        unique_indexed = list(enumerate(uncached_unique_texts))
+        batches = [unique_indexed[i:i + batch_size] for i in range(0, len(unique_indexed), batch_size)]
+        
+        print(f"[INFO] Memproses {len(uncached_unique_texts)} teks unik belum ter-cache via Gemini AI ({len(batches)} batch @ maks {batch_size} teks/batch)...")
+        
+        max_workers = min(8, max(1, len(batches)))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(clean_unique_texts_batch, gemini_client, batch)
+                for batch in batches
+            ]
+            for future in as_completed(futures):
+                try:
+                    cleaned_res = future.result()
+                    for idx, cleaned_t in cleaned_res.items():
+                        raw_orig = uncached_unique_texts[idx]
+                        eyd_cache[raw_orig] = cleaned_t
+                except Exception as e:
+                    print(f"[ERROR] Eksekusi batch AI unik gagal: {e}")
+
+    # Map seluruh data RAW ke cleaned_texts menggunakan eyd_cache
+    pids = [pid for pid, _ in rows]
+    cleaned_texts = [eyd_cache.get(raw, raw) for _, raw in rows]
+
+    # 3. Vectorized Machine Learning (SVM) Massal
+    sentiment_labels = [None] * len(rows)
+    confidence_scores = [0.0] * len(rows)
     
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [
-            executor.submit(process_batch, batch, gemini_client, model, vectorizer)
-            for batch in batches
-        ]
-        for future in as_completed(futures):
-            try:
-                success_count += future.result()
-            except Exception as e:
-                print(f"[ERROR] Batch execution failed: {e}")
-                
+    if model and vectorizer:
+        print(f"[INFO] Melakukan inferensi ML (SVM) massal secara ter-vektorisasi untuk {len(rows)} data...")
+        try:
+            vec_texts = vectorizer.transform(cleaned_texts)
+            preds = model.predict(vec_texts)
+            probs = model.predict_proba(vec_texts)
+            for i in range(len(rows)):
+                sentiment_labels[i] = preds[i]
+                confidence_scores[i] = float(np.max(probs[i]))
+        except Exception as e:
+            print(f"[ERROR] Inferensi SVM massal gagal: {e}")
+
+    # 4. Single-Transaction Bulk Database Update
+    print(f"[INFO] Menyimpan hasil pemrosesan AI & ML ke database dalam 1 transaksi massal...")
+    batch_updates = [
+        (cleaned_texts[i], sentiment_labels[i], confidence_scores[i], pids[i])
+        for i in range(len(rows))
+    ]
+    
+    try:
+        db_manager.perbarui_cuitan_batch(batch_updates)
+        success_count = len(batch_updates)
+    except Exception as e:
+        print(f"[ERROR] Bulk update DB gagal: {e}")
+        success_count = 0
+
     failed_count = len(rows) - success_count
     print("")
     print("=" * 60)
@@ -201,7 +217,7 @@ def process_pipeline():
     if success_count == 0 and len(rows) > 0:
         print("[EXIT_CODE=1] Semua baris GAGAL diproses!")
         sys.exit(1)
-    print(f"[SUCCESS] Pipa data selesai! Berhasil memproses {success_count} dari {len(rows)} data dalam {len(batches)} batch.")
+    print(f"[SUCCESS] Pipa data selesai! Berhasil memproses {success_count} dari {len(rows)} data.")
     sys.exit(0)
 
 if __name__ == "__main__":

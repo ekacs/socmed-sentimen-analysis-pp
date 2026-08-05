@@ -1068,7 +1068,7 @@ with tab_scrape:
 
                     with info_placeholder.container():
                         m1, m2, m3 = st.columns(3)
-                        m1.metric("🕒 Waktu Mulai (WIB)", start_str)
+                        m1.metric("🕒 Waktu Mulai (UTC)", start_str)
                         m2.metric("⏱️ Waktu Berjalan", f"{time_str} ({elapsed_seconds}s)")
                         m3.metric("⚡ Status Mesin", "Proses Scraping Aktif...")
                         st.caption(f"🎯 **Platform Target (Simultan):** {', '.join(selected_platforms)}")
@@ -1141,7 +1141,7 @@ with tab_scrape:
             st.success(f"✅ **Penarikan data mentah selesai!** Berhasil menarik total **{s1['total_data_fetched']:,} baris data** dalam waktu **{s1['dur_str']}**.")
             
             m_res1, m_res2, m_res3, m_res4 = st.columns(4)
-            m_res1.metric("🕒 Waktu Mulai (WIB)", s1["start_str"])
+            m_res1.metric("🕒 Waktu Mulai (UTC)", s1["start_str"])
             m_res2.metric("🏁 Waktu Selesai", s1["end_str"])
             m_res3.metric("⏱️ Total Durasi", s1["dur_str"])
             m_res4.metric("📦 Total Data Ditarik", f"{s1['total_data_fetched']:,} Baris")
@@ -1171,7 +1171,7 @@ with tab_scrape:
         else:
             st.error(f"❌ **Penarikan Data Dihentikan / Gagal (Exit code: {s1['returncode']})**")
             m_res1, m_res2, m_res3, m_res4 = st.columns(4)
-            m_res1.metric("🕒 Waktu Mulai (WIB)", s1["start_str"])
+            m_res1.metric("🕒 Waktu Mulai (UTC)", s1["start_str"])
             m_res2.metric("🏁 Waktu Selesai", s1["end_str"])
             m_res3.metric("⏱️ Durasi Berjalan", s1["dur_str"])
             m_res4.metric("📦 Total Data Ditarik", f"{s1['total_data_fetched']:,} Baris")
@@ -1286,7 +1286,7 @@ with tab_ml:
 
                     with info_placeholder_ml.container():
                         m1, m2, m3 = st.columns(3)
-                        m1.metric("🕒 Waktu Mulai (WIB)", start_str_ml)
+                        m1.metric("🕒 Waktu Mulai (UTC)", start_str_ml)
                         m2.metric("⏱️ Waktu Berjalan", f"{time_str} ({elapsed_seconds}s)")
                         m3.metric("⚡ Status Mesin", "Proses AI & ML Aktif...")
 
@@ -1342,7 +1342,7 @@ with tab_ml:
             st.success(f"✅ **Proses prapemrosesan AI & klasifikasi ML selesai dengan sukses!** Data siap di-review di Tahapan 3.")
 
             m_ml1, m_ml2, m_ml3, m_ml4 = st.columns(4)
-            m_ml1.metric("🕒 Waktu Mulai (WIB)", s2["start_str_ml"])
+            m_ml1.metric("🕒 Waktu Mulai (UTC)", s2["start_str_ml"])
             m_ml2.metric("🏁 Waktu Selesai", s2["end_str_ml"])
             m_ml3.metric("⏱️ Total Durasi", s2["dur_str_ml"])
             m_ml4.metric("📦 Total Data Terolah", f"{s2['final_clean_count']:,} Baris")
@@ -1352,7 +1352,7 @@ with tab_ml:
         else:
             st.error(f"❌ **Pemrosesan AI & ML Dihentikan / Gagal (Exit code: {s2['returncode']})**")
             m_ml1, m_ml2, m_ml3, m_ml4 = st.columns(4)
-            m_ml1.metric("🕒 Waktu Mulai (WIB)", s2["start_str_ml"])
+            m_ml1.metric("🕒 Waktu Mulai (UTC)", s2["start_str_ml"])
             m_ml2.metric("🏁 Waktu Selesai", s2["end_str_ml"])
             m_ml3.metric("⏱️ Durasi Berjalan", s2["dur_str_ml"])
             m_ml4.metric("📦 Total Data Terolah", f"{s2['final_clean_count']:,} Baris")
