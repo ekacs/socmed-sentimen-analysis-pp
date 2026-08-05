@@ -1061,7 +1061,7 @@ with tab_scrape:
 
                     with info_placeholder.container():
                         m1, m2, m3 = st.columns(3)
-                        m1.metric("🕒 Waktu Mulai", start_str)
+                        m1.metric("🕒 Waktu Mulai (UTC)", start_str)
                         m2.metric("⏱️ Waktu Berjalan", f"{time_str} ({elapsed_seconds}s)")
                         m3.metric("⚡ Status Mesin", "Proses Scraping Aktif...")
                         st.caption(f"🎯 **Platform Target (Simultan):** {', '.join(selected_platforms)}")
@@ -1116,7 +1116,7 @@ with tab_scrape:
                     st.success(f"✅ **Penarikan data mentah selesai!** Berhasil menarik total **{total_data_fetched:,} baris data** dalam waktu **{dur_str}**.")
                     
                     m_res1, m_res2, m_res3, m_res4 = st.columns(4)
-                    m_res1.metric("🕒 Waktu Mulai", start_str)
+                    m_res1.metric("🕒 Waktu Mulai (UTC)", start_str)
                     m_res2.metric("🏁 Waktu Selesai", end_str)
                     m_res3.metric("⏱️ Total Durasi", dur_str)
                     m_res4.metric("📦 Total Data Ditarik", f"{total_data_fetched:,} Baris")
@@ -1145,7 +1145,7 @@ with tab_scrape:
                     status_s.update(label=f"❌ Penarikan Data Dihentikan / Gagal (Exit code: {proc.returncode})", state="error", expanded=True)
                     
                     m_res1, m_res2, m_res3, m_res4 = st.columns(4)
-                    m_res1.metric("🕒 Waktu Mulai", start_str)
+                    m_res1.metric("🕒 Waktu Mulai (UTC)", start_str)
                     m_res2.metric("🏁 Waktu Selesai", end_str)
                     m_res3.metric("⏱️ Durasi Berjalan", dur_str)
                     m_res4.metric("📦 Total Data Ditarik", f"{total_data_fetched:,} Baris")
@@ -1211,6 +1211,14 @@ with tab_ml:
             st.info("ℹ️ Tidak ada proses AI & ML yang sedang berjalan.")
     
     if btn_run_pipeline:
+        import queue
+        import threading
+        import time
+
+        initial_clean_count = len(db_manager.ambil_cuitan_terolah())
+        start_time_ml = datetime.datetime.now()
+        start_str_ml = start_time_ml.strftime("%H:%M:%S WIB")
+
         with st.status("🧠 Melakukan pembersihan duplikat RAW, standardisasi EYD (LLM), & klasifikasi SVM...", expanded=True) as status_ml:
             try:
                 proc = subprocess.Popen(
@@ -1218,31 +1226,105 @@ with tab_ml:
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
+                    bufsize=1,
                     env=session_credentials.get_session_env_dict()
                 )
                 st.session_state["proc_pipeline_obj"] = proc
-                
-                import time
+
+                log_queue_ml = queue.Queue()
+                log_lines_ml = []
+
+                def enqueue_output_ml(out_stream, q):
+                    for line in iter(out_stream.readline, ''):
+                        q.put(line)
+                    out_stream.close()
+
+                t_out_ml = threading.Thread(target=enqueue_output_ml, args=(proc.stdout, log_queue_ml))
+                t_out_ml.daemon = True
+                t_out_ml.start()
+
+                info_placeholder_ml = st.empty()
+                log_placeholder_ml = st.empty()
+
                 while proc.poll() is None:
+                    # Ambil baris log baru dari queue
+                    while True:
+                        try:
+                            line = log_queue_ml.get_nowait()
+                            log_lines_ml.append(line)
+                        except queue.Empty:
+                            break
+
+                    now = datetime.datetime.now()
+                    elapsed_seconds = int((now - start_time_ml).total_seconds())
+                    mins, secs = divmod(elapsed_seconds, 60)
+                    time_str = f"{mins:02d}:{secs:02d}"
+
+                    with info_placeholder_ml.container():
+                        m1, m2, m3 = st.columns(3)
+                        m1.metric("🕒 Waktu Mulai (WIB)", start_str_ml)
+                        m2.metric("⏱️ Waktu Berjalan", f"{time_str} ({elapsed_seconds}s)")
+                        m3.metric("⚡ Status Mesin", "Proses AI & ML Aktif...")
+
+                    if log_lines_ml:
+                        with log_placeholder_ml.container():
+                            st.markdown("**📋 Live Terminal Output (Pipeline AI & ML):**")
+                            st.code("".join(log_lines_ml[-12:]), language="text")
+
                     time.sleep(0.5)
-                    
-                stdout, stderr = proc.communicate()
+
+                # Kuras sisa queue log
+                while True:
+                    try:
+                        line = log_queue_ml.get_nowait()
+                        log_lines_ml.append(line)
+                    except queue.Empty:
+                        break
+
+                stderr_text = proc.stderr.read() if proc.stderr else ""
                 st.session_state["proc_pipeline_obj"] = None
-                
+
+                end_time_ml = datetime.datetime.now()
+                end_str_ml = end_time_ml.strftime("%H:%M:%S WIB")
+                total_sec_ml = (end_time_ml - start_time_ml).total_seconds()
+                t_mins_ml, t_secs_ml = divmod(int(total_sec_ml), 60)
+                dur_str_ml = f"{t_mins_ml} menit {t_secs_ml} detik" if t_mins_ml > 0 else f"{total_sec_ml:.1f} detik"
+
+                info_placeholder_ml.empty()
+                log_placeholder_ml.empty()
+
+                full_log_ml = "".join(log_lines_ml) or stderr_text
+                final_clean_count = len(db_manager.ambil_cuitan_terolah())
+                processed_count = max(0, final_clean_count - initial_clean_count)
+
                 if proc.returncode == 0:
-                    status_ml.update(label="✅ Proses AI & ML Selesai!", state="complete", expanded=False)
-                    st.success("✅ Proses prapemrosesan AI & klasifikasi ML selesai dengan sukses! Data siap di-review di Tahapan 3.")
+                    status_ml.update(label=f"✅ Proses AI & ML Selesai! Total durasi: {dur_str_ml}", state="complete", expanded=False)
+                    st.success(f"✅ **Proses prapemrosesan AI & klasifikasi ML selesai dengan sukses!** Data siap di-review di Tahapan 3.")
+
+                    m_ml1, m_ml2, m_ml3, m_ml4 = st.columns(4)
+                    m_ml1.metric("🕒 Waktu Mulai (WIB)", start_str_ml)
+                    m_ml2.metric("🏁 Waktu Selesai", end_str_ml)
+                    m_ml3.metric("⏱️ Total Durasi", dur_str_ml)
+                    m_ml4.metric("📦 Total Data Terolah", f"{final_clean_count:,} Baris")
+
                     with st.expander("📋 Log Detail Pemrosesan Pipeline"):
-                        st.code(stdout, language="text")
-                        if stderr: st.code(stderr, language="text")
+                        st.code(full_log_ml, language="text")
                 else:
                     status_ml.update(label=f"❌ Gagal / Dihentikan (Exit code: {proc.returncode})", state="error", expanded=True)
-                    if proc.returncode in [-9, 15, 1] and ("taskkill" in (stderr or "").lower() or "keyboardinterrupt" in (stderr or "").lower()):
+
+                    m_ml1, m_ml2, m_ml3, m_ml4 = st.columns(4)
+                    m_ml1.metric("🕒 Waktu Mulai (WIB)", start_str_ml)
+                    m_ml2.metric("🏁 Waktu Selesai", end_str_ml)
+                    m_ml3.metric("⏱️ Durasi Berjalan", dur_str_ml)
+                    m_ml4.metric("📦 Total Data Terolah", f"{final_clean_count:,} Baris")
+
+                    if proc.returncode in [-9, 15, 1] and ("taskkill" in (stderr_text or "").lower() or "keyboardinterrupt" in (stderr_text or "").lower()):
                         st.warning("⏹️ Pemrosesan AI & ML dihentikan secara paksa oleh pengguna.")
                     else:
                         st.error("❌ Gagal memproses pipeline data. Cek kunci GEMINI_API_KEY di sesi / file .env dan ketersediaan model SVM.")
+
                     with st.expander("📋 Log Kesalahan"):
-                        st.code(stdout or stderr, language="text")
+                        st.code(full_log_ml, language="text")
             except Exception as e_s2:
                 status_ml.update(label=f"❌ Gagal memproses: {e_s2}", state="error", expanded=True)
                 st.error(f"❌ Terjadi kesalahan saat menjalankan pipeline AI & ML: {e_s2}")
@@ -1929,6 +2011,10 @@ with tab_viz:
     neg_tweets = df_viz_cleaned[df_viz_cleaned['sentiment_label'] == 'Negatif'] if not df_viz_cleaned.empty else pd.DataFrame()
     contoh_suara = f"'{neg_tweets['raw_text'].iloc[0]}'" if not neg_tweets.empty else "Tidak ada cuitan negatif dominan."
 
+    if 'ai_narratives_history' not in st.session_state:
+        st.session_state['ai_narratives_history'] = []
+    if 'ai_narrative_selected_idx' not in st.session_state:
+        st.session_state['ai_narrative_selected_idx'] = 0
     if 'ai_narrative_viz_cache' not in st.session_state:
         st.session_state['ai_narrative_viz_cache'] = ""
 
@@ -1939,11 +2025,15 @@ with tab_viz:
             "**Rekomendasi:** Silakan jalankan penarikan data baru di Tahapan 1 dan proses AI di Tahapan 2."
         )
         st.session_state['ai_narrative_viz_cache'] = ""
+        st.session_state['ai_narratives_history'] = []
     else:
         if selected_search_terms:
             fokus_kebijakan_txt = ", ".join(selected_search_terms)
         else:
             fokus_kebijakan_txt = f"isu publik dengan kata kunci ({top_kw_str})"
+
+        history = st.session_state['ai_narratives_history']
+        count_generated = len(history)
 
         if gemini_is_out:
             st.error(
@@ -1952,22 +2042,59 @@ with tab_viz:
             )
             st.button("🔄 Perbarui Analisis Narasi (AI)", type="primary", disabled=True, help="Kuota token LLM AI habis. Fitur AI dinonaktifkan sementara.")
         else:
-            if st.button("🔄 Perbarui Analisis Narasi (AI)", type="primary", key="btn_gen_nlg_tab4"):
-                with st.spinner(f"Menganalisis isu '{fokus_kebijakan_txt}' & menyusun narasi minimal 250 kata..."):
-                    narrative_res = generate_executive_summary(
-                        total_data=total_cleaned_viz,
-                        persen_negatif=round(persen_neg_v, 1),
-                        persen_positif=round(persen_pos_v, 1),
-                        persen_netral=round(persen_neu_v, 1),
-                        top_keywords=top_kw_str,
-                        contoh_cuitan=contoh_suara,
-                        kebijakan_fokus=fokus_kebijakan_txt,
-                        api_key=session_credentials.get_active_gemini_key()
-                    )
-                    st.session_state['ai_narrative_viz_cache'] = narrative_res
+            c_btn_nlg, c_info_nlg = st.columns([2.5, 3.5])
+            with c_btn_nlg:
+                btn_disabled = (count_generated >= 3)
+                btn_label = f"🔄 Perbarui Analisis Narasi (AI) [{count_generated}/3]" if count_generated > 0 else "🔄 Perbarui Analisis Narasi (AI)"
+                btn_help = "Batas maksimal 3 versi perbarui narasi telah tercapai." if btn_disabled else f"Hasilkan versi narasi baru ({count_generated+1}/3)."
                 
-        if st.session_state['ai_narrative_viz_cache']:
-            st.markdown(st.session_state['ai_narrative_viz_cache'])
+                if st.button(btn_label, type="primary", disabled=btn_disabled, help=btn_help, key="btn_gen_nlg_tab4"):
+                    with st.spinner(f"Menganalisis isu '{fokus_kebijakan_txt}' & menyusun narasi versi {count_generated+1}..."):
+                        narrative_res = generate_executive_summary(
+                            total_data=total_cleaned_viz,
+                            persen_negatif=round(persen_neg_v, 1),
+                            persen_positif=round(persen_pos_v, 1),
+                            persen_netral=round(persen_neu_v, 1),
+                            top_keywords=top_kw_str,
+                            contoh_cuitan=contoh_suara,
+                            kebijakan_fokus=fokus_kebijakan_txt,
+                            api_key=session_credentials.get_active_gemini_key()
+                        )
+                        st.session_state['ai_narratives_history'].append(narrative_res)
+                        st.session_state['ai_narrative_selected_idx'] = len(st.session_state['ai_narratives_history']) - 1
+                        st.session_state['ai_narrative_viz_cache'] = narrative_res
+                        st.rerun()
+
+            with c_info_nlg:
+                if count_generated >= 3:
+                    st.caption("🔒 **Batas Maksimal 3 Versi Narasi Tercapai.** Silakan pilih versi 1, 2, atau 3 di bawah ini yang paling sesuai.")
+                elif count_generated > 0:
+                    st.caption(f"💡 Anda telah menghasilkan **{count_generated} dari 3** batas versi narasi.")
+
+        # Pilihan Versi Narasi (1, 2, 3) jika sudah ada narasi yang dihasilkan
+        curr_history = st.session_state['ai_narratives_history']
+        if curr_history:
+            st.markdown("---")
+            ver_labels = [f"Versi {i+1}" for i in range(len(curr_history))]
+            
+            curr_idx = min(st.session_state.get('ai_narrative_selected_idx', 0), len(curr_history) - 1)
+            
+            selected_ver = st.radio(
+                "📌 **Pilih Versi Narasi yang Sesuai (Versi 1, 2, atau 3):**",
+                options=ver_labels,
+                index=curr_idx,
+                horizontal=True,
+                key="radio_select_narrative_ver",
+                help="Pilih versi narasi yang paling sesuai untuk ditampilkan di dasbor dan diekspor ke laporan PDF."
+            )
+            
+            sel_idx = ver_labels.index(selected_ver)
+            st.session_state['ai_narrative_selected_idx'] = sel_idx
+            st.session_state['ai_narrative_viz_cache'] = curr_history[sel_idx]
+
+            with st.container(border=True):
+                st.markdown(f"### 📝 Hasil Narasi Ringkasan Eksekutif ({selected_ver})")
+                st.markdown(curr_history[sel_idx])
         else:
             st.info("Klik tombol **🔄 Perbarui Analisis Narasi** di atas untuk menghasilkan ringkasan eksekutif.")
 
