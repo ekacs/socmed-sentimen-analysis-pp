@@ -1013,6 +1013,7 @@ with tab_scrape:
             st.info("ℹ️ Tidak ada proses penarikan data yang sedang berjalan.")
 
     if btn_run_s1:
+        st.session_state["last_run_summary_s1"] = None
         do_save_all_current_configs(show_toast=False)
 
         import queue
@@ -1067,7 +1068,7 @@ with tab_scrape:
 
                     with info_placeholder.container():
                         m1, m2, m3 = st.columns(3)
-                        m1.metric("🕒 Waktu Mulai (UTC)", start_str)
+                        m1.metric("🕒 Waktu Mulai (WIB)", start_str)
                         m2.metric("⏱️ Waktu Berjalan", f"{time_str} ({elapsed_seconds}s)")
                         m3.metric("⚡ Status Mesin", "Proses Scraping Aktif...")
                         st.caption(f"🎯 **Platform Target (Simultan):** {', '.join(selected_platforms)}")
@@ -1116,56 +1117,72 @@ with tab_scrape:
                 else:
                     total_data_fetched = sum(platform_counts.values())
 
-                if proc.returncode == 0:
-                    status_s.update(label=f"✅ Penarikan data selesai! Total durasi: {dur_str} | Data ditarik: {total_data_fetched:,} baris", state="complete", expanded=False)
-                    
-                    st.success(f"✅ **Penarikan data mentah selesai!** Berhasil menarik total **{total_data_fetched:,} baris data** dalam waktu **{dur_str}**.")
-                    
-                    m_res1, m_res2, m_res3, m_res4 = st.columns(4)
-                    m_res1.metric("🕒 Waktu Mulai (UTC)", start_str)
-                    m_res2.metric("🏁 Waktu Selesai", end_str)
-                    m_res3.metric("⏱️ Total Durasi", dur_str)
-                    m_res4.metric("📦 Total Data Ditarik", f"{total_data_fetched:,} Baris")
-                    
-                    with st.container(border=True):
-                        st.markdown("#### 📊 Rincian Perolehan Data Per Platform")
-                        cols_p = st.columns(len(selected_platforms))
-                        for idx, sp in enumerate(selected_platforms):
-                            with cols_p[idx]:
-                                if sp == "Twitter (X)":
-                                    cnt = platform_counts.get("twitter", 0)
-                                    st.metric("🐦 Twitter (X)", f"{cnt:,} cuitan")
-                                elif sp == "Instagram":
-                                    cnt = platform_counts.get("instagram", 0)
-                                    st.metric("📸 Instagram", f"{cnt:,} posting")
-                                elif sp == "LinkedIn":
-                                    cnt = platform_counts.get("linkedin", 0)
-                                    st.metric("💼 LinkedIn", f"{cnt:,} posting")
-                                elif sp == "Website / Dokumen Publik":
-                                    cnt = platform_counts.get("website", platform_counts.get("portal_berita", 0))
-                                    st.metric("🌐 Website", f"{cnt:,} artikel")
-
-                    with st.expander("📋 Log Lengkap Scraper"):
-                        st.code(full_log_str, language="text")
-                else:
-                    status_s.update(label=f"❌ Penarikan Data Dihentikan / Gagal (Exit code: {proc.returncode})", state="error", expanded=True)
-                    
-                    m_res1, m_res2, m_res3, m_res4 = st.columns(4)
-                    m_res1.metric("🕒 Waktu Mulai (UTC)", start_str)
-                    m_res2.metric("🏁 Waktu Selesai", end_str)
-                    m_res3.metric("⏱️ Durasi Berjalan", dur_str)
-                    m_res4.metric("📦 Total Data Ditarik", f"{total_data_fetched:,} Baris")
-
-                    if proc.returncode in [-9, 15, 1] and ("taskkill" in stderr_text.lower() or "keyboardinterrupt" in stderr_text.lower()):
-                        st.warning("⏹️ Penarikan data dihentikan secara paksa oleh pengguna.")
-                    else:
-                        st.error("❌ Penarikan data gagal atau dihentikan. Cek token APIFY_API_TOKEN di sesi / file .env.")
-                    
-                    with st.expander("📋 Log Kesalahan"):
-                        st.code(full_log_str, language="text")
+                st.session_state["last_run_summary_s1"] = {
+                    "is_success": (proc.returncode == 0),
+                    "start_str": start_str,
+                    "end_str": end_str,
+                    "dur_str": dur_str,
+                    "total_data_fetched": total_data_fetched,
+                    "platform_counts": platform_counts,
+                    "selected_platforms": list(selected_platforms),
+                    "full_log_str": full_log_str,
+                    "stderr_text": stderr_text,
+                    "returncode": proc.returncode
+                }
             except Exception as e_s1:
                 status_s.update(label=f"❌ Gagal memproses: {e_s1}", state="error", expanded=True)
                 st.error(f"❌ Terjadi kesalahan saat menjalankan scraper: {e_s1}")
+
+    # Tampilkan rangkuman eksekusi penarikan data secara persisten (tidak hilang sampai tombol diklik lagi)
+    if st.session_state.get("last_run_summary_s1"):
+        s1 = st.session_state["last_run_summary_s1"]
+        st.markdown("---")
+        if s1["is_success"]:
+            st.success(f"✅ **Penarikan data mentah selesai!** Berhasil menarik total **{s1['total_data_fetched']:,} baris data** dalam waktu **{s1['dur_str']}**.")
+            
+            m_res1, m_res2, m_res3, m_res4 = st.columns(4)
+            m_res1.metric("🕒 Waktu Mulai (WIB)", s1["start_str"])
+            m_res2.metric("🏁 Waktu Selesai", s1["end_str"])
+            m_res3.metric("⏱️ Total Durasi", s1["dur_str"])
+            m_res4.metric("📦 Total Data Ditarik", f"{s1['total_data_fetched']:,} Baris")
+            
+            with st.container(border=True):
+                st.markdown("#### 📊 Rincian Perolehan Data Per Platform")
+                sp_list = s1.get("selected_platforms", [])
+                if sp_list:
+                    cols_p = st.columns(len(sp_list))
+                    for idx, sp in enumerate(sp_list):
+                        with cols_p[idx]:
+                            if sp == "Twitter (X)":
+                                cnt = s1["platform_counts"].get("twitter", 0)
+                                st.metric("🐦 Twitter (X)", f"{cnt:,} cuitan")
+                            elif sp == "Instagram":
+                                cnt = s1["platform_counts"].get("instagram", 0)
+                                st.metric("📸 Instagram", f"{cnt:,} posting")
+                            elif sp == "LinkedIn":
+                                cnt = s1["platform_counts"].get("linkedin", 0)
+                                st.metric("💼 LinkedIn", f"{cnt:,} posting")
+                            elif sp == "Website / Dokumen Publik":
+                                cnt = s1["platform_counts"].get("website", s1["platform_counts"].get("portal_berita", 0))
+                                st.metric("🌐 Website", f"{cnt:,} artikel")
+
+            with st.expander("📋 Log Lengkap Scraper"):
+                st.code(s1["full_log_str"], language="text")
+        else:
+            st.error(f"❌ **Penarikan Data Dihentikan / Gagal (Exit code: {s1['returncode']})**")
+            m_res1, m_res2, m_res3, m_res4 = st.columns(4)
+            m_res1.metric("🕒 Waktu Mulai (WIB)", s1["start_str"])
+            m_res2.metric("🏁 Waktu Selesai", s1["end_str"])
+            m_res3.metric("⏱️ Durasi Berjalan", s1["dur_str"])
+            m_res4.metric("📦 Total Data Ditarik", f"{s1['total_data_fetched']:,} Baris")
+
+            if s1['returncode'] in [-9, 15, 1] and ("taskkill" in s1['stderr_text'].lower() or "keyboardinterrupt" in s1['stderr_text'].lower()):
+                st.warning("⏹️ Penarikan data dihentikan secara paksa oleh pengguna.")
+            else:
+                st.error("❌ Penarikan data gagal atau dihentikan. Cek token APIFY_API_TOKEN di sesi / file .env.")
+            
+            with st.expander("📋 Log Kesalahan"):
+                st.code(s1["full_log_str"], language="text")
 
 # =====================================================================
 # TAB 2: PROSES AI & KLASIFIKASI ML
@@ -1217,6 +1234,7 @@ with tab_ml:
             st.info("ℹ️ Tidak ada proses AI & ML yang sedang berjalan.")
     
     if btn_run_pipeline:
+        st.session_state["last_run_summary_s2"] = None
         import queue
         import threading
         import time
@@ -1301,39 +1319,51 @@ with tab_ml:
 
                 full_log_ml = "".join(log_lines_ml) or stderr_text
                 final_clean_count = len(db_manager.baca_data_untuk_streamlit())
-                processed_count = max(0, final_clean_count - initial_clean_count)
 
-                if proc.returncode == 0:
-                    status_ml.update(label=f"✅ Proses AI & ML Selesai! Total durasi: {dur_str_ml}", state="complete", expanded=False)
-                    st.success(f"✅ **Proses prapemrosesan AI & klasifikasi ML selesai dengan sukses!** Data siap di-review di Tahapan 3.")
-
-                    m_ml1, m_ml2, m_ml3, m_ml4 = st.columns(4)
-                    m_ml1.metric("🕒 Waktu Mulai (WIB)", start_str_ml)
-                    m_ml2.metric("🏁 Waktu Selesai", end_str_ml)
-                    m_ml3.metric("⏱️ Total Durasi", dur_str_ml)
-                    m_ml4.metric("📦 Total Data Terolah", f"{final_clean_count:,} Baris")
-
-                    with st.expander("📋 Log Detail Pemrosesan Pipeline"):
-                        st.code(full_log_ml, language="text")
-                else:
-                    status_ml.update(label=f"❌ Gagal / Dihentikan (Exit code: {proc.returncode})", state="error", expanded=True)
-
-                    m_ml1, m_ml2, m_ml3, m_ml4 = st.columns(4)
-                    m_ml1.metric("🕒 Waktu Mulai (WIB)", start_str_ml)
-                    m_ml2.metric("🏁 Waktu Selesai", end_str_ml)
-                    m_ml3.metric("⏱️ Durasi Berjalan", dur_str_ml)
-                    m_ml4.metric("📦 Total Data Terolah", f"{final_clean_count:,} Baris")
-
-                    if proc.returncode in [-9, 15, 1] and ("taskkill" in (stderr_text or "").lower() or "keyboardinterrupt" in (stderr_text or "").lower()):
-                        st.warning("⏹️ Pemrosesan AI & ML dihentikan secara paksa oleh pengguna.")
-                    else:
-                        st.error("❌ Gagal memproses pipeline data. Cek kunci GEMINI_API_KEY di sesi / file .env dan ketersediaan model SVM.")
-
-                    with st.expander("📋 Log Kesalahan"):
-                        st.code(full_log_ml, language="text")
+                st.session_state["last_run_summary_s2"] = {
+                    "is_success": (proc.returncode == 0),
+                    "start_str_ml": start_str_ml,
+                    "end_str_ml": end_str_ml,
+                    "dur_str_ml": dur_str_ml,
+                    "final_clean_count": final_clean_count,
+                    "full_log_ml": full_log_ml,
+                    "stderr_text": stderr_text,
+                    "returncode": proc.returncode
+                }
             except Exception as e_s2:
                 status_ml.update(label=f"❌ Gagal memproses: {e_s2}", state="error", expanded=True)
                 st.error(f"❌ Terjadi kesalahan saat menjalankan pipeline AI & ML: {e_s2}")
+
+    # Tampilkan rangkuman eksekusi proses AI & ML secara persisten (tidak hilang sampai tombol diklik lagi)
+    if st.session_state.get("last_run_summary_s2"):
+        s2 = st.session_state["last_run_summary_s2"]
+        st.markdown("---")
+        if s2["is_success"]:
+            st.success(f"✅ **Proses prapemrosesan AI & klasifikasi ML selesai dengan sukses!** Data siap di-review di Tahapan 3.")
+
+            m_ml1, m_ml2, m_ml3, m_ml4 = st.columns(4)
+            m_ml1.metric("🕒 Waktu Mulai (WIB)", s2["start_str_ml"])
+            m_ml2.metric("🏁 Waktu Selesai", s2["end_str_ml"])
+            m_ml3.metric("⏱️ Total Durasi", s2["dur_str_ml"])
+            m_ml4.metric("📦 Total Data Terolah", f"{s2['final_clean_count']:,} Baris")
+
+            with st.expander("📋 Log Detail Pemrosesan Pipeline"):
+                st.code(s2["full_log_ml"], language="text")
+        else:
+            st.error(f"❌ **Pemrosesan AI & ML Dihentikan / Gagal (Exit code: {s2['returncode']})**")
+            m_ml1, m_ml2, m_ml3, m_ml4 = st.columns(4)
+            m_ml1.metric("🕒 Waktu Mulai (WIB)", s2["start_str_ml"])
+            m_ml2.metric("🏁 Waktu Selesai", s2["end_str_ml"])
+            m_ml3.metric("⏱️ Durasi Berjalan", s2["dur_str_ml"])
+            m_ml4.metric("📦 Total Data Terolah", f"{s2['final_clean_count']:,} Baris")
+
+            if s2['returncode'] in [-9, 15, 1] and ("taskkill" in (s2['stderr_text'] or "").lower() or "keyboardinterrupt" in (s2['stderr_text'] or "").lower()):
+                st.warning("⏹️ Pemrosesan AI & ML dihentikan secara paksa oleh pengguna.")
+            else:
+                st.error("❌ Gagal memproses pipeline data. Cek kunci GEMINI_API_KEY di sesi / file .env dan ketersediaan model SVM.")
+
+            with st.expander("📋 Log Kesalahan"):
+                st.code(s2["full_log_ml"], language="text")
 
 # =====================================================================
 # TAB 3: REVIEW DATA
