@@ -165,8 +165,21 @@ def buat_tabel():
                     WHERE table_name='keysearch_history';
                 """)
                 kh_cols = [row[0] for row in cursor.fetchall()]
-                if kh_cols and 'search_term' not in kh_cols:
-                    cursor.execute("ALTER TABLE keysearch_history ADD COLUMN search_term TEXT;")
+                if kh_cols:
+                    if 'search_term' not in kh_cols:
+                        cursor.execute("ALTER TABLE keysearch_history ADD COLUMN search_term TEXT;")
+                    if 'keywords' not in kh_cols:
+                        cursor.execute("ALTER TABLE keysearch_history ADD COLUMN keywords TEXT;")
+                    try:
+                        cursor.execute("ALTER TABLE keysearch_history ADD CONSTRAINT keysearch_history_search_term_key UNIQUE (search_term);")
+                    except Exception:
+                        pass
+                    # Selaraskan nilai antar kolom search_term <-> keywords agar tampil sempurna di Supabase Table Editor
+                    try:
+                        cursor.execute("UPDATE keysearch_history SET search_term = keywords WHERE (search_term IS NULL OR search_term = '') AND keywords IS NOT NULL AND keywords != '';")
+                        cursor.execute("UPDATE keysearch_history SET keywords = search_term WHERE (keywords IS NULL OR keywords = '') AND search_term IS NOT NULL AND search_term != '';")
+                    except Exception:
+                        pass
             else:
                 cursor.execute("PRAGMA table_info(log_cuitan);")
                 columns = [row[1] for row in cursor.fetchall()]
@@ -285,19 +298,40 @@ def simpan_keysearch_history(keywords=None, profiles=None, hashtags=None, terms=
     try:
         for t in cleaned_terms:
             if db_type == "postgresql":
-                query = f"""
-                    INSERT INTO keysearch_history (search_term, created_at)
-                    VALUES ({placeholder}, {placeholder})
-                    ON CONFLICT (search_term) DO NOTHING
-                """
-                cursor.execute(query, (t, created_at))
+                try:
+                    query = f"""
+                        INSERT INTO keysearch_history (search_term, keywords, created_at)
+                        VALUES ({placeholder}, {placeholder}, {placeholder})
+                        ON CONFLICT (search_term) DO UPDATE SET keywords = EXCLUDED.keywords
+                    """
+                    cursor.execute(query, (t, t, created_at))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+                    try:
+                        query = f"""
+                            INSERT INTO keysearch_history (search_term, created_at)
+                            VALUES ({placeholder}, {placeholder})
+                            ON CONFLICT (search_term) DO NOTHING
+                        """
+                        cursor.execute(query, (t, created_at))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+                        try:
+                            cursor.execute(f"SELECT 1 FROM keysearch_history WHERE search_term = {placeholder} OR keywords = {placeholder}", (t, t))
+                            if not cursor.fetchone():
+                                cursor.execute(f"INSERT INTO keysearch_history (search_term, keywords, created_at) VALUES ({placeholder}, {placeholder}, {placeholder})", (t, t, created_at))
+                                conn.commit()
+                        except Exception as _ex_sub:
+                            conn.rollback()
             else:
                 query = f"""
-                    INSERT OR IGNORE INTO keysearch_history (search_term, created_at)
-                    VALUES ({placeholder}, {placeholder})
+                    INSERT OR IGNORE INTO keysearch_history (search_term, keywords, created_at)
+                    VALUES ({placeholder}, {placeholder}, {placeholder})
                 """
-                cursor.execute(query, (t, created_at))
-        conn.commit()
+                cursor.execute(query, (t, t, created_at))
+                conn.commit()
     except Exception as e:
         print(f"[ERROR] Gagal menyimpan keysearch_history: {e}")
     finally:
