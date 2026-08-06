@@ -15,7 +15,7 @@ Platform ini mengintegrasikan teknologi AI fokus pada **Large Language Model (LL
 
 [socmed-sentimen-analysis-pp.streamlit.app](https://socmed-sentimen-analysis-pp.streamlit.app/)
 
-### Fitur Utama
+### Fitur Utama.
 
 - **Penarikan Data Multi-Platform (Multi-Source Scraping)**: Mengambil data percakapan publik secara otomatis dari Twitter/X, Instagram, LinkedIn, dan Portal Berita Utama Indonesia (Kompas, CNN Indonesia, Katadata, Detik, Tribunnews, Liputan6, Tempo, Republika, dll.) via Apify API dengan konfigurasi terstruktur per platform.
 - **Prapemrosesan & Standardisasi Teks EYD berbasis LLM & Local Caching**: Saat Menggunakan Google Gemini API (`gemini-3.1-flash-lite`) dalam mode *high-speed parallel batching* terintegrasi *Local EYD Cache* (`ambil_eyd_cache`) untuk mengoreksi typo, slang, dan singkatan menjadi Bahasa Indonesia Baku (EYD) secara hemat token tanpa pengulangan teks yang pernah dibersihkan.
