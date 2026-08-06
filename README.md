@@ -5,7 +5,7 @@
 
 ---
 
-## 1. Overview Aplikasi
+## 1. Overview Aplikasi.
 
 **Aplikasi Analisis Sentimen Publik terintegrasi AI** adalah platform analitik komprehensif yang dirancang untuk mengumpulkan, memproses, mengklasifikasikan, dan menganalisis persepsi masyarakat di media sosial serta media berita daring terkait isu dan kebijakan publik di Indonesia.
 
