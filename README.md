@@ -72,7 +72,7 @@ graph TD
 
 ---
 
-## 3. Pipeline Data & ML
+## 3. Pipeline Data & ML.
 
 Pipa pemrosesan data berjalan dalam 6 tahapan utama secara terstruktur dari hulu ke hilir:
 
