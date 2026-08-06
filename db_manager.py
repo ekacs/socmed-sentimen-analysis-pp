@@ -1006,13 +1006,27 @@ def hapus_duplikasi_data_raw():
 
 def test_db_connection(db_url):
     """
-    Menguji koneksi ke database PostgreSQL berdasarkan db_url.
+    Menguji koneksi ke database (SQLite lokal atau PostgreSQL cloud) berdasarkan db_url.
     Returns: (success: bool, message: str)
     """
     if not db_url or not isinstance(db_url, str):
         return False, "URL database kosong atau tidak valid."
     
     db_url_clean = db_url.strip()
+    if db_url_clean.lower() in ["sqlite", "local", "lokal"]:
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1;")
+            res = cursor.fetchone()
+            conn.close()
+            if res and res[0] == 1:
+                return True, f"Koneksi ke database SQLite lokal ('{DB_FILE}') berhasil!"
+            else:
+                return False, "Koneksi ke SQLite lokal gagal pada query uji."
+        except Exception as e:
+            return False, f"Gagal terhubung ke SQLite lokal: {str(e)}"
+
     if "[" in db_url_clean and "]" in db_url_clean:
         db_url_clean = db_url_clean.replace("[", "").replace("]", "")
     if db_url_clean.startswith("postgres://"):

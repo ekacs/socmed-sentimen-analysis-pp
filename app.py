@@ -450,15 +450,22 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
             btn_reset_cred = st.form_submit_button("🗑️ Reset", use_container_width=True)
             
         if btn_test_db:
-            target_test_url = input_supabase.strip() if input_supabase.strip() else cur_supabase
-            if not target_test_url:
-                st.warning("⚠️ Silakan masukkan URL PostgreSQL Cloud terlebih dahulu untuk diuji.")
-            else:
-                ok_conn, msg_conn = db_manager.test_db_connection(target_test_url)
+            if selected_db_mode == "Lokal (SQLite)":
+                ok_conn, msg_conn = db_manager.test_db_connection("sqlite")
                 if ok_conn:
                     st.success(f"✅ {msg_conn}")
                 else:
                     st.error(f"❌ {msg_conn}")
+            else:
+                target_test_url = input_supabase.strip() if input_supabase.strip() else cur_supabase
+                if not target_test_url:
+                    st.warning("⚠️ Silakan masukkan URL PostgreSQL Cloud terlebih dahulu untuk diuji.")
+                else:
+                    ok_conn, msg_conn = db_manager.test_db_connection(target_test_url)
+                    if ok_conn:
+                        st.success(f"✅ {msg_conn}")
+                    else:
+                        st.error(f"❌ {msg_conn}")
 
         if btn_save_cred:
             new_db_mode = "sqlite" if selected_db_mode == "Lokal (SQLite)" else "postgresql"

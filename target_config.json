@@ -1,5 +1,7 @@
 {
-    "source_types": [],
+    "source_types": [
+        "website"
+    ],
     "config": {
         "twitter": {
             "keywords": [],
@@ -21,8 +23,36 @@
             "max_results_linkedin": 100
         },
         "website": {
-            "website_urls": [],
-            "keywords": [],
+            "start_date": "2026-07-07",
+            "end_date": "2026-08-06",
+            "website_urls": [
+                "kompas.com",
+                "tempo.com"
+            ],
+            "start_urls": [
+                "kompas.com",
+                "tempo.com"
+            ],
+            "keywords": [
+                "\"kinerja pelabuhan\""
+            ],
+            "max_results": 100,
+            "max_results_website": 100
+        },
+        "general": {
+            "start_date": "2026-07-07",
+            "end_date": "2026-08-06",
+            "website_urls": [
+                "kompas.com",
+                "tempo.com"
+            ],
+            "start_urls": [
+                "kompas.com",
+                "tempo.com"
+            ],
+            "keywords": [
+                "\"kinerja pelabuhan\""
+            ],
             "max_results": 100,
             "max_results_website": 100
         }
