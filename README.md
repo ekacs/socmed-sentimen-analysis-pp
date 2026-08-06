@@ -9,23 +9,23 @@
 
 **Aplikasi Analisis Sentimen Publik terintegrasi AI** adalah platform analitik komprehensif yang dirancang untuk mengumpulkan, memproses, mengklasifikasikan, dan menganalisis persepsi masyarakat di media sosial serta media berita daring terkait isu dan kebijakan publik di Indonesia.
 
-Platform ini mengintegrasikan teknologi **Large Language Model (LLM)** dan **Machine Learning (Support Vector Machine / SVM)** untuk menghasilkan wawasan kebijakan (*policy insights*) yang cepat, akurat, dan bebas dari bias subjektif.
+Platform ini mengintegrasikan teknologi AI fokus pada **Large Language Model (LLM)** dan **Machine Learning (Support Vector Machine / SVM)** untuk menghasilkan wawasan kebijakan (*policy insights*) yang cepat, akurat, dan bebas dari bias subjektif.
 
 **Demo aplikasi (hosted by Streamlit Cloud Community):**
 
-[socmed-sentimen-analysis-pp.streamlit.app](https://socmed-sentimen-analysis-pp.streamlit.app/) 
+[socmed-sentimen-analysis-pp.streamlit.app](https://socmed-sentimen-analysis-pp.streamlit.app/)
 
 ### Fitur Utama
 
-- **Penarikan Data Multi-Platform (Multi-Source Scraping)**: Mengambil data percakapan publik secara otomatis dari Twitter/X, Instagram, LinkedIn, dan Portal Berita Utama Indonesia (Kompas, CNN Indonesia, Katadata, Detik, Tribunnews, Liputan6, Tempo, Republika, dll.) via Apify API.
-- **Prapemrosesan & Standardisasi Teks EYD berbasis LLM**: Menggunakan Google Gemini API (`gemini-3.1-flash-lite`) dalam mode *high-speed parallel batching* untuk mengoreksi typo, slang, dan singkatan menjadi Bahasa Indonesia Baku (EYD) tanpa mengubah makna asli.
+- **Penarikan Data Multi-Platform (Multi-Source Scraping)**: Mengambil data percakapan publik secara otomatis dari Twitter/X, Instagram, LinkedIn, dan Portal Berita Utama Indonesia (Kompas, CNN Indonesia, Katadata, Detik, Tribunnews, Liputan6, Tempo, Republika, dll.) via Apify API dengan konfigurasi terstruktur per platform.
+- **Prapemrosesan & Standardisasi Teks EYD berbasis LLM & Local Caching**: Saat Menggunakan Google Gemini API (`gemini-3.1-flash-lite`) dalam mode *high-speed parallel batching* terintegrasi *Local EYD Cache* (`ambil_eyd_cache`) untuk mengoreksi typo, slang, dan singkatan menjadi Bahasa Indonesia Baku (EYD) secara hemat token tanpa pengulangan teks yang pernah dibersihkan.
 - **Klasifikasi Sentimen Machine Learning (SVM)**: Memprediksi sentimen publik (**Positif**, **Negatif**, **Netral**) beserta *confidence score* (skor keyakinan 0.0 - 1.0) menggunakan model Support Vector Classifier berbasis ekstraksi fitur TF-IDF.
-- **Generasi Ringkasan Eksekutif Otomatis (NLG AI)**: Menggunakan kecerdasan buatan dengan persona Analis Kebijakan Publik Senior untuk menyusun Laporan Ringkasan Eksekutif 3 bagian (Situasi Saat Ini, Analisis Permasalahan, Rekomendasi Kebijakan) berdasarkan metrik statistik aktual.
-- **Dukungan Penyimpanan Ganda (Dual Database Engine)**:
+- **Generasi Ringkasan Eksekutif Otomatis & Pemilihan Multiversi (NLG AI)**: Menggunakan kecerdasan buatan dengan persona Analis Kebijakan Publik Senior untuk menyusun Laporan Ringkasan Eksekutif 3 bagian (Situasi Saat Ini, Analisis Permasalahan, Rekomendasi Kebijakan) dengan dukungan **hingga 3 model/versi narasi interaktif** yang dapat dipilih pengguna.
+- **Dukungan Penyimpanan Ganda & Penyelarasan Riwayat Topik (Dual Database Engine)**:
   - **Local SQLite** (`sentimen_kebijakan.db`): Penyimpanan mandiri secara offline.
-  - **Cloud PostgreSQL (Supabase)**: Sinkronisasi data multi-pengguna di awan.
-- **Antarmuka Dashboard Interaktif (Streamlit)**: Visualisasi data real-time dengan diagram donat, tren waktu interaktif, top kata kunci, breakdown engagement (likes, retweets, views), filter dinamis, dan manajemen dataset.
-- **Ekspor Laporan Publikasi (PDF)**: Membentuk laporan formal berformat PDF siap cetak (dilengkapi grafik matplotlib) d
+  - **Cloud PostgreSQL (Supabase)**: Sinkronisasi data multi-pengguna di awan terintegrasi otomatisasi penulisan kata riwayat pencarian (`keysearch_history`) dan bookmark topik.
+- **Antarmuka Dashboard Interaktif (Streamlit)**: Visualisasi data real-time dengan diagram donat, tren waktu interaktif, top kata kunci, breakdown engagement (likes, retweets, views), distribusi per platform sumber, filter dinamis, dan kontrol kualitas dataset 13 kolom lengkap.
+- **Ekspor Laporan Publikasi (PDF)**: Membentuk laporan formal berformat PDF siap cetak (dilengkapi grafik visualisasi dan versi narasi eksekutif AI terpilih).
 - **Pengemasan Aplikasi Desktop (.exe Windows)**: Dilengkapi proteksi enkripsi kode anti-dekompilasi (PyArmor) dan pengemasan executable mandiri (PyInstaller + PyWebView).
 
 ---
@@ -56,19 +56,19 @@ graph TD
 
 ### Komponen Utama Sistem
 
-| Komponen                        | File Utama                                                                                                      | Tanggung Jawab / Fungsi                                                                              |
-| :------------------------------ | :-------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------- |
-| **User Interface Layer**  | [`app.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/app.py)                                 | Dashboard utama Streamlit (visualisasi, filter, manajemen data, ekspor laporan).                     |
-| **Desktop Launcher**      | [`desktop_launcher.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/desktop_launcher.py)       | Pembungkus aplikasi desktop Windows menggunakan PyWebView & headless Streamlit server.               |
-| **Scraper Engine**        | [`01_run_scraper.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/01_run_scraper.py)           | Orkestrator penarikan data Apify untuk Twitter, Instagram, LinkedIn, dan Portal Berita (Playwright). |
-| **Config & Query Parser** | [`config_parser.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/config_parser.py)             | Mengolah`target_config.json` dan merangkai kueri logika pencarian Twitter Boolean.                 |
-| **AI & ML Pipeline**      | [`01_pipeline_data.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/01_pipeline_data.py)       | Pemrosesan deduplikasi RAW, batch cleaning Gemini EYD, dan inferensi sentimen SVM paralel.           |
-| **Model Trainer**         | [`02_train_model.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/02_train_model.py)           | Pelatihan model Support Vector Machine (Linear SVM) dan ekspor pickle file.                          |
-| **NLG Generator**         | [`nlg_generator.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/nlg_generator.py)             | Generasi Laporan Ringkasan Eksekutif berbasis AI persona Analis Kebijakan Publik.                    |
-| **Database Manager**      | [`db_manager.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/db_manager.py)                   | Abstraksi akses basis data ganda (SQLite`sentimen_kebijakan.db` & Supabase PostgreSQL).            |
-| **Session Credentials**   | [`session_credentials.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/session_credentials.py) | Pengelolaan kredensial terisolasi per-sesi pengguna (Session State API Keys).                        |
-| **License Manager**       | [`license_manager.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/license_manager.py)         | Verifikasi Hardware Fingerprint (Machine ID WMI UUID) untuk aktivasi aplikasi desktop.               |
-| **Build & Obfuscation**   | [`build_desktop.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/build_desktop.py)             | Pengacak kode PyArmor & kompilator executable PyInstaller ke format`.exe`.                         |
+| Komponen                        | File Utama                                                                                                      | Tanggung Jawab / Fungsi                                                                               |
+| :------------------------------ | :-------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------- |
+| **User Interface Layer**  | [`app.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/app.py)                                 | Dashboard utama Streamlit (visualisasi 4-tahapan, review 13 kolom, pilihan 3 narasi AI, ekspor PDF).  |
+| **Desktop Launcher**      | [`desktop_launcher.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/desktop_launcher.py)       | Pembungkus aplikasi desktop Windows menggunakan PyWebView & headless Streamlit server.                |
+| **Scraper Engine**        | [`01_run_scraper.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/01_run_scraper.py)           | Orkestrator penarikan data Apify (Twitter, Instagram, LinkedIn, News) & pendaftaran kata riwayat.     |
+| **Config & Query Parser** | [`config_parser.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/config_parser.py)             | Mengolah`target_config.json` per-platform dan merangkai kueri logika pencarian Twitter Boolean.     |
+| **AI & ML Pipeline**      | [`01_pipeline_data.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/01_pipeline_data.py)       | Pemrosesan deduplikasi RAW, EYD batch cleaning (dengan local cache), dan inferensi sentimen SVM.      |
+| **Model Trainer**         | [`02_train_model.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/02_train_model.py)           | Pelatihan model Support Vector Machine (Linear SVM) dan ekspor pickle file (`svm_model.pkl`).       |
+| **NLG Generator**         | [`nlg_generator.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/nlg_generator.py)             | Generasi Laporan Ringkasan Eksekutif AI persona Analis Kebijakan Publik (versi narasi terstruktur).   |
+| **Database Manager**      | [`db_manager.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/db_manager.py)                   | Abstraksi dual DB (SQLite & Supabase PostgreSQL), sync`keysearch_history`, dan `ambil_eyd_cache`. |
+| **Session Credentials**   | [`session_credentials.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/session_credentials.py) | Pengelolaan kredensial terisolasi per-sesi (Session State) & fungsi penilai API Key kustom.           |
+| **License Manager**       | [`license_manager.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/license_manager.py)         | Verifikasi Hardware Fingerprint (Machine ID WMI UUID) untuk aktivasi aplikasi desktop.                |
+| **Build & Obfuscation**   | [`build_desktop.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/build_desktop.py)             | Pengacak kode PyArmor & kompilator executable PyInstaller ke format`.exe`.                          |
 
 ---
 
@@ -84,7 +84,7 @@ Pipa pemrosesan data berjalan dalam 6 tahapan utama secara terstruktur dari hulu
 
 1. **Tahap 1: Konfigurasi & Inisialisasi Kueri**
 
-   - Parser membaca konfigurasi dari `target_config.json` atau input sesi pengguna di Streamlit.
+   - Parser membaca konfigurasi dari `target_config.json` (terstruktur terpisah per platform: `twitter`, `instagram`, `linkedin`, `website`) atau input sesi pengguna di Streamlit.
    - Merangkai kombinasi kata kunci (*keywords*), tagar (*hashtags*), dan profil target menjadi kueri spesifik platform (contoh: kueri boolean Twitter dengan operator `OR` & `from:`).
 2. **Tahap 2: Penarikan Data Multi-Platform (Apify Scraper)**
 
@@ -92,25 +92,25 @@ Pipa pemrosesan data berjalan dalam 6 tahapan utama secara terstruktur dari hulu
    - **Instagram**: Aktor `apify/instagram-hashtag-scraper` & `apify/instagram-post-scraper`.
    - **LinkedIn**: Aktor `harvestapi/linkedin-post-search` (`buIWk2uOUzTmcLsuB`).
    - **Portal Berita**: Aktor `apify/website-content-crawler` dengan mesin rendering Playwright Adaptive JS.
-   - Hasil disimpan ke basis data pada tabel `log_cuitan` dengan `status = 'RAW'`.
+   - Hasil disimpan ke basis data pada tabel `log_cuitan` dengan `status = 'RAW'`, serta merekam kueri pencarian baru ke tabel `keysearch_history` (terintegrasi dengan fitur Bookmark Topik).
 3. **Tahap 3: Deduplikasi Data Mentah (RAW Clean-up)**
 
    - Fungsi `hapus_duplikasi_data_raw()` di `db_manager.py` menghapus baris duplikat berdasarkan pencocokan Hash Konten / `platform_id` sebelum data dikirim ke API AI untuk menghemat penggunaan kuota token.
-4. **Tahap 4: Standardisasi Teks EYD (Google Gemini Batch Cleaning)**
+4. **Tahap 4: Standardisasi Teks EYD (LLM Batch Cleaning & Local EYD Cache)**
 
-   - Mengelompokkan teks mentah dalam batch (25-50 item per kiriman JSON).
-   - Mengirimkan batch ke Google Gemini API (`gemini-3.1-flash-lite`) dengan instruksi sistem untuk memperbaiki typo, slang, dan singkatan menjadi Bahasa Indonesia Baku (EYD).
+   - **Mekanisme Local EYD Cache (`ambil_eyd_cache`)**: Sistem secara otomatis mengecek pasangan `raw_text` ➔ `cleaned_text` dari data berstatus `CLEANED` yang tersimpan di basis data. Teks yang sudah pernah dibersihkan langsung menggunakan hasil baku tanpa memanggil Gemini API.
+   - **Batch Cleaning Gemini**: Teks mentah baru yang belum ada di cache dikelompokkan dalam batch (25-50 item per kiriman JSON) dan dikirim ke Google Gemini API (`gemini-3.1-flash-lite`) untuk dikoreksi menjadi Bahasa Indonesia Baku (EYD).
    - Hasil standardisasi disimpan pada kolom `cleaned_text`.
 5. **Tahap 5: Klasifikasi Sentimen Machine Learning (Linear SVM)**
 
    - Teks baku (`cleaned_text`) ditransformasikan menjadi vektor numerik menggunakan `tfidf_vectorizer.pkl` (max 5.000 fitur, n-gram range 1-2).
    - Model Support Vector Classifier (`svm_model.pkl`) memprediksi label sentimen (`Positif`, `Negatif`, `Netral`) dan menghitung *confidence score*.
    - Status baris data diperbarui dari `'RAW'` menjadi `'CLEANED'`.
-6. **Tahap 6: Analisis Visual, NLG Summary, & Ekspor**
+6. **Tahap 6: Analisis Visual, Generasi Multiversi NLG Summary, & Ekspor**
 
-   - Data `CLEANED` ditayangkan pada Dashboard Streamlit.
-   - Mengagregasi metrik sentimen dan memicu `nlg_generator.py` untuk menyusun Ringkasan Eksekutif.
-   - Memungkinkan pengguna mengunduh laporan berformat PDF.
+   - Data `CLEANED` ditayangkan pada Dashboard Streamlit (visualisasi diagram donat, tren harian, top kata kunci, dan distribusi platform).
+   - Mengagregasi metrik sentimen dan memicu `nlg_generator.py` untuk menyusun Laporan Ringkasan Eksekutif berbasis persona Analis Kebijakan Publik dengan opsi **hingga 3 versi/model narasi interaktif**.
+   - Memungkinkan pengguna memilih versi narasi yang diinginkan dan mengunduh laporan berformat PDF.
 
 ---
 
@@ -124,7 +124,7 @@ Pipa pemrosesan data berjalan dalam 6 tahapan utama secara terstruktur dari hulu
 - **Python**: Versi `3.10.x` atau `3.11.x`.
 - **Git**: Versi terbaru.
 - **Kredensial / API Key**:
-  - **Google Gemini API Key**: Diperlukan untuk pembersihan EYD & NLG Ringkasan Eksekutif.
+  - **LLM API Key**: Diperlukan untuk pembersihan EYD & NLG Ringkasan Eksekutif (default menggunakan Google Gemini).
   - **Apify API Token**: Diperlukan untuk penarikan data scraper.
   - **Supabase Database URL** *(opsional)*: Diperlukan jika menggunakan Cloud PostgreSQL.
 
@@ -379,52 +379,52 @@ sudo systemctl restart socmed-app
 
 ## 5. Panduan Penggunaan
 
-Aplikasi memiliki antarmuka yang terbagi ke dalam 5 Tab Utama dan 1 Sidebar Pengaturan Kredensial.
+Aplikasi memiliki antarmuka Streamlit yang terbagi ke dalam 4 Tab Utama dan 1 Sidebar Pengaturan Kredensial:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│ 🔐 Sidebar Pengaturan Sesi & Mode Database                              │
-├───────────┬───────────┬───────────┬───────────┬────────────────────────┤
-│  Tab 1    │  Tab 2    │  Tab 3    │  Tab 4    │  Tab 5                 │
-│ Penarikan │ Pipa Data │ Dashboard │ Manajemen │ Ekspor PDF             │
-│   Data    │   & ML    │ Analytics │  Dataset  │                        │
-└───────────┴───────────┴───────────┴───────────┴────────────────────────┤
+│ 🔐 Sidebar Pengaturan Sesi API Key & Database Engine (SQLite / Supabase)│
+├───────────────┬───────────────┬───────────────┬────────────────────────┤
+│    Tab 1      │    Tab 2      │    Tab 3      │         Tab 4          │
+│ Penarikan Data│ Pipa Data AI  │ Review Data   │ Dashboard Visualisasi  │
+│  (Scraper)    │    & ML       │ (13 Kolom)    │ Narasi AI & Cetak PDF  │
+└───────────────┴───────────────┴───────────────┴────────────────────────┘
 ```
 
 ### 1. Sidebar: Pengaturan API Key Sesi & Database Engine
 
-- **Mode Database**: Pilih antara **Cloud PostgreSQL (Supabase)** atau **Local Storage (SQLite)**.
-- **Kredensial Sesi**: Pengguna dapat memasukkan API Key kustom (Apify Token, Gemini Key, Supabase URL) yang berlaku selama sesi peramban berlangsung tanpa mengubah isi file `.env`.
+- **Mode Database**: Pilihan antara **Cloud PostgreSQL (Supabase)** atau **Local Storage (SQLite)**.
+- **Kredensial Sesi (Session-Only Keys)**: Pengguna dapat memasukkan API Key kustom (Apify Token, Gemini Key, Supabase URL) yang berlaku khusus selama sesi peramban tanpa mengubah isi file `.env`.
+- **Bookmark Topik Sentimen**: Mengelola dan memilih kelompok kueri kata kunci yang sering dianalisis.
 
-### 2. Tab 1: Penarikan Data (Scraper)
+### 2. Tab 1: Penarikan Data (Scraper Engine)
 
 - Pilih platform sasaran (**Twitter / X**, **Instagram**, **LinkedIn**, atau **Portal Berita**).
-- Masukkan kata kunci pencarian, tagar (*hashtags*), profil target, dan rentang tanggal.
-- Tentukan batas maksimal data per platform (*max results*).
+- Konfigurasi parameter terpisah per platform: kata kunci pencarian, tagar (*hashtags*), profil target, rentang tanggal, dan batas maksimal data (*max results*).
+- Perekaman kueri otomatis ke tabel `keysearch_history` agar topik yang baru dicari langsung tersimpan ke riwayat bookmark.
 - Klik **🚀 Jalankan Penarikan Data (Scraper)** untuk memulai proses scraping di latar belakang.
 
-### 3. Tab 2: Pipa Data & Pemrosesan (Gemini & SVM)
+### 3. Tab 2: Pipa Data & Pemrosesan AI dan Support Vector Machine (SVM) Machine Learning
 
 - Menampilkan ringkasan status data mentah (**RAW**) yang belum diproses.
-- Klik **⚡ Jalankan Pipa Data & Pemrosesan AI** untuk memicu deduplikasi, pembersihan teks EYD (Gemini), dan klasifikasi sentimen (SVM) secara otomatis.
+- Klik **⚡ Jalankan Pipa Data & Pemrosesan AI** untuk memicu deduplikasi RAW, pembersihan teks EYD berbasis **LLM API + Local EYD Cache** (`ambil_eyd_cache`), serta inferensi sentimen SVM secara otomatis.
 
-### 4. Tab 3: Dashboard & Visualisasi Analytics
+### 4. Tab 3: Review Data & Kontrol Kualitas
 
-- **Ringkasan Metrik**: Menampilkan Total Data, Persentase Sentimen Positif, Netral, dan Negatif.
-- **Visualisasi Interaktif**: Diagram Donat Distribusi Sentimen, Grafik Tren Sentimen berbasis Waktu (Harian/Mingguan), dan Frekuensi Top Kata Kunci.
-- **Breakdown Engagement**: Analisis interaksi publik berdasarkan Likes, Retweets/Shares, dan Views.
-- **Laporan Ringkasan Eksekutif (NLG AI)**: Klik **🔄 Perbarui Analisis Narasi** untuk menghasilkan narasi laporan kebijakan berbasis AI persona Analis Kebijakan Publik.
+- Menampilkan tabel data live 13 kolom lengkap (`ID Platform`, `Username`, `Tanggal Pembuatan`, `Teks Mentah`, `Teks Baku (EYD)`, `Label Sentimen`, `Skor Keyakinan`, `Platform`, `Likes`, `Retweets`, `Tayangan`, `Log Aktivitas Scraping`, `User Aplikasi`).
+- Edit label sentimen manual atau pemulihan data cadangan database.
+- Tombol **🔄 Segarkan** untuk memuat ulang data live dari database secara real-time.
 
-### 5. Tab 4: Manajemen Data & Dataset
+### 5. Tab 4: Visualisasi & Analisis Dashboard Eksekutif
 
-- Eksplorasi tabel data secara menyeluruh dengan fitur pencarian dan filter cepat.
-- Edit label sentimen manual atau hapus baris data.
-- Impor data baru dari file CSV/Exc atau Ekspor dataset saat ini.
-- Kelola **Bookmark Kueri Pencarian** untuk pengulangan analisis di masa mendatang.
-
-### 6. Tab 5: Ekspor Laporan PDF
-
-- Mengompilasi seluruh hasil analisis, grafik visualisasi sentimen (Matplotlib), dan narasi Ringkasan Eksekutif menjadi dokumen PDF siap cetak.
+- **Filter Parameter & Periode**: Pemilihan target analisis dari riwayat kata kunci, tagar, profil, atau bookmark topik.
+- **Metrik Utama & Distribusi Platform**: Menampilkan Total Volume Data, Akun Unik, Persentase Sentimen (Positif, Negatif, Netral), serta breakdown persentase platform (Twitter, Instagram, LinkedIn, Website/Portal Berita).
+- **Grafik Interaktif**: Tren Sentimen Publik Harian, Komposisi Sentimen (Diagram Donat), dan Bar Chart Top 10 Kata Kunci.
+- **Ringkasan Eksekutif Narasi AI (NLG)**:
+  - Klik **🔄 Perbarui Analisis Narasi (AI)** untuk menyusun laporan analisis kebijakan 250+ kata (minimal 100 data CLEANED).
+  - Sistem mendukung generasi hingga **3 model/versi narasi interaktif**. Pengguna dapat memilih versi terbaik (`Versi 1`, `Versi 2`, atau `Versi 3`) melalui kontrol radio button untuk ditampilkan di dashboard.
+  - Notifikasi proteksi jika kuota API LLM habis (HTTP 429).
+- **Cetak Laporan PDF Eksekutif**: Membentuk dokumen PDF resmi berformat A4 yang mengompilasi grafik visualisasi dan versi narasi eksekutif AI pilihan pengguna.
 
 ---
 
@@ -433,28 +433,31 @@ Aplikasi memiliki antarmuka yang terbagi ke dalam 5 Tab Utama dan 1 Sidebar Peng
 1. **Batasan Kuota API & Rate Limit**:
 
    - **Apify API**: Penarikan data bergantung pada saldo/kredit akun Apify. Jika kredit habis, API akan mengembalikan respons `HTTP 402 Payment Required`.
-   - **Google Gemini API**: Pembersihan teks dan generasi NLG tunduk pada kuota limit token dan *Rate Limit* (HTTP 429). Jika limit tercapai, sistem secara otomatis beralih ke *fallback mode* (menggunakan teks asli).
-2. **Pengikat Lisensi Perangkat (Hardware Fingerprint)**:
+   - **LLM API**: Pembersihan teks dan generasi NLG tunduk pada limit token dan *Rate Limit* (HTTP 429). Jika kuota habis, sistem menampilkan notifikasi informatif dan pengarahan kontak institusi (*Prof. Tuti Rachmawati, PhD - Universitas Parahyangan*) serta menonaktifkan sementara tombol generasi AI secara aman.
+2. **Pembatasan Generasi Narasi AI (Maksimal 3 Versi)**:
+
+   - Modul pembuat Ringkasan Eksekutif membatasi regenerasi narasi hingga **maksimal 3 versi** per sesi perbaruan untuk menghemat token API LLM.
+3. **Pengikat Lisensi Perangkat (Hardware Fingerprint)**:
 
    - Peluncuran aplikasi desktop (`desktop_launcher.py`) memeriksa ketersediaan lisensi lokal (`app_license.lic`) yang terikat dengan WMI Computer System Product UUID perangkat. Aplikasi tidak dapat dipindahkan antar komputer tanpa registrasi ulang lisensi. (Catatan: Untuk eksekusi pada server Linux via Streamlit `app.py`, verifikasi lisensi WMI desktop ini dapat dilewati secara otomatis).
-3. **Spesifikasi Bahasa**:
+4. **Spesifikasi Bahasa**:
 
-   - Model klasifikasi SVM dan instruksi pembersihan Gemini dioptimalkan khusus untuk **Bahasa Indonesia (EYD)**. Penggunaan pada teks berbahasa asing dapat menurunkan tingkat akurasi klasifikasi.
-4. **Ambang Jumlah Data Minimum untuk NLG AI**:
+   - Model klasifikasi SVM dan instruksi pembersihan LLM dioptimalkan khusus untuk **Bahasa Indonesia (EYD)**. Penggunaan pada teks berbahasa asing dapat menurunkan tingkat akurasi klasifikasi.
+5. **Ambang Jumlah Data Minimum untuk NLG AI**:
 
    - Modul pembuat Ringkasan Eksekutif (`nlg_generator.py`) mensyaratkan **minimal 100 baris data `CLEANED`** yang lolos filter agar narasi analisis kebijakan yang dihasilkan valid secara statistik dan tidak mengalami *halusinasi*.
-5. **Dinamika Struktur Platform Sumber**:
+6. **Dinamika Struktur Platform Sumber**:
 
    - Proses scraping bergantung pada kestabilan Aktor Apify dan struktur halaman target. Perubahan besar pada API atau layout antarmuka platform (Twitter, Instagram, LinkedIn, Portal Berita) dapat mempengaruhi kelancaran penarikan data.
-6. **Pemberitahuan Keamanan Windows (Smart App Control / SmartScreen)**:
+7. **Pemberitahuan Keamanan Windows (Smart App Control / SmartScreen)**:
 
-   - File executable (`SocMedSentimentAnalysis.exe`) yang dibentuk via PyInstaller/PyArmor bersifat *unsigned* (belum memiliki sertifikat digital komersial *Code Signing*). Di Windows 11, fitur **Smart App Control** dapat memblokir eksekusi aplikasi secara otomatis. Pengguna dapat membuka blokir melalui `Properties` ➔ centang `Unblock`, atau menjalankan aplikasi via skrip `python desktop_launcher.py`.
+   - File executable (`SocMedSentimentAnalysis.exe`) yang dibentuk via PyInstaller/PyArmor bersifat *unsigned* (belum memiliki sertifikat digital komersial *Code Signing*). Di Windows 11, fitur **Smart App Control** dapat memblokir eksekusi aplikasi secara otomatis. Pengguna dapat membuka blokir melalui `Properties` ➔ centang `Unblock`, atau menjalankan aplikasi via skrip `python desktop_launcher.py`(unstable).
 
 ---
 
 ## Lisensi & Kontribusi
 
-Proyek ini dikembangkan untuk tujuan riset akademis dan perumusan kebij) ini akan publik oleh **Universitas Parahyangan bersama Prof. Tuti**.
+Proyek ini dikembangkan untuk tujuan riset akademis dan perumusan kebijakan publik oleh **Universitas Parahyangan bersama Prof. Tuti**.
 
 Perangkat lunak ini dilindungi di bawah **[PolyForm Noncommercial License 1.0.0 &amp; Patent Reservation Notice](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/LICENSE)**:
 
