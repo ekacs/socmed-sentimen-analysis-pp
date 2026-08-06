@@ -10,6 +10,18 @@ from google import genai
 from google.genai import types
 import db_manager
 
+# Rekonfigurasi stdout/stderr ke UTF-8 di Windows agar tidak crash UnicodeEncodeError saat print emoji
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 # Memuat file .env — override=False agar env var sistem (GitHub Actions) tidak tertimpa
 load_dotenv(override=False)
 
@@ -75,7 +87,7 @@ def clean_unique_texts_batch(client, batch_texts):
     for attempt in range(3):
         try:
             response = client.models.generate_content(
-                model='gemini-3.1-flash-lite',
+                model='gemini-2.5-flash',
                 contents=payload_str,
                 config=types.GenerateContentConfig(
                     system_instruction=system_prompt,

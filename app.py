@@ -493,8 +493,16 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
             st.session_state[session_credentials.KEY_DB_MODE] = new_db_mode
             if input_apify.strip():
                 st.session_state[session_credentials.KEY_APIFY] = input_apify.strip()
+                try:
+                    db_manager.set_apify_quota_flag(False)
+                except Exception:
+                    pass
             if input_gemini.strip():
                 st.session_state[session_credentials.KEY_GEMINI] = input_gemini.strip()
+                try:
+                    db_manager.set_gemini_quota_flag(False)
+                except Exception:
+                    pass
             if input_supabase.strip():
                 st.session_state[session_credentials.KEY_SUPABASE] = input_supabase.strip()
             

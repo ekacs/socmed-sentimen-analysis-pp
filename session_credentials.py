@@ -117,5 +117,7 @@ def get_session_env_dict() -> dict:
     # Set DATABASE_URL sesuai mode aktif (kosong untuk SQLite, postgresql://... untuk Cloud DB)
     env_dict["DATABASE_URL"] = active_db_url
     env_dict["PYTHONUNBUFFERED"] = "1"
+    env_dict["PYTHONIOENCODING"] = "utf-8"
+    env_dict["PYTHONUTF8"] = "1"
         
     return env_dict
