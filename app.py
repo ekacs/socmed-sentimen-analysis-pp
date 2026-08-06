@@ -272,6 +272,27 @@ def check_apify_quota_exhausted():
         pass
     return False
 
+if hasattr(st, "dialog"):
+    @st.dialog("🔑 Token API Apify Wajib Diisi!")
+    def show_apify_token_required_dialog():
+        st.error("❌ **Token API Apify (`APIFY_API_TOKEN`) Belum Dikonfigurasi!**")
+        st.warning(
+            "Penarikan data dari media sosial & website publik **wajib** menggunakan **API Token Apify** "
+            "karena scraping dilakukan melalui Actor cloud Apify."
+        )
+        st.markdown(
+            "**Cara Pengisian Token:**\n"
+            "1. Dapatkan Token API gratis/berbayar dari akun Apify Anda: [console.apify.com](https://console.apify.com/account/integrations)\n"
+            "2. Buka **Sidebar (Pengaturan Kredensial)** di sebelah kiri.\n"
+            "3. Masukkan token Anda pada kolom **🔑 Apify API Token**.\n"
+            "4. Klik tombol **💾 Simpan Sesi** atau atur di file `.env` (`APIFY_API_TOKEN=...`)."
+        )
+        if st.button("👌 Saya Mengerti / Buka Sidebar", type="primary", use_container_width=True):
+            st.rerun()
+else:
+    def show_apify_token_required_dialog():
+        pass
+
 def check_gemini_quota_exhausted():
     if session_credentials.is_custom_gemini():
         return False
@@ -1072,7 +1093,17 @@ with tab_scrape:
     st.divider()
     render_active_config_summary_card()
     st.markdown("### 🚀 Eksekusi & Pengaturan Penarikan Data")
-    
+
+    active_apify_tok = session_credentials.get_active_apify_token()
+    has_valid_apify_tok = bool(active_apify_tok and active_apify_tok != "YOUR_APIFY_API_TOKEN_HERE")
+
+    if not has_valid_apify_tok:
+        st.warning(
+            "⚠️ **Perhatian (Mandatory):** Token API Apify (`APIFY_API_TOKEN`) belum diisi!\n\n"
+            "Penarikan data dari media sosial & website publik **wajib** menggunakan API Token Apify valid. "
+            "Silakan masukkan token Anda pada **Sidebar (Pengaturan Kredensial)** di sebelah kiri."
+        )
+
     c_s1_save, c_s1_run, c_s1_stop = st.columns([2.5, 3.5, 2])
     with c_s1_save:
         btn_save_all = st.button("💾 Simpan Semua Konfigurasi", key="btn_save_all_configs", use_container_width=True, help="Simpan seluruh parameter tanpa menjalankan proses penarikan data.")
@@ -1101,47 +1132,82 @@ with tab_scrape:
             st.info("ℹ️ Tidak ada proses penarikan data yang sedang berjalan.")
 
     if btn_run_s1:
-        st.session_state["last_run_summary_s1"] = None
-        do_save_all_current_configs(show_toast=False)
+        if not has_valid_apify_tok:
+            show_apify_token_required_dialog()
+            st.error("❌ **Penarikan data dibatalkan:** Token API Apify (`APIFY_API_TOKEN`) wajib diisi terlebih dahulu pada sidebar kredensial!")
+        else:
+            st.session_state["last_run_summary_s1"] = None
+            do_save_all_current_configs(show_toast=False)
 
-        import queue
-        import threading
-        import time
-        import re
+            import queue
+            import threading
+            import time
+            import re
 
-        initial_raw_count = len(db_manager.ambil_cuitan_mentah())
-        start_time = datetime.datetime.now()
-        start_str = start_time.strftime("%H:%M:%S UTC")
+            initial_raw_count = len(db_manager.ambil_cuitan_mentah())
+            start_time = datetime.datetime.now()
+            start_str = start_time.strftime("%H:%M:%S UTC")
 
-        with st.status("⚡ Menghubungkan ke Apify Cloud & menarik data mentah (SIMULTAN)...", expanded=True) as status_s:
-            try:
-                proc = subprocess.Popen(
-                    [sys.executable, "01_run_scraper.py"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    bufsize=1,
-                    env=session_credentials.get_session_env_dict()
-                )
-                st.session_state["proc_scraper_obj"] = proc
+            with st.status("⚡ Menghubungkan ke Apify Cloud & menarik data mentah (SIMULTAN)...", expanded=True) as status_s:
+                try:
+                    proc = subprocess.Popen(
+                        [sys.executable, "01_run_scraper.py"],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        bufsize=1,
+                        env=session_credentials.get_session_env_dict()
+                    )
+                    st.session_state["proc_scraper_obj"] = proc
 
-                log_queue = queue.Queue()
-                log_lines = []
+                    log_queue = queue.Queue()
+                    log_lines = []
 
-                def enqueue_output(out_stream, q):
-                    for line in iter(out_stream.readline, ''):
-                        q.put(line)
-                    out_stream.close()
+                    def enqueue_output(out_stream, q):
+                        for line in iter(out_stream.readline, ''):
+                            q.put(line)
+                        out_stream.close()
 
-                t_out = threading.Thread(target=enqueue_output, args=(proc.stdout, log_queue))
-                t_out.daemon = True
-                t_out.start()
+                    t_out = threading.Thread(target=enqueue_output, args=(proc.stdout, log_queue))
+                    t_out.daemon = True
+                    t_out.start()
 
-                info_placeholder = st.empty()
-                log_placeholder = st.empty()
+                    t_err = threading.Thread(target=enqueue_output, args=(proc.stderr, log_queue))
+                    t_err.daemon = True
+                    t_err.start()
 
-                while proc.poll() is None:
-                    # Ambil baris log baru dari queue
+                    info_placeholder = st.empty()
+                    log_placeholder = st.empty()
+
+                    while proc.poll() is None:
+                        # Ambil baris log baru dari queue
+                        while True:
+                            try:
+                                line = log_queue.get_nowait()
+                                log_lines.append(line)
+                            except queue.Empty:
+                                break
+
+                        now = datetime.datetime.now()
+                        elapsed_seconds = int((now - start_time).total_seconds())
+                        mins, secs = divmod(elapsed_seconds, 60)
+                        time_str = f"{mins:02d}:{secs:02d}"
+
+                        with info_placeholder.container():
+                            m1, m2, m3 = st.columns(3)
+                            m1.metric("🕒 Waktu Mulai (UTC)", start_str)
+                            m2.metric("⏱️ Waktu Berjalan", f"{time_str} ({elapsed_seconds}s)")
+                            m3.metric("⚡ Status Mesin", "Proses Scraping Aktif...")
+                            st.caption(f"🎯 **Platform Target (Simultan):** {', '.join(selected_platforms)}")
+
+                        if log_lines:
+                            with log_placeholder.container():
+                                st.markdown("**📋 Live Terminal Output:**")
+                                st.code("".join(log_lines[-12:]), language="text")
+
+                        time.sleep(0.5)
+
+                    # Kuras sisa queue log
                     while True:
                         try:
                             line = log_queue.get_nowait()
@@ -1149,84 +1215,62 @@ with tab_scrape:
                         except queue.Empty:
                             break
 
-                    now = datetime.datetime.now()
-                    elapsed_seconds = int((now - start_time).total_seconds())
-                    mins, secs = divmod(elapsed_seconds, 60)
-                    time_str = f"{mins:02d}:{secs:02d}"
+                    stderr_text = proc.stderr.read() if proc.stderr else ""
+                    st.session_state["proc_scraper_obj"] = None
 
-                    with info_placeholder.container():
-                        m1, m2, m3 = st.columns(3)
-                        m1.metric("🕒 Waktu Mulai (UTC)", start_str)
-                        m2.metric("⏱️ Waktu Berjalan", f"{time_str} ({elapsed_seconds}s)")
-                        m3.metric("⚡ Status Mesin", "Proses Scraping Aktif...")
-                        st.caption(f"🎯 **Platform Target (Simultan):** {', '.join(selected_platforms)}")
+                    end_time = datetime.datetime.now()
+                    end_str = end_time.strftime("%H:%M:%S UTC")
+                    total_sec = (end_time - start_time).total_seconds()
+                    t_mins, t_secs = divmod(int(total_sec), 60)
+                    dur_str = f"{t_mins} menit {t_secs} detik" if t_mins > 0 else f"{total_sec:.1f} detik"
 
-                    if log_lines:
-                        with log_placeholder.container():
-                            st.markdown("**📋 Live Terminal Output:**")
-                            st.code("".join(log_lines[-12:]), language="text")
+                    info_placeholder.empty()
+                    log_placeholder.empty()
 
-                    time.sleep(0.5)
+                    full_log_str = "".join(log_lines) or stderr_text
 
-                # Kuras sisa queue log
-                while True:
-                    try:
-                        line = log_queue.get_nowait()
-                        log_lines.append(line)
-                    except queue.Empty:
-                        break
+                    if proc.returncode != 0:
+                        status_s.update(label=f"❌ Penarikan Data Gagal (Exit Code: {proc.returncode})", state="error", expanded=True)
+                    else:
+                        status_s.update(label="✅ Penarikan Data Mentah Selesai!", state="complete", expanded=False)
 
-                stderr_text = proc.stderr.read() if proc.stderr else ""
-                st.session_state["proc_scraper_obj"] = None
+                    # Parse log untuk ekstrak jumlah data per platform & total data ditarik
+                    platform_counts = {}
+                    for line_str in log_lines:
+                        m_p = re.search(r"Platform '([^']+)'[^\d]+(\d+)\s+baris data", line_str, re.IGNORECASE)
+                        if m_p:
+                            p_name = m_p.group(1).lower()
+                            p_count = int(m_p.group(2))
+                            if "twitter" in p_name:
+                                p_name = "twitter"
+                            elif "instagram" in p_name:
+                                p_name = "instagram"
+                            elif "linkedin" in p_name:
+                                p_name = "linkedin"
+                            elif "website" in p_name or "news" in p_name or "berita" in p_name:
+                                p_name = "website"
+                            platform_counts[p_name] = p_count
 
-                end_time = datetime.datetime.now()
-                end_str = end_time.strftime("%H:%M:%S UTC")
-                total_sec = (end_time - start_time).total_seconds()
-                t_mins, t_secs = divmod(int(total_sec), 60)
-                dur_str = f"{t_mins} menit {t_secs} detik" if t_mins > 0 else f"{total_sec:.1f} detik"
+                    m_tot = re.search(r"Total gabungan (\d+) baris data", full_log_str, re.IGNORECASE)
+                    if m_tot:
+                        total_data_fetched = int(m_tot.group(1))
+                    else:
+                        total_data_fetched = sum(platform_counts.values())
 
-                info_placeholder.empty()
-                log_placeholder.empty()
-
-                full_log_str = "".join(log_lines) or stderr_text
-
-                # Parse log untuk ekstrak jumlah data per platform & total data ditarik
-                platform_counts = {}
-                for line_str in log_lines:
-                    m_p = re.search(r"Platform '([^']+)'[^\d]+(\d+)\s+baris data", line_str, re.IGNORECASE)
-                    if m_p:
-                        p_name = m_p.group(1).lower()
-                        p_count = int(m_p.group(2))
-                        if "twitter" in p_name:
-                            p_name = "twitter"
-                        elif "instagram" in p_name:
-                            p_name = "instagram"
-                        elif "linkedin" in p_name:
-                            p_name = "linkedin"
-                        elif "website" in p_name or "news" in p_name or "berita" in p_name:
-                            p_name = "website"
-                        platform_counts[p_name] = p_count
-
-                m_tot = re.search(r"Total gabungan (\d+) baris data", full_log_str, re.IGNORECASE)
-                if m_tot:
-                    total_data_fetched = int(m_tot.group(1))
-                else:
-                    total_data_fetched = sum(platform_counts.values())
-
-                st.session_state["last_run_summary_s1"] = {
-                    "is_success": (proc.returncode == 0),
-                    "start_str": start_str,
-                    "end_str": end_str,
-                    "dur_str": dur_str,
-                    "total_data_fetched": total_data_fetched,
-                    "platform_counts": platform_counts,
-                    "selected_platforms": list(selected_platforms),
-                    "full_log_str": full_log_str,
-                    "stderr_text": stderr_text,
-                    "returncode": proc.returncode
-                }
-            except Exception as e_s1:
-                status_s.update(label=f"❌ Gagal memproses: {e_s1}", state="error", expanded=True)
+                    st.session_state["last_run_summary_s1"] = {
+                        "is_success": (proc.returncode == 0),
+                        "start_str": start_str,
+                        "end_str": end_str,
+                        "dur_str": dur_str,
+                        "total_data_fetched": total_data_fetched,
+                        "platform_counts": platform_counts,
+                        "selected_platforms": list(selected_platforms),
+                        "full_log_str": full_log_str,
+                        "stderr_text": stderr_text,
+                        "returncode": proc.returncode
+                    }
+                except Exception as e_s1:
+                    status_s.update(label=f"❌ Gagal memproses: {e_s1}", state="error", expanded=True)
                 st.error(f"❌ Terjadi kesalahan saat menjalankan scraper: {e_s1}")
 
     # Tampilkan rangkuman eksekusi penarikan data secara persisten (tidak hilang sampai tombol diklik lagi)
