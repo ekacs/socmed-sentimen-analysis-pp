@@ -551,17 +551,37 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
 #                 else:
 #                     st.error(f"❌ {msg_m}")
 
-# 2. Akses Database Awan
+# 2. Akses Database
 st.sidebar.divider()
 st.sidebar.markdown("### 🗄️ Status & Akses Database")
 col_db1, col_db2 = st.sidebar.columns([1, 1])
 with col_db1:
-    st.link_button(
-        "🌐 Supabase",
-        get_supabase_dashboard_url(),
-        use_container_width=True,
-        help="Buka editor tabel PostgreSQL Supabase secara instan."
-    )
+    if session_credentials.get_active_db_mode() == "sqlite":
+        with st.popover("🗄️ Database", use_container_width=True, help="Informasi & File Database SQLite Lokal"):
+            st.markdown("#### 📂 Database Lokal (SQLite)")
+            st.write("Mode database aktif: **Lokal (SQLite)**")
+            st.code("sentimen_kebijakan.db", language="text")
+            db_size_str = "0 KB"
+            if os.path.exists("sentimen_kebijakan.db"):
+                size_bytes = os.path.getsize("sentimen_kebijakan.db")
+                db_size_str = f"{size_bytes / 1024:.1f} KB" if size_bytes < 1024*1024 else f"{size_bytes / (1024*1024):.2f} MB"
+            st.caption(f"Ukuran Berkas DB: {db_size_str}")
+            if os.path.exists("sentimen_kebijakan.db"):
+                with open("sentimen_kebijakan.db", "rb") as f:
+                    st.download_button(
+                        label="📥 Unduh File DB (SQLite)",
+                        data=f.read(),
+                        file_name="sentimen_kebijakan.db",
+                        mime="application/x-sqlite3",
+                        use_container_width=True
+                    )
+    else:
+        st.link_button(
+            "🗄️ Database",
+            get_supabase_dashboard_url(),
+            use_container_width=True,
+            help="Buka editor tabel PostgreSQL Supabase secara instan."
+        )
 with col_db2:
     if st.button("🔄 Muat Ulang", use_container_width=True, help="Muat ulang data dari basis data.", key="btn_reload_db_sidebar"):
         st.rerun()
