@@ -1184,9 +1184,17 @@ with tab_scrape:
                     log_lines = []
 
                     def enqueue_output(out_stream, q):
-                        for line in iter(out_stream.readline, ''):
-                            q.put(line)
-                        out_stream.close()
+                        try:
+                            for line in iter(out_stream.readline, ''):
+                                q.put(line)
+                        except Exception:
+                            pass
+                        finally:
+                            try:
+                                if out_stream and not out_stream.closed:
+                                    out_stream.close()
+                            except Exception:
+                                pass
 
                     t_out = threading.Thread(target=enqueue_output, args=(proc.stdout, log_queue))
                     t_out.daemon = True
@@ -1227,6 +1235,10 @@ with tab_scrape:
 
                         time.sleep(0.5)
 
+                    # Tunggu thread pembaca selesai flushing
+                    t_out.join(timeout=2.0)
+                    t_err.join(timeout=2.0)
+
                     # Kuras sisa queue log
                     while True:
                         try:
@@ -1235,7 +1247,13 @@ with tab_scrape:
                         except queue.Empty:
                             break
 
-                    stderr_text = proc.stderr.read() if proc.stderr else ""
+                    stderr_text = ""
+                    if proc.stderr:
+                        try:
+                            if not proc.stderr.closed:
+                                stderr_text = proc.stderr.read()
+                        except Exception:
+                            stderr_text = ""
                     st.session_state["proc_scraper_obj"] = None
 
                     end_time = datetime.datetime.now()
