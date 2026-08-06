@@ -1271,7 +1271,7 @@ with tab_scrape:
                     }
                 except Exception as e_s1:
                     status_s.update(label=f"❌ Gagal memproses: {e_s1}", state="error", expanded=True)
-                st.error(f"❌ Terjadi kesalahan saat menjalankan scraper: {e_s1}")
+                    st.error(f"❌ Terjadi kesalahan saat menjalankan scraper: {e_s1}")
 
     # Tampilkan rangkuman eksekusi penarikan data secara persisten (tidak hilang sampai tombol diklik lagi)
     if st.session_state.get("last_run_summary_s1"):
