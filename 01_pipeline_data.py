@@ -84,10 +84,16 @@ def clean_unique_texts_batch(client, batch_texts):
         "Jangan ubah nilai 'id'. DILARANG KERAS menambah teks/komentar di luar JSON."
     )
 
+    try:
+        import session_credentials
+        active_model = session_credentials.get_active_gemini_model()
+    except Exception:
+        active_model = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+
     for attempt in range(3):
         try:
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model=active_model,
                 contents=payload_str,
                 config=types.GenerateContentConfig(
                     system_instruction=system_prompt,

@@ -83,7 +83,7 @@ def generate_executive_summary(
         for attempt in range(3):
             try:
                 response = client.models.generate_content(
-                    model='gemini-3.1-flash-lite',  # gemini-3.1-flash-lite adalah model aktif dan didukung
+                    model=session_credentials.get_active_gemini_model() if hasattr(session_credentials, 'get_active_gemini_model') else os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash"),
                     contents=prompt_narasi,
                     config=types.GenerateContentConfig(
                         temperature=0.15,
