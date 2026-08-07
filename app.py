@@ -525,18 +525,17 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
 
             if apify_val:
                 st.session_state[session_credentials.KEY_APIFY] = apify_val
-                try:
-                    db_manager.set_apify_quota_flag(False)
-                except Exception:
-                    pass
             if gemini_val:
                 st.session_state[session_credentials.KEY_GEMINI] = gemini_val
-                try:
-                    db_manager.set_gemini_quota_flag(False)
-                except Exception:
-                    pass
             if supabase_val:
                 st.session_state[session_credentials.KEY_SUPABASE] = supabase_val
+            
+            # Reset flag kuota di database setiap kali kredensial diperbarui/disimpan
+            try:
+                db_manager.set_gemini_quota_flag(False)
+                db_manager.set_apify_quota_flag(False)
+            except Exception:
+                pass
             
             # Simpan secara persisten ke file .env
             session_credentials.save_credentials_to_env(
@@ -648,7 +647,13 @@ if check_apify_quota_exhausted():
     st.sidebar.error("🚨 Status APIFY: Quota/Saldo Habis (Hubungi Developer / Top-up Quota)")
 
 if check_gemini_quota_exhausted():
-    st.sidebar.error("🚨 Status LLM AI: Quota Token Habis (Hubungi Developer / Top-up Token)")
+    c_q1, c_q2 = st.sidebar.columns([3, 1])
+    with c_q1:
+        st.error("🚨 Status LLM AI: Quota Token Habis")
+    with c_q2:
+        if st.button("🔄 Reset", key="btn_reset_gemini_quota_badge", help="Klik untuk memulihkan status kuota Gemini AI"):
+            db_manager.set_gemini_quota_flag(False)
+            st.rerun()
 
 # 📌 Sidebar: Pengelolaan Topik Sentimen
 st.sidebar.divider()
