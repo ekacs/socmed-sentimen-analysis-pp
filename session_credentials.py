@@ -13,6 +13,7 @@ import streamlit as st
 KEY_APIFY = "user_apify_api_token"
 KEY_SUPABASE = "user_supabase_db_url"
 KEY_GEMINI = "user_gemini_api_key"
+KEY_GEMINI_MODEL = "user_gemini_model"
 KEY_DB_MODE = "user_db_mode"
 
 def init_session_credentials():
@@ -23,6 +24,8 @@ def init_session_credentials():
         st.session_state[KEY_SUPABASE] = ""
     if KEY_GEMINI not in st.session_state:
         st.session_state[KEY_GEMINI] = ""
+    if KEY_GEMINI_MODEL not in st.session_state:
+        st.session_state[KEY_GEMINI_MODEL] = os.getenv("GEMINI_MODEL_NAME", "gemini-2.0-flash")
     if KEY_DB_MODE not in st.session_state:
         # Default mode utama aplikasi: Cloud PostgreSQL (Supabase)
         st.session_state[KEY_DB_MODE] = "postgresql"
@@ -123,6 +126,7 @@ def get_session_env_dict() -> dict:
         env_dict["APIFY_API_TOKEN"] = apify_tok
     if gemini_key:
         env_dict["GEMINI_API_KEY"] = gemini_key
+    env_dict["GEMINI_MODEL_NAME"] = get_active_gemini_model()
     # Set DATABASE_URL sesuai mode aktif (kosong untuk SQLite, postgresql://... untuk Cloud DB)
     env_dict["DATABASE_URL"] = active_db_url
     env_dict["PYTHONUNBUFFERED"] = "1"
@@ -131,7 +135,7 @@ def get_session_env_dict() -> dict:
         
     return env_dict
 
-def save_credentials_to_env(apify_tok: str = None, gemini_key: str = None, supabase_url: str = None, env_path: str = ".env"):
+def save_credentials_to_env(apify_tok: str = None, gemini_key: str = None, supabase_url: str = None, gemini_model: str = None, env_path: str = ".env"):
     """
     Memperbarui file .env secara persisten dengan kredensial baru.
     """
@@ -155,6 +159,10 @@ def save_credentials_to_env(apify_tok: str = None, gemini_key: str = None, supab
         val = gemini_key.strip()
         env_vars["GEMINI_API_KEY"] = val
         os.environ["GEMINI_API_KEY"] = val
+    if gemini_model is not None:
+        val = gemini_model.strip()
+        env_vars["GEMINI_MODEL_NAME"] = val
+        os.environ["GEMINI_MODEL_NAME"] = val
     if supabase_url is not None:
         val = supabase_url.strip()
         env_vars["DATABASE_URL"] = val
