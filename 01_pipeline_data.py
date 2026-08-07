@@ -88,7 +88,7 @@ def clean_unique_texts_batch(client, batch_texts):
         import session_credentials
         active_model = session_credentials.get_active_gemini_model()
     except Exception:
-        active_model = os.getenv("GEMINI_MODEL_NAME", "gemini-2.0-flash")
+        active_model = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
 
     for attempt in range(3):
         try:

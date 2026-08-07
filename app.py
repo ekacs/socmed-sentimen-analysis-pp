@@ -466,10 +466,11 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
         input_gemini = st.text_input("🧠 LLM API Key:", type="password", placeholder=session_credentials.mask_credential(cur_gemini) or "Masukkan LLM API Key...", help="Kunci API LLM untuk pembersihan EYD dan NLG Laporan.")
         
         model_options = [
-            "gemini-2.0-flash",
             "gemini-1.5-flash",
+            "gemini-2.5-flash",
+            "gemini-3.1-flash-lite",
+            "gemini-2.5-flash-lite",
             "gemini-1.5-pro",
-            "gemini-2.0-pro-exp-02-05",
             "Varian Model Kustom..."
         ]
         default_model_idx = model_options.index(cur_model) if cur_model in model_options else (len(model_options) - 1)
@@ -480,7 +481,7 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
             help="Pilih versi model Gemini AI resmi dari Google yang ingin digunakan."
         )
         if selected_model_option == "Varian Model Kustom...":
-            input_model_custom = st.text_input("✍️ Ketik Identifier Model Kustom:", value=cur_model if cur_model not in model_options else "", placeholder="misal: gemini-2.0-flash-lite", help="Ketik identifier resmi nama model Gemini baru saat menginput API LLM Key.")
+            input_model_custom = st.text_input("✍️ Ketik Identifier Model Kustom:", value=cur_model if cur_model not in model_options else "", placeholder="misal: gemini-3.1-flash-lite", help="Ketik identifier resmi nama model Gemini baru saat menginput API LLM Key.")
             chosen_gemini_model = input_model_custom.strip() if input_model_custom.strip() else cur_model
         else:
             chosen_gemini_model = selected_model_option
@@ -557,11 +558,11 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
         if btn_reset_cred:
             st.session_state[session_credentials.KEY_APIFY] = ""
             st.session_state[session_credentials.KEY_GEMINI] = ""
-            st.session_state[session_credentials.KEY_GEMINI_MODEL] = "gemini-2.0-flash"
+            st.session_state[session_credentials.KEY_GEMINI_MODEL] = "gemini-1.5-flash"
             st.session_state[session_credentials.KEY_SUPABASE] = ""
             st.session_state[session_credentials.KEY_DB_MODE] = "sqlite"
-            session_credentials.save_credentials_to_env(apify_tok="", gemini_key="", supabase_url="", gemini_model="gemini-2.0-flash")
-            st.info("ℹ️ Pengaturan dikembalikan ke nilai default (SQLite Lokal & gemini-2.0-flash).")
+            session_credentials.save_credentials_to_env(apify_tok="", gemini_key="", supabase_url="", gemini_model="gemini-1.5-flash")
+            st.info("ℹ️ Pengaturan dikembalikan ke nilai default (SQLite Lokal & gemini-1.5-flash).")
             st.rerun()
 
 # # 1c. Popover Tools Migrasi Data (Lokal ↔ Cloud)

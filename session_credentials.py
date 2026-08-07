@@ -25,7 +25,7 @@ def init_session_credentials():
     if KEY_GEMINI not in st.session_state:
         st.session_state[KEY_GEMINI] = ""
     if KEY_GEMINI_MODEL not in st.session_state:
-        st.session_state[KEY_GEMINI_MODEL] = os.getenv("GEMINI_MODEL_NAME", "gemini-2.0-flash")
+        st.session_state[KEY_GEMINI_MODEL] = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
     if KEY_DB_MODE not in st.session_state:
         # Default mode utama aplikasi: Cloud PostgreSQL (Supabase)
         st.session_state[KEY_DB_MODE] = "postgresql"
@@ -77,10 +77,10 @@ def get_active_gemini_model() -> str:
     """
     Mengembalikan nama model Gemini aktif. 
     Mengambil dari pilihan sesi pengguna (jika ada), variabel lingkungan GEMINI_MODEL_NAME, 
-    atau fallback ke model standar 'gemini-2.0-flash'.
+    atau fallback ke model standar 'gemini-1.5-flash'.
     """
     custom = st.session_state.get("user_gemini_model", "").strip() if hasattr(st, "session_state") else ""
-    return custom if custom else os.getenv("GEMINI_MODEL_NAME", "gemini-2.0-flash")
+    return custom if custom else os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
 
 def is_custom_gemini() -> bool:
     """Memeriksa apakah pengguna menginput LLM API Key kustom di sesi UI."""
