@@ -465,6 +465,8 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
         st.markdown("**🧠 Pengaturan LLM AI Gemini:**")
         input_gemini = st.text_input("🧠 LLM API Key:", type="password", placeholder=session_credentials.mask_credential(cur_gemini) or "Masukkan LLM API Key...", help="Kunci API LLM untuk pembersihan EYD dan NLG Laporan.")
         
+        # Pilihan Model Dinamis
+        detected_models = session_credentials.fetch_available_gemini_models() if cur_gemini else []
         model_options = [
             "gemini-1.5-flash",
             "gemini-2.5-flash",
@@ -473,6 +475,11 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
             "gemini-1.5-pro",
             "Varian Model Kustom..."
         ]
+        if detected_models:
+            for dm in detected_models:
+                if dm not in model_options:
+                    model_options.insert(0, dm)
+
         default_model_idx = model_options.index(cur_model) if cur_model in model_options else (len(model_options) - 1)
         selected_model_option = st.selectbox(
             "🤖 Varian Model Gemini AI:",
@@ -485,6 +492,9 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
             chosen_gemini_model = input_model_custom.strip() if input_model_custom.strip() else cur_model
         else:
             chosen_gemini_model = selected_model_option
+
+        if cur_gemini and detected_models:
+            st.caption(f"✨ *Terdeteksi {len(detected_models)} model aktif dari API Key Anda.*")
 
         st.markdown("---")
         input_supabase = st.text_input("🗄️ Cloud PostgreSQL DATABASE_URL:", type="password", placeholder=session_credentials.mask_credential(cur_supabase) or "postgresql://postgres:...@db...", help="URL PostgreSQL kustom.")

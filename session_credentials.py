@@ -82,6 +82,29 @@ def get_active_gemini_model() -> str:
     custom = st.session_state.get("user_gemini_model", "").strip() if hasattr(st, "session_state") else ""
     return custom if custom else os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
 
+def fetch_available_gemini_models(api_key: str = None) -> list:
+    """
+    Mengambil daftar model Gemini yang secara aktif didukung oleh API Key pengguna langsung dari server Google GenAI API.
+    """
+    if not api_key:
+        api_key = get_active_gemini_key()
+    if not api_key:
+        return []
+    try:
+        from google import genai
+        client = genai.Client(api_key=api_key)
+        models = []
+        for m in client.models.list():
+            # Filter hanya model yang mendukung generateContent
+            if hasattr(m, 'name') and m.name:
+                name_clean = m.name.replace('models/', '')
+                if 'gemini' in name_clean.lower():
+                    models.append(name_clean)
+        return models
+    except Exception as e:
+        print(f"[DEBUG] Gagal mengambil daftar model dari Google API: {e}")
+        return []
+
 def is_custom_gemini() -> bool:
     """Memeriksa apakah pengguna menginput LLM API Key kustom di sesi UI."""
     custom = st.session_state.get(KEY_GEMINI, "").strip() if hasattr(st, "session_state") else ""
