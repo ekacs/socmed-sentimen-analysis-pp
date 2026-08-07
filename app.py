@@ -431,6 +431,7 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
     
     cur_apify = session_credentials.get_active_apify_token()
     cur_gemini = session_credentials.get_active_gemini_key()
+    cur_model = session_credentials.get_active_gemini_model()
     cur_supabase = session_credentials.get_active_supabase_url()
     cur_db_mode = session_credentials.get_active_db_mode()
     
@@ -441,6 +442,7 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
     st.markdown("**Status Kredensial & Storage Aktif:**")
     st.text(f"• Apify: {'🟢 Terdeteksi (' + session_credentials.mask_credential(cur_apify) + ')' if cur_apify else '🔴 Belum Diisi'}")
     st.text(f"• LLM Gemini: {'🟢 Terdeteksi (' + session_credentials.mask_credential(cur_gemini) + ')' if cur_gemini else '🔴 Belum Diisi'}")
+    st.text(f"• Varian Model: 🤖 {cur_model}")
     st.text(f"• Storage DB: {'🔵 Lokal (SQLite)' if cur_db_mode == 'sqlite' else '🟢 Awan (PostgreSQL / Supabase)'}")
     if cur_db_mode == "postgresql":
         st.text(f"  URL Cloud DB: {'🟢 Terdeteksi (' + session_credentials.mask_credential(cur_supabase) + ')' if cur_supabase else '🔴 Belum Diisi'}")
@@ -458,7 +460,32 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
         
         st.markdown("**Update Kredensial Sesi (Input Tersamarkan):**")
         input_apify = st.text_input("🔑 Apify API Token:", type="password", placeholder=session_credentials.mask_credential(cur_apify) or "Masukkan Apify Token...", help="Token Apify untuk penarikan data publik.")
+        
+        st.markdown("---")
+        st.markdown("**🧠 Pengaturan LLM AI Gemini:**")
         input_gemini = st.text_input("🧠 LLM API Key:", type="password", placeholder=session_credentials.mask_credential(cur_gemini) or "Masukkan LLM API Key...", help="Kunci API LLM untuk pembersihan EYD dan NLG Laporan.")
+        
+        model_options = [
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
+            "gemini-1.5-pro",
+            "gemini-2.0-pro-exp-02-05",
+            "Varian Model Kustom..."
+        ]
+        default_model_idx = model_options.index(cur_model) if cur_model in model_options else (len(model_options) - 1)
+        selected_model_option = st.selectbox(
+            "🤖 Varian Model Gemini AI:",
+            options=model_options,
+            index=default_model_idx,
+            help="Pilih versi model Gemini AI resmi dari Google yang ingin digunakan."
+        )
+        if selected_model_option == "Varian Model Kustom...":
+            input_model_custom = st.text_input("✍️ Ketik Identifier Model Kustom:", value=cur_model if cur_model not in model_options else "", placeholder="misal: gemini-2.0-flash-lite", help="Ketik identifier resmi nama model Gemini baru saat menginput API LLM Key.")
+            chosen_gemini_model = input_model_custom.strip() if input_model_custom.strip() else cur_model
+        else:
+            chosen_gemini_model = selected_model_option
+
+        st.markdown("---")
         input_supabase = st.text_input("🗄️ Cloud PostgreSQL DATABASE_URL:", type="password", placeholder=session_credentials.mask_credential(cur_supabase) or "postgresql://postgres:...@db...", help="URL PostgreSQL kustom.")
         
         c_btn_cred1, c_btn_cred2, c_btn_cred3 = st.columns([1.2, 1, 1])
@@ -490,6 +517,7 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
         if btn_save_cred:
             new_db_mode = "sqlite" if selected_db_mode == "Lokal (SQLite)" else "postgresql"
             st.session_state[session_credentials.KEY_DB_MODE] = new_db_mode
+            st.session_state[session_credentials.KEY_GEMINI_MODEL] = chosen_gemini_model
             
             apify_val = input_apify.strip() if input_apify.strip() else None
             gemini_val = input_gemini.strip() if input_gemini.strip() else None
@@ -514,7 +542,8 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
             session_credentials.save_credentials_to_env(
                 apify_tok=apify_val,
                 gemini_key=gemini_val,
-                supabase_url=supabase_val
+                supabase_url=supabase_val,
+                gemini_model=chosen_gemini_model
             )
             
             # Pastikan tabel terinisialisasi untuk database yang baru dipilih
@@ -523,16 +552,17 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
             except Exception:
                 pass
                 
-            st.success("✅ Pengaturan database & kredensial berhasil diperbarui dan disimpan ke file `.env`!")
+            st.success("✅ Pengaturan database, model AI, & kredensial berhasil diperbarui dan disimpan ke file `.env`!")
             st.rerun()
             
         if btn_reset_cred:
             st.session_state[session_credentials.KEY_APIFY] = ""
             st.session_state[session_credentials.KEY_GEMINI] = ""
+            st.session_state[session_credentials.KEY_GEMINI_MODEL] = "gemini-2.0-flash"
             st.session_state[session_credentials.KEY_SUPABASE] = ""
             st.session_state[session_credentials.KEY_DB_MODE] = "sqlite"
-            session_credentials.save_credentials_to_env(apify_tok="", gemini_key="", supabase_url="")
-            st.info("ℹ️ Pengaturan dikembalikan ke nilai default (SQLite Lokal).")
+            session_credentials.save_credentials_to_env(apify_tok="", gemini_key="", supabase_url="", gemini_model="gemini-2.0-flash")
+            st.info("ℹ️ Pengaturan dikembalikan ke nilai default (SQLite Lokal & gemini-2.0-flash).")
             st.rerun()
 
 # # 1c. Popover Tools Migrasi Data (Lokal ↔ Cloud)
