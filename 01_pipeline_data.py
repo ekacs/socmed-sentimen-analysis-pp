@@ -191,7 +191,7 @@ def process_pipeline():
         batches = [unique_indexed[i:i + batch_size] for i in range(0, len(unique_indexed), batch_size)]
         total_batches = len(batches)
         
-        print(f"[INFO] 🚀 Mengirim {len(eligible_unique_texts)} teks unik ke Gemini AI ({total_batches} batch @ maks {batch_size} teks/batch)...")
+        print(f"[INFO] 🚀 Mengirim {len(eligible_unique_texts)} teks unik ke Gemini AI ({total_batches} batch @ maks {batch_size} teks/batch)...", flush=True)
         
         max_workers = min(5, max(1, total_batches))
         completed_batches = 0
@@ -203,14 +203,14 @@ def process_pipeline():
             for future in as_completed(futures):
                 completed_batches += 1
                 try:
-                    cleaned_res = future.result()
+                    cleaned_res = future.result(timeout=45.0)
                     for idx, cleaned_t in cleaned_res.items():
                         raw_orig = eligible_unique_texts[idx]
                         eyd_cache[raw_orig] = cleaned_t
                     pct = (completed_batches / total_batches) * 100
-                    print(f"[INFO] 🚀 Progres AI: Batch {completed_batches}/{total_batches} selesai ({pct:.0f}%)...")
+                    print(f"[INFO] 🚀 Progres AI: Batch {completed_batches}/{total_batches} selesai ({pct:.0f}%)...", flush=True)
                 except Exception as e:
-                    print(f"[ERROR] Eksekusi batch AI unik gagal: {e}")
+                    print(f"[ERROR] Eksekusi batch AI {completed_batches}/{total_batches} gagal/timeout: {e}", flush=True)
 
     # Map seluruh data RAW ke cleaned_texts menggunakan eyd_cache
     pids = [pid for pid, _ in rows]

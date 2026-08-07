@@ -1458,13 +1458,25 @@ with tab_ml:
                 log_lines_ml = []
 
                 def enqueue_output_ml(out_stream, q):
-                    for line in iter(out_stream.readline, ''):
-                        q.put(line)
-                    out_stream.close()
+                    try:
+                        for line in iter(out_stream.readline, ''):
+                            q.put(line)
+                    except Exception:
+                        pass
+                    finally:
+                        try:
+                            if out_stream and not out_stream.closed:
+                                out_stream.close()
+                        except Exception:
+                            pass
 
                 t_out_ml = threading.Thread(target=enqueue_output_ml, args=(proc.stdout, log_queue_ml))
                 t_out_ml.daemon = True
                 t_out_ml.start()
+
+                t_err_ml = threading.Thread(target=enqueue_output_ml, args=(proc.stderr, log_queue_ml))
+                t_err_ml.daemon = True
+                t_err_ml.start()
 
                 info_placeholder_ml = st.empty()
                 log_placeholder_ml = st.empty()
@@ -1496,6 +1508,10 @@ with tab_ml:
 
                     time.sleep(0.5)
 
+                # Tunggu thread pembaca selesai flushing
+                t_out_ml.join(timeout=2.0)
+                t_err_ml.join(timeout=2.0)
+
                 # Kuras sisa queue log
                 while True:
                     try:
@@ -1504,7 +1520,13 @@ with tab_ml:
                     except queue.Empty:
                         break
 
-                stderr_text = proc.stderr.read() if proc.stderr else ""
+                stderr_text = ""
+                if proc.stderr:
+                    try:
+                        if not proc.stderr.closed:
+                            stderr_text = proc.stderr.read()
+                    except Exception:
+                        stderr_text = ""
                 st.session_state["proc_pipeline_obj"] = None
 
                 end_time_ml = datetime.datetime.now()
