@@ -130,6 +130,18 @@ def clean_unique_texts_batch(client, batch_texts):
 
     return {idx: raw for idx, raw in batch_texts}
 
+def is_text_eligible_for_ai(text: str) -> bool:
+    """Memeriksa apakah teks layak dikirim ke Gemini AI (panjang minimal 5 karakter & memuat minimal 3 huruf)."""
+    if not text or not isinstance(text, str):
+        return False
+    clean = text.strip()
+    if len(clean) < 5:
+        return False
+    letters = sum(1 for c in clean if c.isalpha())
+    if letters < 3:
+        return False
+    return True
+
 def process_pipeline():
     # 0. Deduplikasi Data RAW sebelum pemrosesan AI & ML
     deleted_dups = db_manager.hapus_duplikasi_data_raw()
@@ -159,26 +171,44 @@ def process_pipeline():
     
     if cache_hits > 0:
         print(f"[INFO] ⚡ Caching Hit: {cache_hits} baris data langsung menggunakan hasil EYD dari cache (bebas API token).")
+
+    # Filter teks pendek / simbol yang tidak perlu dikirim ke API Gemini
+    eligible_unique_texts = []
+    skipped_short_count = 0
+    for raw in uncached_unique_texts:
+        if is_text_eligible_for_ai(raw):
+            eligible_unique_texts.append(raw)
+        else:
+            eyd_cache[raw] = raw
+            skipped_short_count += 1
+
+    if skipped_short_count > 0:
+        print(f"[INFO] ⚡ Penghematan Token: {skipped_short_count} teks pendek/simbol dilewati dari panggilan AI.")
         
-    if gemini_client and uncached_unique_texts:
-        batch_size = 25
-        unique_indexed = list(enumerate(uncached_unique_texts))
+    if gemini_client and eligible_unique_texts:
+        batch_size = 60
+        unique_indexed = list(enumerate(eligible_unique_texts))
         batches = [unique_indexed[i:i + batch_size] for i in range(0, len(unique_indexed), batch_size)]
+        total_batches = len(batches)
         
-        print(f"[INFO] Memproses {len(uncached_unique_texts)} teks unik belum ter-cache via Gemini AI ({len(batches)} batch @ maks {batch_size} teks/batch)...")
+        print(f"[INFO] 🚀 Mengirim {len(eligible_unique_texts)} teks unik ke Gemini AI ({total_batches} batch @ maks {batch_size} teks/batch)...")
         
-        max_workers = min(8, max(1, len(batches)))
+        max_workers = min(5, max(1, total_batches))
+        completed_batches = 0
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [
                 executor.submit(clean_unique_texts_batch, gemini_client, batch)
                 for batch in batches
             ]
             for future in as_completed(futures):
+                completed_batches += 1
                 try:
                     cleaned_res = future.result()
                     for idx, cleaned_t in cleaned_res.items():
-                        raw_orig = uncached_unique_texts[idx]
+                        raw_orig = eligible_unique_texts[idx]
                         eyd_cache[raw_orig] = cleaned_t
+                    pct = (completed_batches / total_batches) * 100
+                    print(f"[INFO] 🚀 Progres AI: Batch {completed_batches}/{total_batches} selesai ({pct:.0f}%)...")
                 except Exception as e:
                     print(f"[ERROR] Eksekusi batch AI unik gagal: {e}")
 
