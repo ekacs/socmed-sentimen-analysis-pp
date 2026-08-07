@@ -591,7 +591,12 @@ with col_db1:
             help="Buka editor tabel PostgreSQL Supabase secara instan."
         )
 with col_db2:
-    if st.button("🔄 Muat Ulang", use_container_width=True, help="Muat ulang data dari basis data.", key="btn_reload_db_sidebar"):
+    if st.button("🔄 Muat Ulang", use_container_width=True, help="Muat ulang seluruh data dari basis data aktif.", key="btn_reload_db_sidebar"):
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
+        st.toast(f"🔄 Data berhasil dimuat ulang dari Database ({session_credentials.get_active_db_mode().upper()})!")
         st.rerun()
 
 if check_db_storage_full():
