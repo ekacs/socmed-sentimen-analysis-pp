@@ -425,9 +425,8 @@ with st.sidebar.popover("🔒 Disclaimer Keamanan & Kerahasiaan Data", use_conta
 with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=True):
     st.markdown("### 🔐 Pengaturan API Key & Storage Database")
     st.caption(
-        "Kunci API dan pengaturan database yang Anda masukkan di sini tersimpan dalam memori sesi browser Anda "
-        "(Session-Only) dan **otomatis terhapus** saat tab browser ditutup. "
-        "Jika dikosongkan/di-reset, sistem secara otomatis menggunakan kunci bawaan dari file `.env`."
+        "Kunci API dan pengaturan database yang Anda masukkan di sini akan disinkronkan ke sesi aplikasi "
+        "dan tersimpan secara otomatis di berkas `.env` agar tidak hilang saat halaman di-refresh."
     )
     
     cur_apify = session_credentials.get_active_apify_token()
@@ -440,11 +439,11 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
     has_custom_supabase = bool(st.session_state.get(session_credentials.KEY_SUPABASE, "").strip())
     
     st.markdown("**Status Kredensial & Storage Aktif:**")
-    st.text(f"• Apify: {'🟢 Kustom Sesi (' + session_credentials.mask_credential(cur_apify) + ')' if has_custom_apify else '⚪ Default (.env)'}")
-    st.text(f"• LLM: {'🟢 Kustom Sesi (' + session_credentials.mask_credential(cur_gemini) + ')' if has_custom_gemini else '⚪ Default (.env)'}")
+    st.text(f"• Apify: {'🟢 Terdeteksi (' + session_credentials.mask_credential(cur_apify) + ')' if cur_apify else '🔴 Belum Diisi'}")
+    st.text(f"• LLM Gemini: {'🟢 Terdeteksi (' + session_credentials.mask_credential(cur_gemini) + ')' if cur_gemini else '🔴 Belum Diisi'}")
     st.text(f"• Storage DB: {'🔵 Lokal (SQLite)' if cur_db_mode == 'sqlite' else '🟢 Awan (PostgreSQL / Supabase)'}")
     if cur_db_mode == "postgresql":
-        st.text(f"  URL Cloud DB: {'🟢 Kustom Sesi (' + session_credentials.mask_credential(cur_supabase) + ')' if has_custom_supabase else '⚪ Default (.env)'}")
+        st.text(f"  URL Cloud DB: {'🟢 Terdeteksi (' + session_credentials.mask_credential(cur_supabase) + ')' if cur_supabase else '🔴 Belum Diisi'}")
     
     st.divider()
     
@@ -458,15 +457,15 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
         )
         
         st.markdown("**Update Kredensial Sesi (Input Tersamarkan):**")
-        input_apify = st.text_input("🔑 Apify API Token:", type="password", placeholder="Masukkan Apify Token kustom...", help="Token Apify untuk penarikan data publik.")
-        input_gemini = st.text_input("🧠 LLM API Key:", type="password", placeholder="Masukkan LLM API Key kustom...", help="Kunci API LLM untuk pembersihan EYD dan NLG Laporan.")
-        input_supabase = st.text_input("🗄️ Cloud PostgreSQL DATABASE_URL:", type="password", placeholder="postgresql://postgres:...@db...supabase.co:5432/postgres", help="URL PostgreSQL kustom.")
+        input_apify = st.text_input("🔑 Apify API Token:", type="password", placeholder=session_credentials.mask_credential(cur_apify) or "Masukkan Apify Token...", help="Token Apify untuk penarikan data publik.")
+        input_gemini = st.text_input("🧠 LLM API Key:", type="password", placeholder=session_credentials.mask_credential(cur_gemini) or "Masukkan LLM API Key...", help="Kunci API LLM untuk pembersihan EYD dan NLG Laporan.")
+        input_supabase = st.text_input("🗄️ Cloud PostgreSQL DATABASE_URL:", type="password", placeholder=session_credentials.mask_credential(cur_supabase) or "postgresql://postgres:...@db...", help="URL PostgreSQL kustom.")
         
         c_btn_cred1, c_btn_cred2, c_btn_cred3 = st.columns([1.2, 1, 1])
         with c_btn_cred1:
-            btn_test_db = st.form_submit_button("🧪 Uji Koneksi DB", use_container_width=True)
+            btn_test_db = st.form_submit_button("🧪 Uji DB", use_container_width=True)
         with c_btn_cred2:
-            btn_save_cred = st.form_submit_button("💾 Simpan Sesi", use_container_width=True)
+            btn_save_cred = st.form_submit_button("💾 Simpan", use_container_width=True)
         with c_btn_cred3:
             btn_reset_cred = st.form_submit_button("🗑️ Reset", use_container_width=True)
             
@@ -491,20 +490,32 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
         if btn_save_cred:
             new_db_mode = "sqlite" if selected_db_mode == "Lokal (SQLite)" else "postgresql"
             st.session_state[session_credentials.KEY_DB_MODE] = new_db_mode
-            if input_apify.strip():
-                st.session_state[session_credentials.KEY_APIFY] = input_apify.strip()
+            
+            apify_val = input_apify.strip() if input_apify.strip() else None
+            gemini_val = input_gemini.strip() if input_gemini.strip() else None
+            supabase_val = input_supabase.strip() if input_supabase.strip() else None
+
+            if apify_val:
+                st.session_state[session_credentials.KEY_APIFY] = apify_val
                 try:
                     db_manager.set_apify_quota_flag(False)
                 except Exception:
                     pass
-            if input_gemini.strip():
-                st.session_state[session_credentials.KEY_GEMINI] = input_gemini.strip()
+            if gemini_val:
+                st.session_state[session_credentials.KEY_GEMINI] = gemini_val
                 try:
                     db_manager.set_gemini_quota_flag(False)
                 except Exception:
                     pass
-            if input_supabase.strip():
-                st.session_state[session_credentials.KEY_SUPABASE] = input_supabase.strip()
+            if supabase_val:
+                st.session_state[session_credentials.KEY_SUPABASE] = supabase_val
+            
+            # Simpan secara persisten ke file .env
+            session_credentials.save_credentials_to_env(
+                apify_tok=apify_val,
+                gemini_key=gemini_val,
+                supabase_url=supabase_val
+            )
             
             # Pastikan tabel terinisialisasi untuk database yang baru dipilih
             try:
@@ -512,7 +523,7 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
             except Exception:
                 pass
                 
-            st.success("✅ Pengaturan database & kredensial berhasil diperbarui!")
+            st.success("✅ Pengaturan database & kredensial berhasil diperbarui dan disimpan ke file `.env`!")
             st.rerun()
             
         if btn_reset_cred:
@@ -520,7 +531,8 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
             st.session_state[session_credentials.KEY_GEMINI] = ""
             st.session_state[session_credentials.KEY_SUPABASE] = ""
             st.session_state[session_credentials.KEY_DB_MODE] = "sqlite"
-            st.info("ℹ️ Pengaturan dikembalikan ke nilai default (.env / SQLite Lokal).")
+            session_credentials.save_credentials_to_env(apify_tok="", gemini_key="", supabase_url="")
+            st.info("ℹ️ Pengaturan dikembalikan ke nilai default (SQLite Lokal).")
             st.rerun()
 
 # # 1c. Popover Tools Migrasi Data (Lokal ↔ Cloud)
@@ -1571,7 +1583,11 @@ with tab_ml:
             with st.expander("📋 Log Detail Pemrosesan Pipeline"):
                 st.code(s2["full_log_ml"], language="text")
         else:
-            st.error(f"❌ **Pemrosesan AI & ML Dihentikan / Gagal (Exit code: {s2['returncode']})**")
+            if s2['returncode'] == 2:
+                st.info("ℹ️ **Pemrosesan AI & ML Tidak Mengubah Data (Exit code: 2)**")
+            else:
+                st.error(f"❌ **Pemrosesan AI & ML Dihentikan / Gagal (Exit code: {s2['returncode']})**")
+            
             m_ml1, m_ml2, m_ml3, m_ml4 = st.columns(4)
             m_ml1.metric("🕒 Waktu Mulai (UTC)", s2["start_str_ml"])
             m_ml2.metric("🏁 Waktu Selesai", s2["end_str_ml"])
@@ -1580,10 +1596,12 @@ with tab_ml:
 
             if s2['returncode'] in [-9, 15, 1] and ("taskkill" in (s2['stderr_text'] or "").lower() or "keyboardinterrupt" in (s2['stderr_text'] or "").lower()):
                 st.warning("⏹️ Pemrosesan AI & ML dihentikan secara paksa oleh pengguna.")
+            elif s2['returncode'] == 2:
+                st.info("💡 **Informasi:** Tidak ada data cuitan mentah baru (status `RAW`) di database yang perlu diproses. Seluruh data di database sudah selesai diproses sebelumnya, atau belum ada penarikan data baru di Tahapan 1.")
             else:
-                st.error("❌ Gagal memproses pipeline data. Cek kunci GEMINI_API_KEY di sesi / file .env dan ketersediaan model SVM.")
+                st.error("❌ Gagal memproses pipeline data. Silakan cek detail pada Log Kesalahan di bawah. (Pastikan kunci GEMINI_API_KEY terisi jika ingin menggunakan pembersihan EYD AI dan model SVM tersedia).")
 
-            with st.expander("📋 Log Kesalahan"):
+            with st.expander("📋 Log Detail & Kesalahan"):
                 st.code(s2["full_log_ml"], language="text")
 
 # =====================================================================

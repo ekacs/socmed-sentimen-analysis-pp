@@ -130,3 +130,46 @@ def get_session_env_dict() -> dict:
     env_dict["PYTHONUTF8"] = "1"
         
     return env_dict
+
+def save_credentials_to_env(apify_tok: str = None, gemini_key: str = None, supabase_url: str = None, env_path: str = ".env"):
+    """
+    Memperbarui file .env secara persisten dengan kredensial baru.
+    """
+    env_vars = {}
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line_clean = line.strip()
+                    if line_clean and not line_clean.startswith("#") and "=" in line_clean:
+                        k, v = line_clean.split("=", 1)
+                        env_vars[k.strip()] = v.strip().strip('"\'')
+        except Exception:
+            pass
+
+    if apify_tok is not None:
+        val = apify_tok.strip()
+        env_vars["APIFY_API_TOKEN"] = val
+        os.environ["APIFY_API_TOKEN"] = val
+    if gemini_key is not None:
+        val = gemini_key.strip()
+        env_vars["GEMINI_API_KEY"] = val
+        os.environ["GEMINI_API_KEY"] = val
+    if supabase_url is not None:
+        val = supabase_url.strip()
+        env_vars["DATABASE_URL"] = val
+        os.environ["DATABASE_URL"] = val
+
+    lines = []
+    for k, v in env_vars.items():
+        if v:
+            lines.append(f'{k}="{v}"\n')
+        else:
+            lines.append(f'{k}=\n')
+    
+    try:
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+    except Exception as e:
+        print(f"[WARNING] Gagal menulis ke berkas {env_path}: {e}")
+
