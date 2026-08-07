@@ -74,10 +74,10 @@ def get_active_gemini_model() -> str:
     """
     Mengembalikan nama model Gemini aktif. 
     Mengambil dari pilihan sesi pengguna (jika ada), variabel lingkungan GEMINI_MODEL_NAME, 
-    atau fallback ke model standar 'gemini-2.5-flash'.
+    atau fallback ke model standar 'gemini-2.0-flash'.
     """
     custom = st.session_state.get("user_gemini_model", "").strip() if hasattr(st, "session_state") else ""
-    return custom if custom else os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+    return custom if custom else os.getenv("GEMINI_MODEL_NAME", "gemini-2.0-flash")
 
 def is_custom_gemini() -> bool:
     """Memeriksa apakah pengguna menginput LLM API Key kustom di sesi UI."""
