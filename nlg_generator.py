@@ -3,6 +3,7 @@ import time
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+import session_credentials
 
 # Memuat berkas .env
 load_dotenv()
@@ -32,7 +33,7 @@ def generate_executive_summary(
 
     # 2. Validasi Kunci API LLM secara aman
     if not api_key:
-        api_key = os.getenv("GEMINI_API_KEY")
+        api_key = session_credentials.get_active_gemini_key()
     if not api_key or api_key == "YOUR_GEMINI_API_KEY_HERE":
         return (
             "### ⚠️ Kunci API LLM Belum Dikonfigurasi\n\n"
@@ -83,7 +84,7 @@ def generate_executive_summary(
         for attempt in range(3):
             try:
                 response = client.models.generate_content(
-                    model=session_credentials.get_active_gemini_model() if hasattr(session_credentials, 'get_active_gemini_model') else os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash"),
+                    model=session_credentials.get_active_gemini_model(),
                     contents=prompt_narasi,
                     config=types.GenerateContentConfig(
                         temperature=0.15,
