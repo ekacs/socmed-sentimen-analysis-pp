@@ -449,115 +449,78 @@ def scrape_threads(client, general_cfg, log_activity: str = "", user_app: str = 
     all_results = []
     seen_ids = set()
 
-    # Mode 1: Search berdasarkan Kata Kunci & Tagar (searchQuery)
-    if clean_keywords:
-        for kw in clean_keywords:
-            print(f"[INFO] >>> Menjalankan Threads Search (Query: '{kw}' | Sort: {search_filter} | After: {start_date} | Before: {end_date} | Max: {max_results})...")
-            run_input = {
-                "searchQuery": kw,
-                "sort": search_filter,
-                "after": start_date,
-                "before": end_date,
-                "maxPosts": max_results
-            }
-
-            try:
-                print(f"[INFO] Memanggil actor igview-owner/threads-search-scraper dengan input: {run_input}")
-                try:
-                    run_act = client.actor("igview-owner/threads-search-scraper").call(run_input=run_input)
-                except Exception:
-                    run_act = client.actor("FP43CZrdHtiSNn4SY").call(run_input=run_input)
-                    
-                ds_id = run_act["defaultDatasetId"]
-                
-                for item in client.dataset(ds_id).iterate_items():
-                    post_id = item.get("post_id") or item.get("thread_id") or item.get("code") or item.get("id")
-                    if not post_id or post_id in seen_ids:
-                        continue
-                    seen_ids.add(post_id)
-
-                    raw_date = item.get("timestamp") or item.get("created_at") or item.get("created_at_display")
-                    
-                    user_info = item.get("user") if isinstance(item.get("user"), dict) else {}
-                    username = user_info.get("username") or item.get("username") or item.get("from_user") or "unknown"
-                    if not username.startswith("@"):
-                        username = f"@{username}"
-
-                    raw_text = item.get("caption") or item.get("text_content") or item.get("text") or "No Content"
-                    likes = int(item.get("like_count", 0) or item.get("likes", 0) or 0)
-                    reposts = int(item.get("repost_count", 0) or item.get("reshare_count", 0) or item.get("comment_count", 0) or 0)
-                    views = int(item.get("view_count", 0) or item.get("reshare_count", 0) or item.get("views", 0) or 0)
-
-                    all_results.append({
-                        "platform_id": f"THREADS_{post_id}",
-                        "date": parse_to_wib_iso(raw_date),
-                        "username": username,
-                        "raw_text": raw_text,
-                        "likes": likes,
-                        "retweets": reposts,
-                        "views": views,
-                        "source_platform": "Threads",
-                        "log_activity": log_activity,
-                        "user_app": user_app
-                    })
-            except Exception as e_kw:
-                print(f"[ERROR] Kesalahan saat memanggil Aktor Threads Search (Query '{kw}'): {e_kw}")
-
-    # Mode 2: Search berdasarkan Username Profil (parameter 'from' - optional, default kosong)
-    elif clean_profiles:
+    # Susun kombinasi kueri pencarian & profil
+    search_payloads = []
+    
+    if clean_profiles:
         for prof in clean_profiles:
-            print(f"[INFO] >>> Menjalankan Threads User Filter (FromUser: '{prof}' | Sort: {search_filter} | After: {start_date} | Before: {end_date} | Max: {max_results})...")
-            q_str = clean_keywords[0] if clean_keywords else prof
-            run_input_prof = {
-                "searchQuery": q_str,
-                "from": prof,
-                "sort": search_filter,
-                "after": start_date,
-                "before": end_date,
-                "maxPosts": max_results
-            }
+            if clean_keywords:
+                for kw in clean_keywords:
+                    search_payloads.append({"searchQuery": kw, "from": prof, "fromUser": prof})
+            else:
+                search_payloads.append({"searchQuery": prof, "from": prof, "fromUser": prof})
+    else:
+        for kw in clean_keywords:
+            search_payloads.append({"searchQuery": kw})
 
+    for pld in search_payloads:
+        q_kw = pld["searchQuery"]
+        p_from = pld.get("from")
+        from_msg = f" | FromUser: '{p_from}'" if p_from else ""
+        print(f"[INFO] >>> Menjalankan Threads Search (Query: '{q_kw}'{from_msg} | Sort: {search_filter} | After: {start_date} | Before: {end_date} | Max: {max_results})...")
+        
+        run_input = {
+            "searchQuery": q_kw,
+            "sort": search_filter,
+            "after": start_date,
+            "before": end_date,
+            "maxPosts": max_results
+        }
+        if p_from:
+            run_input["from"] = p_from
+            run_input["fromUser"] = p_from
+
+        try:
+            print(f"[INFO] Memanggil actor igview-owner/threads-search-scraper dengan input: {run_input}")
             try:
-                print(f"[INFO] Memanggil actor igview-owner/threads-search-scraper (FromUser '{prof}') dengan input: {run_input_prof}")
-                try:
-                    run_act_prof = client.actor("igview-owner/threads-search-scraper").call(run_input=run_input_prof)
-                except Exception:
-                    run_act_prof = client.actor("FP43CZrdHtiSNn4SY").call(run_input=run_input_prof)
-                    
-                ds_id_p = run_act_prof["defaultDatasetId"]
+                run_act = client.actor("igview-owner/threads-search-scraper").call(run_input=run_input)
+            except Exception:
+                run_act = client.actor("FP43CZrdHtiSNn4SY").call(run_input=run_input)
                 
-                for item in client.dataset(ds_id_p).iterate_items():
-                    post_id = item.get("post_id") or item.get("thread_id") or item.get("code") or item.get("id")
-                    if not post_id or post_id in seen_ids:
-                        continue
-                    seen_ids.add(post_id)
+            ds_id = run_act["defaultDatasetId"]
+            
+            for item in client.dataset(ds_id).iterate_items():
+                post_id = item.get("post_id") or item.get("thread_id") or item.get("code") or item.get("id")
+                if not post_id or post_id in seen_ids:
+                    continue
+                seen_ids.add(post_id)
 
-                    raw_date = item.get("timestamp") or item.get("created_at") or item.get("created_at_display")
-                    
-                    user_info = item.get("user") if isinstance(item.get("user"), dict) else {}
-                    username = user_info.get("username") or item.get("username") or prof
-                    if not username.startswith("@"):
-                        username = f"@{username}"
+                raw_date = item.get("timestamp") or item.get("created_at") or item.get("created_at_display")
+                
+                user_info = item.get("user") if isinstance(item.get("user"), dict) else {}
+                username = user_info.get("username") or item.get("username") or item.get("from_user") or p_from or "unknown"
+                if not username.startswith("@"):
+                    username = f"@{username}"
 
-                    raw_text = item.get("caption") or item.get("text_content") or item.get("text") or "No Content"
-                    likes = int(item.get("like_count", 0) or item.get("likes", 0) or 0)
-                    reposts = int(item.get("repost_count", 0) or item.get("reshare_count", 0) or item.get("comment_count", 0) or 0)
-                    views = int(item.get("view_count", 0) or item.get("reshare_count", 0) or item.get("views", 0) or 0)
+                raw_text = item.get("caption") or item.get("text_content") or item.get("text") or "No Content"
+                likes = int(item.get("like_count", 0) or item.get("likes", 0) or 0)
+                reposts = int(item.get("repost_count", 0) or item.get("reshare_count", 0) or item.get("comment_count", 0) or 0)
+                views = int(item.get("view_count", 0) or item.get("reshare_count", 0) or item.get("views", 0) or 0)
 
-                    all_results.append({
-                        "platform_id": f"THREADS_USER_{post_id}",
-                        "date": parse_to_wib_iso(raw_date),
-                        "username": username,
-                        "raw_text": raw_text,
-                        "likes": likes,
-                        "retweets": reposts,
-                        "views": views,
-                        "source_platform": "Threads",
-                        "log_activity": log_activity,
-                        "user_app": user_app
-                    })
-            except Exception as e_prof:
-                print(f"[ERROR] Kesalahan saat memanggil Aktor Threads Search untuk Profil '{prof}': {e_prof}")
+                all_results.append({
+                    "platform_id": f"THREADS_{post_id}",
+                    "date": parse_to_wib_iso(raw_date),
+                    "username": username,
+                    "raw_text": raw_text,
+                    "likes": likes,
+                    "retweets": reposts,
+                    "views": views,
+                    "source_platform": "Threads",
+                    "log_activity": log_activity,
+                    "user_app": user_app
+                })
+        except Exception as e_run:
+            print(f"[ERROR] Kesalahan saat memanggil Aktor Threads Search (Query '{q_kw}'{from_msg}): {e_run}")
 
     return all_results
 
