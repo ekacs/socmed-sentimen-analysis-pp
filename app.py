@@ -964,7 +964,7 @@ with tab_scrape:
                 th_prof_raw = str(st.session_state.get("th_prof", ""))
                 th_start_d = st.session_state.get("th_start")
                 th_end_d = st.session_state.get("th_end")
-                th_filter_val = str(st.session_state.get("th_filter_radio", "recent"))
+                th_filter_val = str(st.session_state.get("th_filter_radio", "top"))
                 th_max_num = int(st.session_state.get("th_max", 100))
 
                 th_kw_list = [k.strip() for k in th_kw_raw.split(",") if k.strip()]
@@ -1163,28 +1163,28 @@ with tab_scrape:
     if "Threads" in selected_platforms:
         with st.container(border=True):
             st.markdown("### 🧵 Konfigurasi Penarikan Meta Threads")
-            st.caption("Menggunakan Aktor official Apify `futurizerush/meta-threads-scraper` (Search Posts & User Posts).")
+            st.caption("Menggunakan Aktor official Apify")
             col_th1, col_th2 = st.columns(2)
             with col_th1:
                 th_start_val = _parse_date(threads_cfg.get("start_date"), 14)
-                th_start_input = st.date_input("Tanggal Posting Terlama (Threads) — opsional", value=th_start_val, key="th_start")
+                th_start_input = st.date_input("Tanggal Posting Terlama (Threads) — Mandatory", value=th_start_val, key="th_start")
             with col_th2:
                 th_end_val = _parse_date(threads_cfg.get("end_date"), 0)
-                th_end_input = st.date_input("Tanggal Posting Terbaru (Threads) — opsional", value=th_end_val, key="th_end")
+                th_end_input = st.date_input("Tanggal Posting Terbaru (Threads) — Mandatory", value=th_end_val, key="th_end")
 
             th_kw_val = ", ".join(threads_cfg.get("keywords", threads_cfg.get("hashtags", [])))
             th_prof_val = ", ".join(threads_cfg.get("profiles", []))
             th_max_val = int(threads_cfg.get("max_results_threads") or threads_cfg.get("max_results", 100))
 
-            th_kw_input = st.text_input("Kata Kunci / Hashtag (Threads, pisahkan koma):", value=th_kw_val, key="th_kw")
-            th_prof_input = st.text_input("Username Profil Threads (pisahkan koma):", value=th_prof_val, key="th_prof")
+            th_kw_input = st.text_input("Kata Kunci / Hashtag (Threads, pisahkan koma) — Mandatory (Wajib Diisi):", value=th_kw_val, key="th_kw")
+            th_prof_input = st.text_input("Username Profil Threads (pisahkan koma) — Optional (Default Kosong):", value=th_prof_val, key="th_prof")
 
-            th_filter_val = threads_cfg.get("search_filter", "recent")
+            th_filter_val = threads_cfg.get("search_filter", "top")
             th_filter_radio = st.radio(
                 "Filter Pencarian Threads (Search Mode):",
-                options=["recent", "top"],
-                index=0 if th_filter_val == "recent" else 1,
-                help="'recent' menampilkan postingan terbaru secara kronologis; 'top' menampilkan postingan paling relevan.",
+                options=["top", "recent"],
+                index=0 if th_filter_val == "top" else 1,
+                help="'top' menampilkan postingan paling relevan/populer (default); 'recent' menampilkan postingan terbaru secara kronologis.",
                 key="th_filter_radio"
             )
 

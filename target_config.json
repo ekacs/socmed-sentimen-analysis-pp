@@ -1,6 +1,6 @@
 {
     "source_types": [
-        "website"
+        "threads"
     ],
     "config": {
         "twitter": {
@@ -23,9 +23,16 @@
             "max_results_linkedin": 100
         },
         "threads": {
-            "keywords": [],
+            "start_date": "2026-07-27",
+            "end_date": "2026-08-10",
+            "keywords": [
+                "sarwendah"
+            ],
+            "hashtags": [
+                "sarwendah"
+            ],
             "profiles": [],
-            "search_filter": "recent",
+            "search_filter": "top",
             "max_results": 100,
             "max_results_threads": 100
         },
@@ -47,8 +54,8 @@
             "max_results_website": 100
         },
         "general": {
-            "start_date": "2026-07-07",
-            "end_date": "2026-08-06",
+            "start_date": "2026-07-27",
+            "end_date": "2026-08-10",
             "website_urls": [
                 "kompas.com",
                 "tempo.com"
@@ -58,10 +65,16 @@
                 "tempo.com"
             ],
             "keywords": [
-                "\"kinerja pelabuhan\""
+                "sarwendah"
             ],
             "max_results": 100,
-            "max_results_website": 100
+            "max_results_website": 100,
+            "hashtags": [
+                "sarwendah"
+            ],
+            "profiles": [],
+            "search_filter": "recent",
+            "max_results_threads": 100
         }
     }
 }
