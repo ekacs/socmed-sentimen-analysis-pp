@@ -1821,6 +1821,138 @@ with tab_ml:
                 st.code(s2["full_log_ml"], language="text")
 
 # =====================================================================
+# HELPER: GENERATE UNIQUE ACCOUNTS EXCEL REPORT
+# =====================================================================
+def generate_unique_accounts_excel_bytes(df_source: pd.DataFrame) -> bytes:
+    """
+    Menghasilkan file Excel (.xlsx) murni dengan styling rapi untuk statistik Akun Unik.
+    Kolom: Username, Platform, Jumlah Data (Scraped), Sentimen Dominan, Rata-rata Skor Keyakinan (%)
+    """
+    if df_source is None or df_source.empty or 'username' not in df_source.columns:
+        df_out = pd.DataFrame(columns=[
+            "Username", "Platform", "Jumlah Data (Scraped)", "Sentimen Dominan", "Rata-rata Skor Keyakinan (%)"
+        ])
+    else:
+        records = []
+        grouped = df_source.groupby('username')
+        for user, grp in grouped:
+            user_str = str(user).strip() if pd.notna(user) and str(user).strip() else "@unknown"
+            cnt = len(grp)
+            
+            # Platforms
+            if 'source_platform' in grp.columns:
+                p_list = [str(p).strip() for p in grp['source_platform'].dropna().unique() if str(p).strip()]
+                platforms_str = ", ".join(p_list) if p_list else "Unknown"
+            else:
+                platforms_str = "Unknown"
+
+            # Sentimen Dominan
+            if 'sentiment_label' in grp.columns and not grp['sentiment_label'].dropna().empty:
+                s_counts = grp['sentiment_label'].dropna().value_counts()
+                dominant_sent = str(s_counts.idxmax()) if not s_counts.empty else "Netral"
+            else:
+                dominant_sent = "Netral"
+
+            # Rata-rata Skor Keyakinan
+            if 'confidence_score' in grp.columns and not grp['confidence_score'].dropna().empty:
+                try:
+                    scores = pd.to_numeric(grp['confidence_score'], errors='coerce').dropna()
+                    if not scores.empty:
+                        avg_score = float(scores.mean())
+                        if avg_score <= 1.0:
+                            avg_score_pct = avg_score * 100.0
+                        else:
+                            avg_score_pct = avg_score
+                        avg_score_str = f"{avg_score_pct:.1f}%"
+                    else:
+                        avg_score_str = "N/A"
+                except Exception:
+                    avg_score_str = "N/A"
+            else:
+                avg_score_str = "N/A"
+
+            records.append({
+                "Username": user_str,
+                "Platform": platforms_str,
+                "Jumlah Data (Scraped)": cnt,
+                "Sentimen Dominan": dominant_sent,
+                "Rata-rata Skor Keyakinan (%)": avg_score_str
+            })
+
+        df_out = pd.DataFrame(records)
+        if not df_out.empty:
+            df_out = df_out.sort_values(by="Jumlah Data (Scraped)", ascending=False).reset_index(drop=True)
+
+    buf = BytesIO()
+    excel_engine = 'openpyxl'
+    try:
+        import openpyxl
+    except ImportError:
+        try:
+            import xlsxwriter
+            excel_engine = 'xlsxwriter'
+        except ImportError:
+            return df_out.to_csv(index=False).encode('utf-8')
+
+    with pd.ExcelWriter(buf, engine=excel_engine) as writer:
+        df_out.to_excel(writer, index=False, sheet_name='Daftar_Akun_Unik')
+        
+        if excel_engine == 'openpyxl':
+            try:
+                worksheet = writer.sheets['Daftar_Akun_Unik']
+                from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+                
+                header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+                header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+                cell_font = Font(name="Calibri", size=11)
+                align_center = Alignment(horizontal="center", vertical="center")
+                align_left = Alignment(horizontal="left", vertical="center")
+                align_right = Alignment(horizontal="right", vertical="center")
+                
+                thin_border = Border(
+                    left=Side(style='thin', color='D9D9D9'),
+                    right=Side(style='thin', color='D9D9D9'),
+                    top=Side(style='thin', color='D9D9D9'),
+                    bottom=Side(style='thin', color='D9D9D9')
+                )
+
+                # Header styling
+                for col_idx in range(1, len(df_out.columns) + 1):
+                    cell = worksheet.cell(row=1, column=col_idx)
+                    cell.fill = header_fill
+                    cell.font = header_font
+                    cell.alignment = align_center
+                    cell.border = thin_border
+
+                # Data row styling
+                for row_idx in range(2, len(df_out) + 2):
+                    for col_idx in range(1, len(df_out.columns) + 1):
+                        cell = worksheet.cell(row=row_idx, column=col_idx)
+                        cell.font = cell_font
+                        cell.border = thin_border
+                        
+                        if col_idx in [1, 2]:
+                            cell.alignment = align_left
+                        elif col_idx in [3, 5]:
+                            cell.alignment = align_right
+                        else:
+                            cell.alignment = align_center
+
+                # Auto-fit Column Widths
+                for col in worksheet.columns:
+                    max_len = 0
+                    col_letter = col[0].column_letter
+                    for cell in col:
+                        val_str = str(cell.value or "")
+                        if len(val_str) > max_len:
+                            max_len = len(val_str)
+                    worksheet.column_dimensions[col_letter].width = max(max_len + 4, 15)
+            except Exception:
+                pass
+
+    return buf.getvalue()
+
+# =====================================================================
 # TAB 3: REVIEW DATA
 # =====================================================================
 with tab_review:
@@ -1980,7 +2112,7 @@ with tab_review:
                     st.error(f"❌ Gagal membaca file yang diunggah: {e_up}")
                     df_reviewed_final = df_live_full.copy()
             else:
-                st.info("Upload file Excel yang sudah dikoreksi di sini. Jika belum ada, seluruh data live digunakan.")
+                st.info("Upload data sentimen yang sudah dikoreksi manual, untuk menjadi bahan analisis pada tahapan berikutnya.")
                 df_reviewed_final = df_live_full.copy()
 
     st.session_state['df_reviewed_final'] = df_reviewed_final
@@ -2008,6 +2140,17 @@ with tab_review:
     with cr3: st.metric("🟢 Sentimen Positif", f"{pct_pos_r:.1f}%", delta=f"{pos_cnt_r:,} data")
     with cr4: st.metric("🔴 Sentimen Negatif", f"{pct_neg_r:.1f}%", delta=f"{neg_cnt_r:,} data", delta_color="inverse")
     with cr5: st.metric("🔵 Sentimen Netral", f"{pct_neu_r:.1f}%", delta=f"{neu_cnt_r:,} data", delta_color="off")
+
+    if not df_reviewed_final.empty:
+        buf_xlsx_acc = generate_unique_accounts_excel_bytes(df_reviewed_final)
+        st.download_button(
+            label="📥 Download Laporan Statistik Akun Unik (Excel .xlsx)",
+            data=buf_xlsx_acc,
+            file_name="Daftar_Akun_Unik_Analisis.xlsx",
+            mime="application/vnd.openpyxlformats-officedocument.spreadsheetml.sheet",
+            key="dl_unique_users_excel_rev",
+            use_container_width=True
+        )
 
     # Distribusi Data per Platform Sumber (dengan Logo/Icon)
     if 'source_platform' in df_reviewed_final.columns and not df_reviewed_final.empty:
@@ -2422,6 +2565,17 @@ with tab_viz:
     with mv3: st.metric("🟢 Sentimen Positif", f"{persen_pos_v:.1f}%", delta=f"{pos_cnt_v:,} data")
     with mv4: st.metric("🔴 Sentimen Negatif", f"{persen_neg_v:.1f}%", delta=f"{neg_cnt_v:,} data", delta_color="inverse")
     with mv5: st.metric("🔵 Sentimen Netral", f"{persen_neu_v:.1f}%", delta=f"{neu_cnt_v:,} data", delta_color="off")
+
+    if not df_viz_filtered.empty:
+        buf_xlsx_acc_v = generate_unique_accounts_excel_bytes(df_viz_filtered)
+        st.download_button(
+            label="📥 Download Laporan Statistik Akun Unik (Excel .xlsx)",
+            data=buf_xlsx_acc_v,
+            file_name="Daftar_Akun_Unik_Analisis.xlsx",
+            mime="application/vnd.openpyxlformats-officedocument.spreadsheetml.sheet",
+            key="dl_unique_users_excel_viz",
+            use_container_width=True
+        )
 
     # Distribusi Data per Platform Sumber (dengan Logo/Icon)
     if 'source_platform' in df_viz_filtered.columns and not df_viz_filtered.empty:
