@@ -61,23 +61,24 @@ def generate_executive_summary(
         - Contoh suara langsung masyarakat: {contoh_cuitan}.
 
         ATURAN PENULISAN MUTLAK:
-        1. Panjang teks MINIMAL 250 kata.
-        2. Gunakan gaya bahasa birokrasi pemerintahan (formal, objektif, taktis, dan bebas dari emosi subjektif).
-        3. Catatan Penting Konteks Sentimen: Sentimen positif bukan berarti menandakan emosi yang positif namun bisa juga diartikan pembenaran atas suatu peristiwa dan sebaliknya.
-        4. DILARANG KERAS berasumsi atau berhalusinasi di luar data statistik di atas. Jika data terbatas untuk ditarik kesimpulan yang memadai, berikan informasi secara profesional bahwa data yang diterima masih belum cukup untuk ditarik kesimpulan yang memadai.
-        5. Struktur Laporan harus terdiri dari 3 bagian dengan sub-heading bertanda markdown:
+        1. Panjang teks ideal 250 - 450 kata.
+        2. GAYA BAHASA FORMAL: Gunakan gaya bahasa birokrasi pemerintahan yang formal, baku, profesional, lugas, dan taktis.
+        3. ANALISIS KRITIS & TRANSPARAN (TETAP MENGANDUNG KRITIK): Laporan WAJIB secara jujur, lugas, dan transparan memaparkan kritik masyarakat, poin keberatan publik, serta potensi risiko/kelemahan kebijakan berdasarkan data tanpa memperhalus (*sugarcoating*) atau menyembunyikan isu negatif.
+        4. Catatan Penting Konteks Sentimen: Sentimen positif bukan berarti menandakan emosi yang positif namun bisa juga diartikan pembenaran atas suatu peristiwa dan sebaliknya.
+        5. DILARANG KERAS berasumsi atau berhalusinasi di luar data statistik di atas. Jika data terbatas untuk ditarik kesimpulan yang memadai, berikan informasi secara profesional bahwa data yang diterima masih belum cukup untuk ditarik kesimpulan yang memadai.
+        6. Struktur Laporan harus LENGKAP dan terdiri dari 3 bagian dengan sub-heading bertanda markdown (TIDAK BOLEH TERPOTONG):
            ### [Situasi Saat Ini]
            (Uraikan volume percakapan dan dominasi sentimen publik secara komparatif untuk fokus topik {kebijakan_fokus})
            
            ### [Analisis Permasalahan]
-           (Uraikan akar masalah utama berdasarkan Top Keywords dan kutipan suara masyarakat yang relevan dengan {kebijakan_fokus})
+           (Uraikan akar masalah utama dan paparkan KRITIK tajam publik secara objektif berdasarkan Top Keywords dan kutipan suara masyarakat yang relevan dengan {kebijakan_fokus})
            
            ### [Rekomendasi Kebijakan]
-           (Sajikan 2-3 butir rekomendasi taktis-realistis yang ditujukan bagi pimpinan/manajemen terkait {kebijakan_fokus})
+           (Sajikan 2-3 butir rekomendasi taktis-realistis yang merespons kritik publik tersebut bagi pimpinan/manajemen terkait {kebijakan_fokus})
            
-        6. DILARANG KERAS menuliskan judul laporan formal (seperti "LAPORAN RINGKASAN EKSEKUTIF: ..."), salam pembuka, perihal, rincian penerima (seperti "Kepada: Yth..."), atau penutup surat formal di awal maupun di akhir output. Hasil generasi harus langsung diawali dengan sub-heading pertama: "### [Situasi Saat Ini]".
+        7. DILARANG KERAS menuliskan judul laporan formal (seperti "LAPORAN RINGKASAN EKSEKUTIF: ..."), salam pembuka, perihal, rincian penerima (seperti "Kepada: Yth..."), atau penutup surat formal di awal maupun di akhir output. Hasil generasi harus langsung diawali dengan sub-heading pertama: "### [Situasi Saat Ini]".
 
-        Tuliskan laporan analisis Anda sekarang:
+        Tuliskan laporan analisis Anda secara tuntas sampai selesai tanpa terputus:
         """
         
         # 3. Eksekusi menggunakan model generasi terbaru dengan retry loop
@@ -87,8 +88,8 @@ def generate_executive_summary(
                     model=session_credentials.get_active_gemini_model(),
                     contents=prompt_narasi,
                     config=types.GenerateContentConfig(
-                        temperature=0.15,
-                        max_output_tokens=1000
+                        temperature=0.2,
+                        max_output_tokens=3000
                     )
                 )
                 return response.text

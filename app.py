@@ -1812,13 +1812,363 @@ with tab_ml:
 
             if s2['returncode'] in [-9, 15, 1] and ("taskkill" in (s2['stderr_text'] or "").lower() or "keyboardinterrupt" in (s2['stderr_text'] or "").lower()):
                 st.warning("⏹️ Pemrosesan AI & ML dihentikan secara paksa oleh pengguna.")
-            elif s2['returncode'] == 2:
-                st.info("💡 **Informasi:** Tidak ada data cuitan mentah baru (status `RAW`) di database yang perlu diproses. Seluruh data di database sudah selesai diproses sebelumnya, atau belum ada penarikan data baru di Tahapan 1.")
             else:
                 st.error("❌ Gagal memproses pipeline data. Silakan cek detail pada Log Kesalahan di bawah. (Pastikan kunci GEMINI_API_KEY terisi jika ingin menggunakan pembersihan EYD AI dan model SVM tersedia).")
 
             with st.expander("📋 Log Detail & Kesalahan"):
                 st.code(s2["full_log_ml"], language="text")
+
+from collections import Counter
+
+def generate_semantic_group_name(terms: list, existing_names: set = None) -> str:
+    """
+    Menghasilkan nama kelompok isu kontekstual dan UNIK berbasis kata kunci (semantic topic labeling).
+    """
+    if existing_names is None:
+        existing_names = set()
+
+    if not terms:
+        base_name = "Kelompok Isu Utama"
+    else:
+        terms_set = set([t.lower().strip() for t in terms])
+
+        if terms_set.intersection({"mbg", "makan", "bergizi", "gizi", "dapur", "keracunan"}):
+            if "mbg" in terms_set or "bergizi" in terms_set:
+                base_name = "Isu Program Makan Bergizi (MBG)"
+            else:
+                base_name = "Isu Layanan Kesehatan & Dapur Gizi"
+        elif terms_set.intersection({"kapal", "pelabuhan", "pemanduan", "perhubungan", "laut", "dermaga", "armada"}):
+            base_name = "Isu Pelayaran & Layanan Maritim"
+        elif terms_set.intersection({"pendidikan", "guru", "sekolah", "siswa", "kelas", "kuliah"}):
+            base_name = "Isu Sektor Pendidikan & Sekolah"
+        elif terms_set.intersection({"koperasi", "anggaran", "dana", "apbn", "keuangan", "pemerintah", "triliun"}):
+            base_name = "Isu Kebijakan Anggaran & Koperasi"
+        elif terms_set.intersection({"korupsi", "hukum", "putusan", "sidang", "kasus", "pengawasan"}):
+            base_name = "Isu Penegakan Hukum & Pengawasan"
+        elif terms_set.intersection({"prabowo", "presiden", "menteri", "pemerintah", "negara", "rakyat"}):
+            base_name = "Isu Kebijakan Pemerintah & Negara"
+        else:
+            top_terms = [t.title() for t in terms[:2]]
+            base_name = f"Fokus Isu: {' & '.join(top_terms)}"
+
+    # Garansi 100% UNIK di legenda tanpa duplikasi nama
+    candidate = base_name
+    if candidate in existing_names:
+        sub_kw = " & ".join([t.title() for t in terms[:2]])
+        candidate = f"{base_name} ({sub_kw})"
+        
+        idx = 2
+        while candidate in existing_names:
+            candidate = f"{base_name} ({sub_kw} #{idx})"
+            idx += 1
+
+    existing_names.add(candidate)
+    return candidate
+
+def build_semantic_issue_clusters(word_counts_eyd: Counter, full_eyd_corpus: str) -> list:
+    """
+    Mengelompokkan kata-kata baku EYD ke dalam kluster tema isu yang 100% kontekstual & akurat.
+    """
+    domain_seeds = [
+        {
+            "name": "Isu Program Makan Bergizi (MBG)",
+            "keywords": ["mbg", "makan", "bergizi", "dapur", "keracunan", "gizi", "siswa"]
+        },
+        {
+            "name": "Isu Pelayaran & Layanan Maritim",
+            "keywords": ["kapal", "pelabuhan", "pemanduan", "perhubungan", "laut", "dermaga", "armada"]
+        },
+        {
+            "name": "Isu Kebijakan Anggaran & Koperasi",
+            "keywords": ["anggaran", "dana", "koperasi", "pemerintah", "prabowo", "program", "negara", "rakyat", "kepala"]
+        },
+        {
+            "name": "Isu Sektor Pendidikan & Hukum",
+            "keywords": ["pendidikan", "sekolah", "korupsi", "putusan", "nasional", "indonesia", "gratis"]
+        }
+    ]
+
+    top_words = [w for w, c in word_counts_eyd.most_common(40)]
+    used_words = set()
+    clusters = []
+
+    for dom in domain_seeds:
+        d_name = dom["name"]
+        seeds = dom["keywords"]
+        
+        # Kata-kata yang persis cocok dari seed
+        matched = [w for w in seeds if w in word_counts_eyd and w not in used_words]
+        
+        # Kata-kata lain dari corpus yang relevan
+        for w in top_words:
+            if w not in used_words and w not in matched:
+                if any(s in w or w in s for s in seeds):
+                    matched.append(w)
+                    if len(matched) >= 6:
+                        break
+
+        if matched:
+            used_words.update(matched)
+            clusters.append({"name": d_name, "terms": matched[:7]})
+
+    # Tangkap sisa kata bermakna (max 1 kluster tambahan jika ada)
+    remaining = [w for w in top_words if w not in used_words]
+    if remaining and len(clusters) < 4:
+        rem_terms = remaining[:6]
+        rem_name = generate_semantic_group_name(rem_terms)
+        clusters.append({"name": rem_name, "terms": rem_terms})
+
+    return clusters
+
+# =====================================================================
+# HELPER: WORD CLOUD & JARINGAN KATA KUNCI PER BOOKMARK
+# =====================================================================
+def render_bookmark_word_network(df_source: pd.DataFrame, key_suffix: str = "rev"):
+    """
+    Visualisasi Word Cloud & Jaringan Kata Kunci per Bookmark
+    - Mengelompokkan kata-kata dalam 1 bookmark/isu di posisi berdekatan
+    - Diberikan penanda garis hubung (connecting lines) antar kata dalam 1 kelompok
+    - Diletakkan tepat di atas Tabel Live Interaktif
+    """
+    if df_source is None or df_source.empty:
+        st.info("Belum ada data untuk menampilkan visualisasi Word Cloud per Bookmark.")
+        return
+
+    # 1. Ambil & Urai seluruh teks hasil scraping yang telah terolah EYD (cleaned_text)
+    eyd_texts = []
+    if 'cleaned_text' in df_source.columns and not df_source['cleaned_text'].dropna().empty:
+        eyd_texts = df_source['cleaned_text'].dropna().astype(str).tolist()
+    elif 'raw_text' in df_source.columns and not df_source['raw_text'].dropna().empty:
+        eyd_texts = df_source['raw_text'].dropna().astype(str).tolist()
+
+    full_eyd_corpus = " ".join(eyd_texts).lower()
+
+    # Daftar Stopwords Bahasa Indonesia & Noise Lengkap (Komprehensif)
+    stopwords_id = set([
+        # Preposisi, Penghubung & Kata Tugas Standar
+        "yang", "di", "ke", "dari", "dan", "ini", "itu", "untuk", "pada", "adalah", "dengan", "juga", "akan",
+        "bisa", "sudah", "saya", "kami", "mereka", "ia", "dia", "oleh", "atau", "sebagai", "karena", "bahwa",
+        "ada", "tidak", "tak", "bukan", "pun", "dalam", "lagi", "bila", "jika", "maka", "tentang", "serta",
+        "dapat", "harus", "banyak", "hal", "para", "secara", "sama", "saat", "tersebut", "http", "https",
+        "co", "com", "www", "amp", "rt", "via", "yg", "dgn", "utk", "sdh", "tdk", "tp", "dpt", "hrs", "lebih",
+        "orang", "anak", "tahun", "hari", "jadi", "sampai", "kembali", "bahkan", "tiap", "telah",
+        
+        # Preposisi, Kata Penghubung Tambahan & Kata Keterangan Non-Isu
+        "terus", "hingga", "buat", "melalui", "seperti", "terkait", "tetapi", "tanpa", "selama", "bagi",
+        "semua", "lalu", "mulai", "soal", "depan", "dulu", "baru", "terhadap", "jangan", "bersama", "masa",
+        "sekarang", "kepada", "atas", "seluruh", "lain", "setiap", "setelah", "antara", "maupun", "mencapai",
+        "sehingga", "sekitar", "adapun", "gunung",
+
+        # Kata Meta, Generik, Verba / Nomina Umum Non-Isu
+        "judul", "bikin", "proses", "nama", "kasus", "sendiri", "kegiatan", "salah", "penting", "kelas",
+        "resmi", "hukum", "uang", "desa", "proyek", "layanan", "pelayanan", "penundaan", "bgn", "isi",
+        "mau", "ingin", "tahu", "dibuat", "membuat", "kita", "tapi", "kalau", "menjadi",
+        "merah", "putih", "apa", "siapa", "mengapa", "kenapa", "bagaimana", "mana", "saja", "apabila",
+        "supaya", "agar", "hanya", "cuma", "pernah", "selalu", "sering", "kadang", "pasti", "sesuai",
+        "masih", "belum", "agak", "sangat", "amat", "paling", "pula", "punya", "adanya", "yakni", "yaitu",
+        "selain", "mengenai", "tetap", "satu", "dua", "tiga", "empat", "lima", "kawi", "badan",
+
+        # Kata Percakapan, Kata Ganti, & Slang/Informal
+        "kalian", "nya", "gak", "udah", "aja", "pak", "aku", "nih", "dong", "sih", "deh", "kan",
+        "kok", "ya", "yuk", "lho", "ga", "ngga", "ngggak", "the", "and", "for", "you", "that"
+    ])
+
+    import re
+    import math
+    from collections import Counter
+    import plotly.graph_objects as go
+
+    tokens = re.findall(r'\b[a-zA-Z]{3,}\b', full_eyd_corpus)
+    filtered_eyd_words = [w for w in tokens if w not in stopwords_id]
+    word_counts_eyd = Counter(filtered_eyd_words)
+
+    # Ambil Bookmark dari Database jika ada
+    parsed_bookmarks = []
+    try:
+        if hasattr(db_manager, 'ambil_keysearch_bookmarks'):
+            bm_raw = db_manager.ambil_keysearch_bookmarks()
+            if isinstance(bm_raw, list):
+                for item in bm_raw:
+                    if isinstance(item, dict):
+                        b_name = item.get("bookmark_name") or "Bookmark"
+                        terms_str = item.get("terms") or ""
+                    elif isinstance(item, (tuple, list)) and len(item) >= 3:
+                        b_name = item[1]
+                        terms_str = item[2]
+                    else:
+                        continue
+                    t_list = [t.strip().lower() for t in str(terms_str).split(",") if t.strip() and t.strip().lower() not in stopwords_id]
+                    if t_list:
+                        parsed_bookmarks.append({"name": str(b_name), "terms": t_list})
+    except Exception:
+        parsed_bookmarks = []
+
+    # Bentuk kluster tema isu yang 100% kontekstual & akurat
+    if not parsed_bookmarks:
+        parsed_bookmarks = build_semantic_issue_clusters(word_counts_eyd, full_eyd_corpus)
+
+    if not parsed_bookmarks:
+        st.info("Belum ada teks terolah EYD yang dapat ditampilkan pada Jaringan Kata.")
+        return
+
+    # Skala Frekuensi Global untuk Perbedaan Ukuran Lingkaran yang Signifikan
+    all_freqs = [word_counts_eyd.get(t, full_eyd_corpus.count(t)) for bm in parsed_bookmarks for t in bm["terms"]]
+    f_min = min(all_freqs) if all_freqs else 1
+    f_max = max(all_freqs) if all_freqs else 1
+    f_range = max(1, f_max - f_min)
+
+    cluster_colors = ['#1F77B4', '#2CA02C', '#9467BD', '#FF7F0E', '#D62728', '#8C564B', '#E377C2', '#17BECF']
+
+    edge_x = []
+    edge_y = []
+    node_traces = []
+
+    n_clusters = len(parsed_bookmarks)
+    R_cluster = 3.5  # Jarak antar pusat kluster
+
+    for c_idx, bm in enumerate(parsed_bookmarks):
+        c_name = bm["name"]
+        terms = bm["terms"]
+        c_color = cluster_colors[c_idx % len(cluster_colors)]
+
+        # Posisi pusat kluster
+        angle_c = 2 * math.pi * c_idx / n_clusters
+        cx = R_cluster * math.cos(angle_c)
+        cy = R_cluster * math.sin(angle_c)
+
+        m_terms = len(terms)
+        r_term = max(0.8, 0.4 * m_terms)
+
+        cluster_nodes = []
+        n_x, n_y, n_text, n_sizes, n_hover = [], [], [], [], []
+
+        for t_idx, t in enumerate(terms):
+            angle_t = 2 * math.pi * t_idx / m_terms if m_terms > 1 else 0
+            tx = cx + r_term * math.cos(angle_t)
+            ty = cy + r_term * math.sin(angle_t)
+
+            cluster_nodes.append((tx, ty))
+
+            freq = word_counts_eyd.get(t, full_eyd_corpus.count(t))
+            freq = max(1, freq)
+
+            # Penentuan ukuran lingkaran dengan kontras signifikan (skala 18px hingga 75px)
+            sz = 18 + int(((freq - f_min) / f_range) * 57)
+
+            n_x.append(tx)
+            n_y.append(ty)
+            n_text.append(t)
+            n_sizes.append(sz)
+            n_hover.append(f"<b>{t}</b><br>Kelompok: {c_name}<br>Frekuensi Teks EYD: {freq:,} kali")
+
+        # Buat Garis Hubung (Edges)
+        for i in range(len(cluster_nodes)):
+            for j in range(i + 1, len(cluster_nodes)):
+                x0, y0 = cluster_nodes[i]
+                x1, y1 = cluster_nodes[j]
+                edge_x.extend([x0, x1, None])
+                edge_y.extend([y0, y1, None])
+
+        # Buat Trace Node per Kelompok agar Legenda Warna Terbaca Jelas oleh Pengguna
+        grp_trace = go.Scatter(
+            x=n_x, y=n_y,
+            mode='markers+text',
+            name=f"Grup: {c_name}",
+            hoverinfo='text',
+            hovertext=n_hover,
+            text=n_text,
+            textposition="top center",
+            textfont=dict(size=12, color="#111111", family="Calibri, sans-serif"),
+            marker=dict(
+                color=c_color,
+                size=n_sizes,
+                line=dict(width=2, color='#FFFFFF')
+            )
+        )
+        node_traces.append(grp_trace)
+
+    # Trace Garis Hubung (Edges)
+    edge_trace = go.Scatter(
+        x=edge_x, y=edge_y,
+        line=dict(width=1.5, color='#888888', dash='dash'),
+        hoverinfo='none',
+        showlegend=False,
+        mode='lines'
+    )
+
+    fig_net = go.Figure(data=[edge_trace] + node_traces)
+    fig_net.update_layout(
+        title=dict(text="🕸️ Visualisasi Jaringan Kata Kunci EYD (dengan Garis Hubung & Skala Ukuran)", font=dict(size=15)),
+        showlegend=True,
+        legend=dict(
+            title=dict(text="<b>Legenda Warna Kelompok Isu:</b>", font=dict(size=11)),
+            orientation="h",
+            yanchor="top", y=-0.15,
+            xanchor="center", x=0.5
+        ),
+        hovermode='closest',
+        margin=dict(b=60, l=10, r=10, t=40),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        height=480,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
+    )
+
+    t_wc, t_net = st.tabs([
+        "☁️ Model WordCloud Utama: Canvas Visual WordCloud Teks EYD",
+        "🕸️ Model Jaringan Kata: Jaringan Kata Interaktif & Garis Hubung"
+    ])
+
+    with t_wc:
+        try:
+            from wordcloud import WordCloud
+            import matplotlib.pyplot as plt
+            import re
+            from collections import Counter
+
+            # Mengambil seluruh teks hasil scraping yang telah terolah EYD (cleaned_text)
+            eyd_texts = []
+            if 'cleaned_text' in df_source.columns and not df_source['cleaned_text'].dropna().empty:
+                eyd_texts = df_source['cleaned_text'].dropna().astype(str).tolist()
+            elif 'raw_text' in df_source.columns and not df_source['raw_text'].dropna().empty:
+                eyd_texts = df_source['raw_text'].dropna().astype(str).tolist()
+
+            full_eyd_corpus = " ".join(eyd_texts).lower()
+
+            # Urai token kata (minimal 3 huruf, mengabaikan angka dan kata tak bermakna)
+            tokens = re.findall(r'\b[a-zA-Z]{3,}\b', full_eyd_corpus)
+            filtered_words = [w for w in tokens if w not in stopwords_id]
+
+            word_counts = Counter(filtered_words)
+
+            if word_counts:
+                wc = WordCloud(
+                    width=950, height=450,
+                    background_color="white",
+                    colormap="Dark2",
+                    prefer_horizontal=0.85,
+                    max_words=100,
+                    min_font_size=10,
+                    stopwords=stopwords_id,
+                    collocations=False,
+                    relative_scaling=0.5
+                ).generate_from_frequencies(word_counts)
+
+                fig_wc, ax_wc = plt.subplots(figsize=(10.5, 4.8))
+                ax_wc.imshow(wc, interpolation="bilinear")
+                ax_wc.axis("off")
+                plt.tight_layout(pad=0)
+                st.pyplot(fig_wc, use_container_width=True)
+                plt.close(fig_wc)
+                st.caption("ℹ️ *Visual WordCloud di atas dibentuk dari agregasi seluruh kumpulan kata dari teks postingan yang telah melalui pembersihan EYD (cleaned_text).*")
+            else:
+                st.info("Belum ada teks terolah EYD yang dapat ditampilkan pada WordCloud.")
+        except Exception as e_wc:
+            st.error(f"Gagal memproses Visual WordCloud Teks EYD: {e_wc}")
+
+    with t_net:
+        st.plotly_chart(fig_net, use_container_width=True, key=f"chart_word_network_{key_suffix}")
 
 # =====================================================================
 # HELPER: GENERATE UNIQUE ACCOUNTS EXCEL REPORT
@@ -2211,14 +2561,20 @@ with tab_review:
                     missing_date_cnt = total_rev_all - valid_date_cnt
 
                     if not v_df.empty:
+                        v_df['date_parsed'] = pd.to_datetime(v_df['date_parsed']).dt.date
                         df_trend = v_df.groupby(['date_parsed', 'sentiment_label']).size().reset_index(name='count')
                         if not df_trend.empty:
+                            df_trend = df_trend.sort_values(by=['date_parsed', 'sentiment_label'], ascending=[True, True])
                             fig_tr = px.line(
                                 df_trend, x='date_parsed', y='count', color='sentiment_label',
                                 color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'},
-                                line_shape='spline', height=260
+                                markers=True, line_shape='spline', height=260
                             )
-                            fig_tr.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+                            fig_tr.update_layout(
+                                margin=dict(l=10, r=10, t=10, b=10),
+                                xaxis=dict(type='date', tickformat='%d %b %Y', title="Tanggal Scraping / Postingan"),
+                                yaxis=dict(title="Jumlah Postingan")
+                            )
                             st.plotly_chart(fig_tr, use_container_width=True, key="chart_tab3_trend")
                             st.caption(f"ℹ️ *Informasi Tanggal: Dari total {total_rev_all:,} data, {valid_date_cnt:,} data memiliki tanggal valid dan {missing_date_cnt:,} data tanpa tanggal (diabaikan pada grafik tren).*")
                         else:
@@ -2253,8 +2609,9 @@ with tab_review:
                 )
                 fig_kw.update_layout(margin=dict(l=10, r=10, t=10, b=10), yaxis=dict(autorange="reversed"))
                 st.plotly_chart(fig_kw, use_container_width=True, key="chart_tab3_kw")
-            else:
-                st.info("Belum ada kata kunci dominan.")
+        # Visualisasi Word Cloud & Jaringan Kata Kunci per Bookmark (dengan Garis Hubung)
+        st.markdown("<br>", unsafe_allow_html=True)
+        render_bookmark_word_network(df_reviewed_final, key_suffix="rev")
 
         # Tabel Feed Live Interaktif (Baris Bawah)
         st.markdown("<br>", unsafe_allow_html=True)
@@ -2612,13 +2969,22 @@ with tab_viz:
             missing_viz_cnt = tot_viz_all - valid_viz_cnt
 
             if not v_df_viz.empty:
+                v_df_viz['date_parsed'] = pd.to_datetime(v_df_viz['date_parsed']).dt.date
                 df_tr = v_df_viz.groupby(['date_parsed', 'sentiment_label']).size().reset_index(name='count')
-                fig_tr = px.line(df_tr, x='date_parsed', y='count', color='sentiment_label',
-                                 color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'},
-                                 line_shape='spline', height=260)
-                fig_tr.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-                st.plotly_chart(fig_tr, use_container_width=True, key="chart_tab4_trend")
-                st.caption(f"ℹ️ *Informasi Tanggal: Dari total {tot_viz_all:,} data cleaned, {valid_viz_cnt:,} data memiliki tanggal valid dan {missing_viz_cnt:,} data tanpa tanggal (diabaikan pada grafik tren).*")
+                if not df_tr.empty:
+                    df_tr = df_tr.sort_values(by=['date_parsed', 'sentiment_label'], ascending=[True, True])
+                    fig_tr = px.line(
+                        df_tr, x='date_parsed', y='count', color='sentiment_label',
+                        color_discrete_map={'Positif': '#2D6A4F', 'Netral': '#4682B4', 'Negatif': '#B00020'},
+                        markers=True, line_shape='spline', height=260
+                    )
+                    fig_tr.update_layout(
+                        margin=dict(l=10, r=10, t=10, b=10),
+                        xaxis=dict(type='date', tickformat='%d %b %Y', title="Tanggal Scraping / Postingan"),
+                        yaxis=dict(title="Jumlah Postingan")
+                    )
+                    st.plotly_chart(fig_tr, use_container_width=True, key="chart_tab4_trend")
+                    st.caption(f"ℹ️ *Informasi Tanggal: Dari total {tot_viz_all:,} data cleaned, {valid_viz_cnt:,} data memiliki tanggal valid dan {missing_viz_cnt:,} data tanpa tanggal (diabaikan pada grafik tren).*")
             else:
                 st.info("Belum ada data dengan tanggal valid untuk membentuk grafik tren.")
         else:
@@ -2649,6 +3015,10 @@ with tab_viz:
         else:
             st.info("Belum ada kata kunci dominan.")
 
+    # Visualisasi Word Cloud & Jaringan Kata Kunci per Bookmark (dengan Garis Hubung)
+    st.markdown("<br>", unsafe_allow_html=True)
+    render_bookmark_word_network(df_viz_filtered, key_suffix="viz")
+
     st.divider()
 
     # 6.2 Narasi AI (NLG)
@@ -2660,10 +3030,6 @@ with tab_viz:
     neg_tweets = df_viz_cleaned[df_viz_cleaned['sentiment_label'] == 'Negatif'] if not df_viz_cleaned.empty else pd.DataFrame()
     contoh_suara = f"'{neg_tweets['raw_text'].iloc[0]}'" if not neg_tweets.empty else "Tidak ada cuitan negatif dominan."
 
-    if 'ai_narratives_history' not in st.session_state:
-        st.session_state['ai_narratives_history'] = []
-    if 'ai_narrative_selected_idx' not in st.session_state:
-        st.session_state['ai_narrative_selected_idx'] = 0
     if 'ai_narrative_viz_cache' not in st.session_state:
         st.session_state['ai_narrative_viz_cache'] = ""
 
@@ -2674,15 +3040,14 @@ with tab_viz:
             "**Rekomendasi:** Silakan jalankan penarikan data baru di Tahapan 1 dan proses AI di Tahapan 2."
         )
         st.session_state['ai_narrative_viz_cache'] = ""
-        st.session_state['ai_narratives_history'] = []
     else:
         if selected_search_terms:
             fokus_kebijakan_txt = ", ".join(selected_search_terms)
         else:
             fokus_kebijakan_txt = f"isu publik dengan kata kunci ({top_kw_str})"
 
-        history = st.session_state['ai_narratives_history']
-        count_generated = len(history)
+        curr_narrative = st.session_state.get('ai_narrative_viz_cache', '')
+        has_narrative = bool(curr_narrative and curr_narrative.strip())
 
         if gemini_is_out:
             st.error(
@@ -2691,61 +3056,32 @@ with tab_viz:
             )
             st.button("🔄 Perbarui Analisis Narasi (AI)", type="primary", disabled=True, help="Kuota token LLM AI habis. Fitur AI dinonaktifkan sementara.")
         else:
-            c_btn_nlg, c_info_nlg = st.columns([2.5, 3.5])
-            with c_btn_nlg:
-                btn_disabled = (count_generated >= 3)
-                btn_label = f"🔄 Perbarui Analisis Narasi (AI) [{count_generated}/3]" if count_generated > 0 else "🔄 Perbarui Analisis Narasi (AI)"
-                btn_help = "Batas maksimal 3 versi perbarui narasi telah tercapai." if btn_disabled else f"Hasilkan versi narasi baru ({count_generated+1}/3)."
-                
-                if st.button(btn_label, type="primary", disabled=btn_disabled, help=btn_help, key="btn_gen_nlg_tab4"):
-                    with st.spinner(f"Menganalisis isu '{fokus_kebijakan_txt}' & menyusun narasi versi {count_generated+1}..."):
-                        narrative_res = generate_executive_summary(
-                            total_data=total_cleaned_viz,
-                            persen_negatif=round(persen_neg_v, 1),
-                            persen_positif=round(persen_pos_v, 1),
-                            persen_netral=round(persen_neu_v, 1),
-                            top_keywords=top_kw_str,
-                            contoh_cuitan=contoh_suara,
-                            kebijakan_fokus=fokus_kebijakan_txt,
-                            api_key=session_credentials.get_active_gemini_key()
-                        )
-                        st.session_state['ai_narratives_history'].append(narrative_res)
-                        st.session_state['ai_narrative_selected_idx'] = len(st.session_state['ai_narratives_history']) - 1
-                        st.session_state['ai_narrative_viz_cache'] = narrative_res
-                        st.rerun()
+            btn_label = "✅ Narasi AI Telah Dihasilkan (Maksimal 1 Kali)" if has_narrative else "🔄 Perbarui Analisis Narasi (AI)"
+            btn_help = "Narasi AI telah dihasilkan. Fungsi tombol hanya 1 kali eksekusi." if has_narrative else "Hasilkan narasi ringkasan eksekutif berbasis AI."
+            
+            if st.button(btn_label, type="primary", disabled=has_narrative, help=btn_help, key="btn_gen_nlg_tab4"):
+                with st.spinner(f"Menganalisis isu '{fokus_kebijakan_txt}' & menyusun narasi ringkasan eksekutif..."):
+                    narrative_res = generate_executive_summary(
+                        total_data=total_cleaned_viz,
+                        persen_negatif=round(persen_neg_v, 1),
+                        persen_positif=round(persen_pos_v, 1),
+                        persen_netral=round(persen_neu_v, 1),
+                        top_keywords=top_kw_str,
+                        contoh_cuitan=contoh_suara,
+                        kebijakan_fokus=fokus_kebijakan_txt,
+                        api_key=session_credentials.get_active_gemini_key()
+                    )
+                    st.session_state['ai_narrative_viz_cache'] = narrative_res
+                    st.rerun()
 
-            with c_info_nlg:
-                if count_generated >= 3:
-                    st.caption("🔒 **Batas Maksimal 3 Versi Narasi Tercapai.** Silakan pilih versi 1, 2, atau 3 di bawah ini yang paling sesuai.")
-                elif count_generated > 0:
-                    st.caption(f"💡 Anda telah menghasilkan **{count_generated} dari 3** batas versi narasi.")
-
-        # Pilihan Versi Narasi (1, 2, 3) jika sudah ada narasi yang dihasilkan
-        curr_history = st.session_state['ai_narratives_history']
-        if curr_history:
+        # Tampilkan Narasi AI Tunggal jika sudah ada
+        if curr_narrative:
             st.markdown("---")
-            ver_labels = [f"Versi {i+1}" for i in range(len(curr_history))]
-            
-            curr_idx = min(st.session_state.get('ai_narrative_selected_idx', 0), len(curr_history) - 1)
-            
-            selected_ver = st.radio(
-                "📌 **Pilih Versi Narasi yang Sesuai (Versi 1, 2, atau 3):**",
-                options=ver_labels,
-                index=curr_idx,
-                horizontal=True,
-                key="radio_select_narrative_ver",
-                help="Pilih versi narasi yang paling sesuai untuk ditampilkan di dasbor dan diekspor ke laporan PDF."
-            )
-            
-            sel_idx = ver_labels.index(selected_ver)
-            st.session_state['ai_narrative_selected_idx'] = sel_idx
-            st.session_state['ai_narrative_viz_cache'] = curr_history[sel_idx]
-
             with st.container(border=True):
-                st.markdown(f"### 📝 Hasil Narasi Ringkasan Eksekutif ({selected_ver})")
-                st.markdown(curr_history[sel_idx])
+                st.markdown("### 📝 Hasil Narasi Ringkasan Eksekutif")
+                st.markdown(curr_narrative)
         else:
-            st.info("Klik tombol **🔄 Perbarui Analisis Narasi** di atas untuk menghasilkan ringkasan eksekutif.")
+            st.info("Klik tombol **🔄 Perbarui Analisis Narasi (AI)** di atas untuk menghasilkan ringkasan eksekutif.")
 
     st.divider()
 
