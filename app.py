@@ -799,7 +799,7 @@ tab_scrape, tab_ml, tab_review, tab_viz = st.tabs([
 # =====================================================================
 with tab_scrape:
     st.subheader("📥 Tahapan 1: Penarikan Data (Scraper)")
-    st.markdown("Tentukan parameter target penarikan data publik dari Twitter (X), Instagram, LinkedIn, dan Website / Dokumen Publik.")
+    st.markdown("Tentukan parameter target penarikan data publik dari Twitter (X), Threads, LinkedIn, dan Website / Dokumen Publik.")
     
     # 3.1 Cek Kapasitas Storage Database (Real-Time Error Detection)
     try:
