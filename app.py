@@ -2832,12 +2832,16 @@ with tab_viz:
         min_d = datetime.date.today() - datetime.timedelta(days=30)
         max_d = datetime.date.today()
         
-    col_dt1, col_dt2 = st.columns([2, 1])
-    with col_dt1:
-        viz_date_range = st.date_input("Rentang Periode Data Scraping:", value=(min_d, max_d))
-    with col_dt2:
+    col_d1, col_d2, col_btn = st.columns([1.5, 1.5, 1.5])
+    with col_d1:
+        start_date = st.date_input("📅 Tanggal Awal Scraping:", value=min_d, key="date_start_tab4")
+    with col_d2:
+        end_date = st.date_input("📅 Tanggal Akhir Scraping:", value=max_d, key="date_end_tab4")
+    with col_btn:
         st.markdown("<br>", unsafe_allow_html=True)
         btn_exec_analysis = st.button("🔍 Jalankan Analisis Sekarang", type="primary", key="btn_exec_viz", use_container_width=True)
+
+    viz_date_range = (start_date, end_date)
 
     df_viz_filtered = df_base_viz.copy()
     selected_search_terms = []
