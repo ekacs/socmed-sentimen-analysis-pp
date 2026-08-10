@@ -480,47 +480,78 @@ def scrape_threads(client, general_cfg, log_activity: str = "", user_app: str = 
             run_input["from"] = p_from
             run_input["fromUser"] = p_from
 
-        try:
-            print(f"[INFO] Memanggil actor igview-owner/threads-search-scraper dengan input: {run_input}")
+        def _fetch_and_parse(payload_input):
+            fetched_count = 0
             try:
-                run_act = client.actor("igview-owner/threads-search-scraper").call(run_input=run_input)
-            except Exception:
-                run_act = client.actor("FP43CZrdHtiSNn4SY").call(run_input=run_input)
+                print(f"[INFO] Memanggil actor igview-owner/threads-search-scraper dengan input: {payload_input}")
+                try:
+                    run_act = client.actor("igview-owner/threads-search-scraper").call(run_input=payload_input)
+                except Exception:
+                    run_act = client.actor("FP43CZrdHtiSNn4SY").call(run_input=payload_input)
+                    
+                ds_id = run_act["defaultDatasetId"]
+                raw_items = list(client.dataset(ds_id).iterate_items())
+                print(f"[INFO] Dataset Apify ID '{ds_id}' mengembalikan {len(raw_items)} item raw.")
                 
-            ds_id = run_act["defaultDatasetId"]
-            
-            for item in client.dataset(ds_id).iterate_items():
-                post_id = item.get("post_id") or item.get("thread_id") or item.get("code") or item.get("id")
-                if not post_id or post_id in seen_ids:
-                    continue
-                seen_ids.add(post_id)
+                for item in raw_items:
+                    post_id = (
+                        item.get("post_id") or 
+                        item.get("thread_id") or 
+                        item.get("code") or 
+                        item.get("id") or 
+                        item.get("pk") or 
+                        item.get("thread_code") or 
+                        item.get("thread_url") or 
+                        item.get("url")
+                    )
+                    if not post_id:
+                        post_id = f"TH_{len(all_results)+1}_{abs(hash(str(item)))}"
+                    
+                    if str(post_id) in seen_ids:
+                        continue
+                    seen_ids.add(str(post_id))
 
-                raw_date = item.get("timestamp") or item.get("created_at") or item.get("created_at_display")
-                
-                user_info = item.get("user") if isinstance(item.get("user"), dict) else {}
-                username = user_info.get("username") or item.get("username") or item.get("from_user") or p_from or "unknown"
-                if not username.startswith("@"):
-                    username = f"@{username}"
+                    raw_date = item.get("timestamp") or item.get("created_at") or item.get("created_at_display") or item.get("date")
+                    
+                    user_info = item.get("user") if isinstance(item.get("user"), dict) else {}
+                    username = user_info.get("username") or item.get("username") or item.get("from_user") or p_from or "unknown"
+                    if not username.startswith("@"):
+                        username = f"@{username}"
 
-                raw_text = item.get("caption") or item.get("text_content") or item.get("text") or "No Content"
-                likes = int(item.get("like_count", 0) or item.get("likes", 0) or 0)
-                reposts = int(item.get("repost_count", 0) or item.get("reshare_count", 0) or item.get("comment_count", 0) or 0)
-                views = int(item.get("view_count", 0) or item.get("reshare_count", 0) or item.get("views", 0) or 0)
+                    raw_text = item.get("caption") or item.get("text_content") or item.get("text") or item.get("body") or "No Content"
+                    likes = int(item.get("like_count", 0) or item.get("likes", 0) or 0)
+                    reposts = int(item.get("repost_count", 0) or item.get("reshare_count", 0) or item.get("comment_count", 0) or 0)
+                    views = int(item.get("view_count", 0) or item.get("reshare_count", 0) or item.get("views", 0) or 0)
 
-                all_results.append({
-                    "platform_id": f"THREADS_{post_id}",
-                    "date": parse_to_wib_iso(raw_date),
-                    "username": username,
-                    "raw_text": raw_text,
-                    "likes": likes,
-                    "retweets": reposts,
-                    "views": views,
-                    "source_platform": "Threads",
-                    "log_activity": log_activity,
-                    "user_app": user_app
-                })
-        except Exception as e_run:
-            print(f"[ERROR] Kesalahan saat memanggil Aktor Threads Search (Query '{q_kw}'{from_msg}): {e_run}")
+                    all_results.append({
+                        "platform_id": f"THREADS_{post_id}",
+                        "date": parse_to_wib_iso(raw_date),
+                        "username": username,
+                        "raw_text": raw_text,
+                        "likes": likes,
+                        "retweets": reposts,
+                        "views": views,
+                        "source_platform": "Threads",
+                        "log_activity": log_activity,
+                        "user_app": user_app
+                    })
+                    fetched_count += 1
+            except Exception as e_run:
+                print(f"[ERROR] Kesalahan saat memanggil Aktor Threads Search (Input: {payload_input}): {e_run}")
+            return fetched_count
+
+        n_got = _fetch_and_parse(run_input)
+        # Jika filter username menghasilkan 0 data, lakukan fallback pencarian kata kunci secara umum
+        if n_got == 0 and p_from and q_kw:
+            print(f"[WARNING] Pencarian dengan filter username '{p_from}' tidak menemukan postingan. Melakukan fallback pencarian kata kunci '{q_kw}' secara umum...")
+            fb_input = {
+                "searchQuery": q_kw,
+                "sort": search_filter,
+                "after": start_date,
+                "before": end_date,
+                "maxPosts": max_results
+            }
+            _fetch_and_parse(fb_input)
 
     return all_results
 
