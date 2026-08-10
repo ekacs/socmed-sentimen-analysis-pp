@@ -1163,7 +1163,7 @@ with tab_scrape:
     if "Threads" in selected_platforms:
         with st.container(border=True):
             st.markdown("### 🧵 Konfigurasi Penarikan Meta Threads")
-            st.caption("Menggunakan Aktor official Apify")
+    #        st.caption("Menggunakan Aktor official Apify")
             col_th1, col_th2 = st.columns(2)
             with col_th1:
                 th_start_val = _parse_date(threads_cfg.get("start_date"), 14)
@@ -1231,7 +1231,7 @@ with tab_scrape:
             li_kw_val = ", ".join(linkedin_cfg.get("keywords", []))
             li_max_val = int(linkedin_cfg.get("max_results_linkedin") or linkedin_cfg.get("max_results", 100))
 
-            li_kw_input = st.text_input("Kata Kunci / Search Terms (LinkedIn — Aktor: harvestapi/linkedin-post-search):", value=li_kw_val, key="li_kw")
+            li_kw_input = st.text_input("Kata Kunci / Search Terms LinkedIn", value=li_kw_val, key="li_kw")
             li_max_input = st.slider("Batas maksimal data yang discrape (LinkedIn):", 5, 500, li_max_val, 5, key="li_max")
 
     # -----------------------------------------------------------------
@@ -1256,7 +1256,7 @@ with tab_scrape:
             web_kw_input = st.text_input("Kata Kunci / Frasa Pencarian (Searchbar — Mendukung sintaks Google Dork):", value=web_kw_val, help='Mendukung kaidah Google Dork! Contoh: "makan bergizi gratis", intitle:"stunting", inurl:nasional, atau -politik', key="web_kw")
 
             web_max_val = int(website_cfg.get("max_results_website") or website_cfg.get("max_results", 100))
-            web_max_input = st.slider("Batas Maksimal Artikel Berita (Max Results):", 10, 1000, web_max_val, 10, key="web_max")
+            web_max_input = st.slider("Batas Maksimal Artikel Berita (Minimal 100):", 10, 1000, web_max_val, 10, key="web_max")
 
     st.divider()
     render_active_config_summary_card()
@@ -1334,7 +1334,8 @@ with tab_scrape:
                     def enqueue_output(out_stream, q):
                         try:
                             for line in iter(out_stream.readline, ''):
-                                q.put(line)
+                                clean_line = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', line)
+                                q.put(clean_line)
                         except Exception:
                             pass
                         finally:
@@ -1354,6 +1355,8 @@ with tab_scrape:
 
                     info_placeholder = st.empty()
                     log_placeholder = st.empty()
+
+                    time_series_data = []
 
                     while proc.poll() is None:
                         # Ambil baris log baru dari queue
@@ -1376,10 +1379,50 @@ with tab_scrape:
                             m3.metric("⚡ Status Mesin", "Proses Scraping Aktif...")
                             st.caption(f"🎯 **Platform Target (Simultan):** {', '.join(selected_platforms)}")
 
-                        if log_lines:
-                            with log_placeholder.container():
-                                st.markdown("**📋 Live Terminal Output:**")
-                                st.code("".join(log_lines[-12:]), language="text")
+                        # Catat time-series aktivitas log per detik
+                        time_series_data.append({
+                            "Waktu (s)": elapsed_seconds,
+                            "Log Event (Aktivitas)": len(log_lines)
+                        })
+
+                        # Deteksi error / warning / kendala secara real-time
+                        detected_issues = [
+                            l.strip() for l in log_lines 
+                            if ("ERROR" in l.upper() or "EXCEPTION" in l.upper() or "FAIL" in l.upper() or "QUOTA" in l.upper() or "HTTP 4" in l.upper() or "HTTP 5" in l.upper())
+                        ]
+                        
+                        latest_activity = [
+                            l.strip() for l in log_lines 
+                            if "[INFO]" in l or "[WARNING]" in l or "[ERROR]" in l
+                        ]
+
+                        with log_placeholder.container():
+                            st.markdown("### 📊 Monitoring Visual Penarikan Data (Real-Time)")
+                            
+                            # 1. Dynamic Progress Bar
+                            prog_percent = min(98, max(5, int((elapsed_seconds / 60.0) * 100)))
+                            st.progress(prog_percent, text=f"⚡ Proses penarikan data sedang berlangsung... ({elapsed_seconds} detik berlalu)")
+
+                            # 2. Real-Time Streaming Chart
+                            if len(time_series_data) > 1:
+                                df_chart = pd.DataFrame(time_series_data).set_index("Waktu (s)")
+                                st.line_chart(df_chart, height=180, use_container_width=True)
+
+                            # 3. Real-time Issue & Health Detector
+                            if detected_issues:
+                                st.error(f"🚨 **Kendala Terdeteksi ({len(detected_issues)} Peringatan/Error):** Mesin menemukan error/masalah di tengah proses penarikan.")
+                                with st.expander("🔍 Lihat Detail Pesan Error / Kendala Terdeteksi", expanded=True):
+                                    st.code("\n".join(detected_issues[-8:]), language="text")
+                            else:
+                                st.success("🟢 **Kesehatan Mesin & Koneksi:** Normal — Tidak ada kendala/error terdeteksi.")
+
+                            # 4. Status Aktivitas Terkini
+                            if latest_activity:
+                                st.caption(f"📌 **Aktivitas Mesin Terkini:** `{latest_activity[-1]}`")
+
+                            # 5. Raw Log Drawer (Collapsible)
+                            with st.expander("📑 Lihat Terminal Output Mentah (Detail System Log)", expanded=False):
+                                st.code("".join(log_lines[-15:]), language="text")
 
                         time.sleep(0.5)
 
@@ -1602,7 +1645,8 @@ with tab_ml:
                 def enqueue_output_ml(out_stream, q):
                     try:
                         for line in iter(out_stream.readline, ''):
-                            q.put(line)
+                            clean_line = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', line)
+                            q.put(clean_line)
                     except Exception:
                         pass
                     finally:
@@ -1622,6 +1666,8 @@ with tab_ml:
 
                 info_placeholder_ml = st.empty()
                 log_placeholder_ml = st.empty()
+
+                time_series_data_ml = []
 
                 while proc.poll() is None:
                     # Ambil baris log baru dari queue
@@ -1643,10 +1689,50 @@ with tab_ml:
                         m2.metric("⏱️ Waktu Berjalan", f"{time_str} ({elapsed_seconds}s)")
                         m3.metric("⚡ Status Mesin", "Proses AI & ML Aktif...")
 
-                    if log_lines_ml:
-                        with log_placeholder_ml.container():
-                            st.markdown("**📋 Live Terminal Output (Pipeline AI & ML):**")
-                            st.code("".join(log_lines_ml[-12:]), language="text")
+                    # Catat time-series aktivitas log per detik untuk AI & ML
+                    time_series_data_ml.append({
+                        "Waktu (s)": elapsed_seconds,
+                        "Log Event (Pipeline AI/ML)": len(log_lines_ml)
+                    })
+
+                    # Deteksi error / warning / kendala secara real-time untuk AI & ML
+                    detected_issues_ml = [
+                        l.strip() for l in log_lines_ml 
+                        if ("ERROR" in l.upper() or "EXCEPTION" in l.upper() or "FAIL" in l.upper() or "HTTP 4" in l.upper() or "HTTP 5" in l.upper())
+                    ]
+                    
+                    latest_activity_ml = [
+                        l.strip() for l in log_lines_ml 
+                        if "[INFO]" in l or "[WARNING]" in l or "[ERROR]" in l
+                    ]
+
+                    with log_placeholder_ml.container():
+                        st.markdown("### 🧠 Monitoring Visual Pipeline AI & ML (Real-Time)")
+                        
+                        # 1. Dynamic Progress Bar
+                        prog_percent = min(98, max(5, int((elapsed_seconds / 90.0) * 100)))
+                        st.progress(prog_percent, text=f"🧠 Pembersihan EYD (LLM) & Klasifikasi SVM sedang berlangsung... ({elapsed_seconds} detik berlalu)")
+
+                        # 2. Real-Time Streaming Chart
+                        if len(time_series_data_ml) > 1:
+                            df_chart_ml = pd.DataFrame(time_series_data_ml).set_index("Waktu (s)")
+                            st.line_chart(df_chart_ml, height=180, use_container_width=True)
+
+                        # 3. Real-time Issue & Health Detector
+                        if detected_issues_ml:
+                            st.error(f"🚨 **Kendala Terdeteksi ({len(detected_issues_ml)} Peringatan/Error):** Pipeline AI & ML menemukan error di tengah proses.")
+                            with st.expander("🔍 Lihat Detail Pesan Error / Kendala Terdeteksi", expanded=True):
+                                st.code("\n".join(detected_issues_ml[-8:]), language="text")
+                        else:
+                            st.success("🟢 **Kesehatan Pipeline & Model ML:** Normal — Tidak ada kendala/error terdeteksi.")
+
+                        # 4. Status Aktivitas Terkini
+                        if latest_activity_ml:
+                            st.caption(f"📌 **Aktivitas AI/ML Terkini:** `{latest_activity_ml[-1]}`")
+
+                        # 5. Raw Log Drawer (Collapsible)
+                        with st.expander("📑 Lihat Terminal Output Mentah (Detail System Log)", expanded=False):
+                            st.code("".join(log_lines_ml[-15:]), language="text")
 
                     time.sleep(0.5)
 

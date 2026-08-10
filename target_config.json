@@ -1,14 +1,19 @@
 {
     "source_types": [
-        "threads"
+        "twitter",
+        "website"
     ],
     "config": {
         "twitter": {
-            "keywords": [],
+            "start_date": "2026-08-03",
+            "end_date": "2026-08-10",
+            "keywords": [
+                "pesugihan gunung kawi"
+            ],
             "profiles": [],
             "hashtags": [],
-            "max_results": 500,
-            "max_results_twitter": 500
+            "max_results": 50,
+            "max_results_twitter": 50
         },
         "instagram": {
             "keywords": [],
@@ -32,7 +37,8 @@
                 "kapal"
             ],
             "profiles": [
-                "kemenhub151"
+                "kemenhub151",
+                "djplkemenhub151"
             ],
             "search_filter": "top",
             "max_results": 100,
@@ -41,44 +47,29 @@
         "website": {
             "start_date": "2026-07-07",
             "end_date": "2026-08-06",
-            "website_urls": [
-                "kompas.com",
-                "tempo.com"
-            ],
-            "start_urls": [
-                "kompas.com",
-                "tempo.com"
-            ],
+            "website_urls": [],
+            "start_urls": [],
             "keywords": [
-                "\"kinerja pelabuhan\""
+                "pesugihan gunung kawi"
             ],
             "max_results": 100,
             "max_results_website": 100
         },
         "general": {
-            "start_date": "2026-07-27",
-            "end_date": "2026-08-10",
-            "website_urls": [
-                "kompas.com",
-                "tempo.com"
-            ],
-            "start_urls": [
-                "kompas.com",
-                "tempo.com"
-            ],
+            "start_date": "2026-07-07",
+            "end_date": "2026-08-06",
+            "website_urls": [],
+            "start_urls": [],
             "keywords": [
-                "kapal"
+                "pesugihan gunung kawi"
             ],
             "max_results": 100,
             "max_results_website": 100,
-            "hashtags": [
-                "kapal"
-            ],
-            "profiles": [
-                "kemenhub151"
-            ],
+            "hashtags": [],
+            "profiles": [],
             "search_filter": "top",
-            "max_results_threads": 100
+            "max_results_threads": 100,
+            "max_results_twitter": 50
         }
     }
 }

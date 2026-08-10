@@ -170,16 +170,20 @@ def buat_tabel():
                         cursor.execute("ALTER TABLE keysearch_history ADD COLUMN search_term TEXT;")
                     if 'keywords' not in kh_cols:
                         cursor.execute("ALTER TABLE keysearch_history ADD COLUMN keywords TEXT;")
+                    # Cek apakah constraint UNIQUE sudah ada di PostgreSQL sebelum menambahkan
                     try:
-                        cursor.execute("ALTER TABLE keysearch_history ADD CONSTRAINT keysearch_history_search_term_key UNIQUE (search_term);")
+                        cursor.execute("SELECT 1 FROM pg_constraint WHERE conname = 'keysearch_history_search_term_key';")
+                        has_const = cursor.fetchone()
+                        if not has_const:
+                            cursor.execute("ALTER TABLE keysearch_history ADD CONSTRAINT keysearch_history_search_term_key UNIQUE (search_term);")
                     except Exception:
-                        pass
+                        conn.rollback()
                     # Selaraskan nilai antar kolom search_term <-> keywords agar tampil sempurna di Supabase Table Editor
                     try:
                         cursor.execute("UPDATE keysearch_history SET search_term = keywords WHERE (search_term IS NULL OR search_term = '') AND keywords IS NOT NULL AND keywords != '';")
                         cursor.execute("UPDATE keysearch_history SET keywords = search_term WHERE (keywords IS NULL OR keywords = '') AND search_term IS NOT NULL AND search_term != '';")
                     except Exception:
-                        pass
+                        conn.rollback()
             else:
                 cursor.execute("PRAGMA table_info(log_cuitan);")
                 columns = [row[1] for row in cursor.fetchall()]
@@ -199,6 +203,10 @@ def buat_tabel():
                     cursor.execute("ALTER TABLE keysearch_history ADD COLUMN search_term TEXT;")
         except Exception as mig_err:
             print(f"[WARNING] Migrasi skema otomatis log_cuitan / keysearch_history: {mig_err}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
         
         # Cek dan seed nilai default jika kosong
         cursor.execute("SELECT COUNT(*) FROM system_config WHERE config_key = 'scraping_mode'")

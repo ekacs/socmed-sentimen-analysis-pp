@@ -1069,9 +1069,12 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
     if time_min_str or time_max_str:
         print(f"[INFO] Rentang Tanggal Google News: {time_min_str or 'Awal'} s.d. {time_max_str or 'Kini'}")
 
+    # Aktor easyapi/google-news-scraper mewajibkan maxItems >= 100
+    actor_max_items = max(100, max_results)
+
     run_input = {
         "query": final_query,
-        "maxItems": max_results,
+        "maxItems": actor_max_items,
         "gl": "id",
         "hl": "id",
         "lr": "lang_id"
@@ -1127,8 +1130,9 @@ def scrape_website_content(client, website_cfg: dict, log_activity: str = "", us
                 "user_app": user_app
             })
 
-        print(f"[INFO] Berhasil menarik {len(results)} artikel berita dari easyapi/google-news-scraper.")
-        return results
+        final_results = results[:max_results]
+        print(f"[INFO] Berhasil menarik {len(final_results)} artikel berita dari easyapi/google-news-scraper (Batas pengguna: {max_results}).")
+        return final_results
     except Exception as e:
         print(f"[ERROR] Kesalahan saat memanggil Aktor easyapi/google-news-scraper: {e}")
         return []
