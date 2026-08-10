@@ -26,12 +26,14 @@
             "start_date": "2026-07-27",
             "end_date": "2026-08-10",
             "keywords": [
-                "sarwendah"
+                "kapal"
             ],
             "hashtags": [
-                "sarwendah"
+                "kapal"
             ],
-            "profiles": [],
+            "profiles": [
+                "kemenhub151"
+            ],
             "search_filter": "top",
             "max_results": 100,
             "max_results_threads": 100
@@ -65,15 +67,17 @@
                 "tempo.com"
             ],
             "keywords": [
-                "sarwendah"
+                "kapal"
             ],
             "max_results": 100,
             "max_results_website": 100,
             "hashtags": [
-                "sarwendah"
+                "kapal"
             ],
-            "profiles": [],
-            "search_filter": "recent",
+            "profiles": [
+                "kemenhub151"
+            ],
+            "search_filter": "top",
             "max_results_threads": 100
         }
     }
