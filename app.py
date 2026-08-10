@@ -172,24 +172,69 @@ def _chart_tren_harian_pdf(df_filtered: pd.DataFrame) -> Optional[BytesIO]:
     fig.autofmt_xdate(); ax.yaxis.set_major_locator(MaxNLocator(integer=True))
     return _fig_to_png_bytes(fig)
 
-def _chart_platform_pdf(df_filtered: pd.DataFrame) -> Optional[BytesIO]:
-    if not PDF_LIBS_OK or df_filtered.empty or 'source_platform' not in df_filtered.columns:
+def _chart_wordcloud_pdf(df_filtered: pd.DataFrame) -> Optional[BytesIO]:
+    if not PDF_LIBS_OK or df_filtered.empty:
         return None
-    df_plat = df_filtered['source_platform'].value_counts().reset_index()
-    df_plat.columns = ['platform', 'count']
-    if df_plat.empty:
+    try:
+        from wordcloud import WordCloud
+        import re
+        from collections import Counter
+
+        eyd_texts = []
+        if 'cleaned_text' in df_filtered.columns and not df_filtered['cleaned_text'].dropna().empty:
+            eyd_texts = df_filtered['cleaned_text'].dropna().astype(str).tolist()
+        elif 'raw_text' in df_filtered.columns and not df_filtered['raw_text'].dropna().empty:
+            eyd_texts = df_filtered['raw_text'].dropna().astype(str).tolist()
+
+        full_eyd_corpus = " ".join(eyd_texts).lower()
+
+        stopwords_id = set([
+            "yang", "di", "ke", "dari", "dan", "ini", "itu", "untuk", "pada", "adalah", "dengan", "juga", "akan",
+            "bisa", "sudah", "saya", "kami", "mereka", "ia", "dia", "oleh", "atau", "sebagai", "karena", "bahwa",
+            "ada", "tidak", "tak", "bukan", "pun", "dalam", "lagi", "bila", "jika", "maka", "tentang", "serta",
+            "dapat", "harus", "banyak", "hal", "para", "secara", "sama", "saat", "tersebut", "http", "https",
+            "co", "com", "www", "amp", "rt", "via", "yg", "dgn", "utk", "sdh", "tdk", "tp", "dpt", "hrs", "lebih",
+            "orang", "anak", "tahun", "hari", "jadi", "sampai", "kembali", "bahkan", "tiap", "telah",
+            "terus", "hingga", "buat", "melalui", "seperti", "terkait", "tetapi", "tanpa", "selama", "bagi",
+            "semua", "lalu", "mulai", "soal", "depan", "dulu", "baru", "terhadap", "jangan", "bersama", "masa",
+            "sekarang", "kepada", "atas", "seluruh", "lain", "setiap", "setelah", "antara", "maupun", "mencapai",
+            "sehingga", "sekitar", "adapun", "gunung", "judul", "bikin", "proses", "nama", "kasus", "sendiri", "kegiatan",
+            "salah", "penting", "kelas", "resmi", "hukum", "uang", "desa", "proyek", "layanan", "pelayanan", "penundaan",
+            "bgn", "isi", "mau", "ingin", "tahu", "dibuat", "membuat", "kita", "tapi", "kalau", "menjadi", "merah", "putih",
+            "apa", "siapa", "mengapa", "kenapa", "bagaimana", "mana", "saja", "apabila", "supaya", "agar", "hanya", "cuma",
+            "pernah", "selalu", "sering", "kadang", "pasti", "sesuai", "masih", "belum", "agak", "sangat", "amat", "paling",
+            "pula", "punya", "adanya", "yakni", "yaitu", "selain", "mengenai", "tetap", "satu", "dua", "tiga", "empat",
+            "lima", "kawi", "badan", "kalian", "nya", "gak", "udah", "aja", "pak", "aku", "nih", "dong", "sih", "deh",
+            "kan", "kok", "ya", "yuk", "lho", "ga", "ngga", "ngggak", "the", "and", "for", "you", "that"
+        ])
+
+        tokens = re.findall(r'\b[a-zA-Z]{3,}\b', full_eyd_corpus)
+        filtered_words = [w for w in tokens if w not in stopwords_id]
+        word_counts = Counter(filtered_words)
+
+        if not word_counts:
+            return None
+
+        wc = WordCloud(
+            width=800, height=400,
+            background_color="white",
+            colormap="Dark2",
+            prefer_horizontal=0.85,
+            max_words=100,
+            min_font_size=10,
+            stopwords=stopwords_id,
+            collocations=False,
+            relative_scaling=0.5
+        ).generate_from_frequencies(word_counts)
+
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.imshow(wc, interpolation="bilinear")
+        ax.axis("off")
+        ax.set_title('Visual WordCloud Teks EYD', fontsize=13, fontweight='bold', pad=10)
+        plt.tight_layout(pad=0)
+        return _fig_to_png_bytes(fig)
+    except Exception:
         return None
-    fig, ax = plt.subplots(figsize=(7.5, 3))
-    bars = ax.barh(df_plat['platform'], df_plat['count'],
-                    color=['#1f77b4', '#2ca02c', '#ff7f0e', '#d62728'][:len(df_plat)])
-    ax.set_title('Volume Data per Platform Sumber', fontsize=13, fontweight='bold', pad=10)
-    ax.set_xlabel('Jumlah Konten')
-    for bar in bars:
-        w = bar.get_width()
-        ax.text(w + max(1, w*0.01), bar.get_y() + bar.get_height()/2,
-                f'{int(w):,}', va='center', fontsize=10, fontweight='bold')
-    ax.grid(alpha=0.3, axis='x', linestyle='--')
-    return _fig_to_png_bytes(fig)
 
 # Injeksi CSS Kustom
 st.markdown("""
@@ -3173,7 +3218,57 @@ with tab_viz:
                     
                     pie_bytes_p = _chart_pie_sentimen_pdf(pos_cnt_v, neu_cnt_v, neg_cnt_v)
                     if pie_bytes_p:
-                        story_p.append(Image(pie_bytes_p, width=12*cm, height=9*cm, hAlign='CENTER'))
+                        story_p.append(Image(pie_bytes_p, width=11*cm, height=8*cm, hAlign='CENTER'))
+                    
+                    # Tambahkan Informasi Visual Distribusi Volume Data per Platform di bawah Pie Chart
+                    if 'source_platform' in df_viz_cleaned.columns and not df_viz_cleaned.empty:
+                        tot_p_pdf = len(df_viz_cleaned) if len(df_viz_cleaned) > 0 else 1
+                        tw_cnt = int(df_viz_cleaned['source_platform'].astype(str).str.contains('Twitter', case=False, na=False).sum())
+                        th_cnt = int(df_viz_cleaned['source_platform'].astype(str).str.contains('Threads', case=False, na=False).sum())
+                        li_cnt = int(df_viz_cleaned['source_platform'].astype(str).str.contains('LinkedIn', case=False, na=False).sum())
+                        web_cnt = int(df_viz_cleaned['source_platform'].astype(str).str.contains('Website|News|Portal|http|\.com|\.go\.id|\.id', case=False, na=False).sum())
+
+                        tw_pct = tw_cnt / tot_p_pdf * 100
+                        th_pct = th_cnt / tot_p_pdf * 100
+                        li_pct = li_cnt / tot_p_pdf * 100
+                        web_pct = web_cnt / tot_p_pdf * 100
+
+                        story_p.append(Spacer(1, 0.4*cm))
+                        story_p.append(Paragraph('<b>Distribusi Volume Data per Platform:</b>', sH2))
+                        story_p.append(Spacer(1, 0.2*cm))
+
+                        platform_data = [
+                            [
+                                Paragraph('<font size=9 color="#4a5568"><b>𝕏 Twitter / X</b></font>', sB),
+                                Paragraph('<font size=9 color="#4a5568"><b>🧵 Threads</b></font>', sB),
+                                Paragraph('<font size=9 color="#4a5568"><b>💼 LinkedIn</b></font>', sB),
+                                Paragraph('<font size=9 color="#4a5568"><b>🌐 Website / Dokumen Publik</b></font>', sB)
+                            ],
+                            [
+                                Paragraph(f'<font size=13 color="#1a365d"><b>{tw_pct:.1f}%</b></font>', sB),
+                                Paragraph(f'<font size=13 color="#1a365d"><b>{th_pct:.1f}%</b></font>', sB),
+                                Paragraph(f'<font size=13 color="#1a365d"><b>{li_pct:.1f}%</b></font>', sB),
+                                Paragraph(f'<font size=13 color="#1a365d"><b>{web_pct:.1f}%</b></font>', sB)
+                            ],
+                            [
+                                Paragraph(f'<font size=8 color="#718096">({tw_cnt:,} data)</font>', sB),
+                                Paragraph(f'<font size=8 color="#718096">({th_cnt:,} data)</font>', sB),
+                                Paragraph(f'<font size=8 color="#718096">({li_cnt:,} data)</font>', sB),
+                                Paragraph(f'<font size=8 color="#718096">({web_cnt:,} data)</font>', sB)
+                            ]
+                        ]
+
+                        t_plat = Table(platform_data, colWidths=[4*cm, 4*cm, 4*cm, 4.5*cm], style=TableStyle([
+                            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f7fafc')),
+                            ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#cbd5e0')),
+                            ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
+                            ('TOPPADDING', (0,0), (-1,-1), 6),
+                            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                        ]))
+                        story_p.append(t_plat)
+
                     story_p.append(PageBreak())
 
                     story_p.append(Paragraph('BAB III — VISUALISASI ANALISIS DASHBOARD', sH1))
@@ -3190,10 +3285,10 @@ with tab_viz:
                             f'<i>Informasi Tanggal: Dari total {tot_pdf_cnt:,} data cleaned, {v_df_pdf_cnt:,} data memiliki tanggal valid dan {no_date_pdf_cnt:,} data tanpa tanggal (diabaikan pada grafik tren).</i>',
                             ParagraphStyle('CaptionPDF', parent=styles_p['Italic'], fontSize=8, leading=11, textColor=colors.HexColor('#4a5568'), alignment=1)
                         ))
-                    pl_bytes_p = _chart_platform_pdf(df_viz_cleaned)
-                    if pl_bytes_p:
-                        story_p.append(Paragraph('3.2 Volume Data per Platform', sH2))
-                        story_p.append(Image(pl_bytes_p, width=16*cm, height=6.5*cm, hAlign='CENTER'))
+                    wc_bytes_p = _chart_wordcloud_pdf(df_viz_cleaned)
+                    if wc_bytes_p:
+                        story_p.append(Paragraph('3.2 Visual WordCloud Teks EYD', sH2))
+                        story_p.append(Image(wc_bytes_p, width=16*cm, height=8*cm, hAlign='CENTER'))
                     story_p.append(PageBreak())
 
                     sBodyJustified = ParagraphStyle(
@@ -3235,6 +3330,42 @@ with tab_viz:
                                 story_p.append(Paragraph(clean_h, sHeading2Styled))
                             else:
                                 story_p.append(Paragraph(formatted_block, sBodyJustified))
+
+                    # Kotak Penafian & Kebijakan Penggunaan LLM AI di Halaman Terakhir
+                    model_active = session_credentials.get_active_gemini_model()
+                    story_p.append(Spacer(1, 0.4*cm))
+                    
+                    disclaimer_style = ParagraphStyle(
+                        'DisclaimerPDF',
+                        parent=styles_p['Normal'],
+                        fontName='Helvetica',
+                        fontSize=8,
+                        leading=11.5,
+                        textColor=colors.HexColor('#4a5568')
+                    )
+
+                    disclaimer_text = (
+                        f"<b>⚠️ PENAFIAN & KEBIJAKAN PENGGUNAAN (AI DISCLAIMER & USAGE POLICY):</b><br/>"
+                        f"Laporan Ringkasan Eksekutif di atas disusun secara otomatis berbasis kecerdasan buatan (*Artificial Intelligence*) "
+                        f"menggunakan <b>Large Language Model (LLM) Google Gemini (Model: {model_active})</b> berdasarkan ekstraksi data "
+                        f"statistik opini publik. Hasil analisis naratif ini berfungsi sebagai bahan rujukan dan masukan awal perumusan kebijakan, "
+                        f"sehingga dalam pemanfaatannya <b>diperlukan verifikasi dan pertimbangan yang bijaksana</b> "
+                        f"oleh pihak pimpinan/manajemen yang berwenang sebelum mengambil keputusan strategis atau tindakan berdampak hukum."
+                    )
+
+                    t_disclaimer = Table(
+                        [[Paragraph(disclaimer_text, disclaimer_style)]],
+                        colWidths=[16.5*cm],
+                        style=TableStyle([
+                            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#fff5f5')),
+                            ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#feb2b2')),
+                            ('TOPPADDING', (0,0), (-1,-1), 7),
+                            ('BOTTOMPADDING', (0,0), (-1,-1), 7),
+                            ('LEFTPADDING', (0,0), (-1,-1), 10),
+                            ('RIGHTPADDING', (0,0), (-1,-1), 10),
+                        ])
+                    )
+                    story_p.append(t_disclaimer)
 
                     def _pn(canvas, doc):
                         canvas.saveState()
