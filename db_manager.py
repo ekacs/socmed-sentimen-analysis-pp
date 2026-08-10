@@ -90,7 +90,7 @@ def buat_tabel():
                 retweets INTEGER DEFAULT 0,             -- Jumlah bagikan/repost
                 views INTEGER DEFAULT 0,                -- Jumlah tayangan konten (tersedia di Twitter/X)
                 status TEXT DEFAULT 'RAW',              -- Status pemrosesan data ('RAW' / 'CLEANED')
-                source_platform TEXT NOT NULL,          -- Keterangan sumber: 'Twitter / X', 'Instagram', 'LinkedIn', 'News'
+                source_platform TEXT NOT NULL,          -- Keterangan sumber: 'Twitter / X', 'Threads', 'Instagram', 'LinkedIn', 'News'
                 log_activity TEXT,                      -- Timestamp aktivitas scraping (format: DD-MMMM-YYYY HH:MM:SS)
                 user_app TEXT                           -- Username pengguna aplikasi Streamlit yang memicu scraping
             )

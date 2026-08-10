@@ -855,18 +855,21 @@ with tab_scrape:
     mapping_source_types = {
         "twitter": "Twitter (X)",
         "twitter_": "Twitter (X)",
+        "threads": "Threads",
         "instagram": "Instagram",
         "linkedin": "LinkedIn",
         "website": "Website / Dokumen Publik"
     }
     rev_mapping = {
         "Twitter (X)": "twitter",
+        "Threads": "threads",
         "Instagram": "instagram",
         "LinkedIn": "linkedin",
         "Website / Dokumen Publik": "website"
     }
     platform_options = [
         "Twitter (X)", 
+        "Threads",
         # "Instagram",  # Dinonaktifkan sementara (dijadikan komentar)
         "LinkedIn", 
         "Website / Dokumen Publik"
@@ -954,6 +957,33 @@ with tab_scrape:
                     "max_results_twitter": tw_max_num
                 }
                 if save_platform_config("twitter", tw_obj):
+                    saved_count += 1
+
+            if "Threads" in selected_platforms:
+                th_kw_raw = str(st.session_state.get("th_kw", ""))
+                th_prof_raw = str(st.session_state.get("th_prof", ""))
+                th_start_d = st.session_state.get("th_start")
+                th_end_d = st.session_state.get("th_end")
+                th_filter_val = str(st.session_state.get("th_filter_radio", "recent"))
+                th_max_num = int(st.session_state.get("th_max", 100))
+
+                th_kw_list = [k.strip() for k in th_kw_raw.split(",") if k.strip()]
+                th_prof_list = [p.strip() for p in th_prof_raw.split(",") if p.strip()]
+
+                all_kw.extend(th_kw_list)
+                all_prof.extend(th_prof_list)
+
+                th_obj = {
+                    "start_date": th_start_d.strftime("%Y-%m-%d") if hasattr(th_start_d, 'strftime') else str(th_start_d or ""),
+                    "end_date": th_end_d.strftime("%Y-%m-%d") if hasattr(th_end_d, 'strftime') else str(th_end_d or ""),
+                    "keywords": th_kw_list,
+                    "hashtags": [k.lstrip("#") for k in th_kw_list],
+                    "profiles": th_prof_list,
+                    "search_filter": th_filter_val,
+                    "max_results": th_max_num,
+                    "max_results_threads": th_max_num
+                }
+                if save_platform_config("threads", th_obj):
                     saved_count += 1
 
             if "Instagram" in selected_platforms:
@@ -1057,6 +1087,7 @@ with tab_scrape:
         gen_c = c_root.get("general", {})
         
         tw_c = c_root.get("twitter", gen_c)
+        th_c = c_root.get("threads", gen_c)
         ig_c = c_root.get("instagram", gen_c)
         li_c = c_root.get("linkedin", gen_c)
         web_c = c_root.get("website", gen_c)
@@ -1075,6 +1106,13 @@ with tab_scrape:
                         hash_t = ", ".join(tw_c.get("hashtags", [])) or "*(Kosong)*"
                         mx = tw_c.get("max_results_twitter") or tw_c.get("max_results", 500)
                         st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Profil:** `{prof}`\n• **Hashtag:** `{hash_t}`\n• **Batas Max:** `{mx}` cuitan")
+                    elif sp == "Threads":
+                        st.markdown("##### 🧵 Meta Threads")
+                        kw = ", ".join(th_c.get("keywords", [])) or "*(Kosong)*"
+                        prof = ", ".join(th_c.get("profiles", [])) or "*(Kosong)*"
+                        flt = th_c.get("search_filter", "recent")
+                        mx = th_c.get("max_results_threads") or th_c.get("max_results", 100)
+                        st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Username:** `{prof}`\n• **Filter:** `{flt}`\n• **Batas Max:** `{mx}` posting")
                     elif sp == "Instagram":
                         st.markdown("##### 📸 Instagram")
                         kw = ", ".join(ig_c.get("keywords", [])) or "*(Kosong)*"
@@ -1119,7 +1157,41 @@ with tab_scrape:
             tw_max_input = st.slider("Batas maksimal cuitan (Twitter):", 10, 5000, tw_max_val, 10, key="tw_max")
 
     # -----------------------------------------------------------------
-    # 2. KONFIGURASI INSTAGRAM
+    # 2. KONFIGURASI META THREADS
+    # -----------------------------------------------------------------
+    threads_cfg = cfg_all_root.get("threads", general_cfg)
+    if "Threads" in selected_platforms:
+        with st.container(border=True):
+            st.markdown("### 🧵 Konfigurasi Penarikan Meta Threads")
+            st.caption("Menggunakan Aktor official Apify `futurizerush/meta-threads-scraper` (Search Posts & User Posts).")
+            col_th1, col_th2 = st.columns(2)
+            with col_th1:
+                th_start_val = _parse_date(threads_cfg.get("start_date"), 14)
+                th_start_input = st.date_input("Tanggal Posting Terlama (Threads) — opsional", value=th_start_val, key="th_start")
+            with col_th2:
+                th_end_val = _parse_date(threads_cfg.get("end_date"), 0)
+                th_end_input = st.date_input("Tanggal Posting Terbaru (Threads) — opsional", value=th_end_val, key="th_end")
+
+            th_kw_val = ", ".join(threads_cfg.get("keywords", threads_cfg.get("hashtags", [])))
+            th_prof_val = ", ".join(threads_cfg.get("profiles", []))
+            th_max_val = int(threads_cfg.get("max_results_threads") or threads_cfg.get("max_results", 100))
+
+            th_kw_input = st.text_input("Kata Kunci / Hashtag (Threads, pisahkan koma):", value=th_kw_val, key="th_kw")
+            th_prof_input = st.text_input("Username Profil Threads (pisahkan koma):", value=th_prof_val, key="th_prof")
+
+            th_filter_val = threads_cfg.get("search_filter", "recent")
+            th_filter_radio = st.radio(
+                "Filter Pencarian Threads (Search Mode):",
+                options=["recent", "top"],
+                index=0 if th_filter_val == "recent" else 1,
+                help="'recent' menampilkan postingan terbaru secara kronologis; 'top' menampilkan postingan paling relevan.",
+                key="th_filter_radio"
+            )
+
+            th_max_input = st.slider("Batas maksimal data yang discrape (Threads):", 5, 1000, th_max_val, 5, key="th_max")
+
+    # -----------------------------------------------------------------
+    # 3. KONFIGURASI INSTAGRAM
     # -----------------------------------------------------------------
     if "Instagram" in selected_platforms:
         with st.container(border=True):
@@ -1357,6 +1429,8 @@ with tab_scrape:
                             p_count = int(m_p.group(2))
                             if "twitter" in p_name:
                                 p_name = "twitter"
+                            elif "threads" in p_name:
+                                p_name = "threads"
                             elif "instagram" in p_name:
                                 p_name = "instagram"
                             elif "linkedin" in p_name:
@@ -1412,6 +1486,11 @@ with tab_scrape:
                                 if cnt == 0 and len(sp_list) == 1 and s1.get("total_data_fetched", 0) > 0:
                                     cnt = s1["total_data_fetched"]
                                 st.metric("🐦 Twitter (X)", f"{cnt:,} cuitan")
+                            elif sp == "Threads":
+                                cnt = s1["platform_counts"].get("threads", 0)
+                                if cnt == 0 and len(sp_list) == 1 and s1.get("total_data_fetched", 0) > 0:
+                                    cnt = s1["total_data_fetched"]
+                                st.metric("🧵 Threads", f"{cnt:,} posting")
                             elif sp == "Instagram":
                                 cnt = s1["platform_counts"].get("instagram", 0)
                                 if cnt == 0 and len(sp_list) == 1 and s1.get("total_data_fetched", 0) > 0:
@@ -1847,12 +1926,14 @@ with tab_review:
     # Distribusi Data per Platform Sumber (dengan Logo/Icon)
     if 'source_platform' in df_reviewed_final.columns and not df_reviewed_final.empty:
         tw_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Twitter', case=False, na=False).sum())
+        th_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Threads', case=False, na=False).sum())
         ig_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Instagram', case=False, na=False).sum())
         li_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('LinkedIn', case=False, na=False).sum())
         web_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Website|News|Portal|http|\.com|\.go\.id|\.id', case=False, na=False).sum())
         tot_p_r = total_volume_rev if total_volume_rev > 0 else 1
         
         tw_pct_r = tw_cnt_r / tot_p_r * 100
+        th_pct_r = th_cnt_r / tot_p_r * 100
         ig_pct_r = ig_cnt_r / tot_p_r * 100
         li_pct_r = li_cnt_r / tot_p_r * 100
         web_pct_r = web_cnt_r / tot_p_r * 100
@@ -1860,7 +1941,7 @@ with tab_review:
         st.markdown("<div style='margin-top: 10px; margin-bottom: 2px; font-weight: 600; font-size: 0.9em; color: #444;'>🌐 Distribusi Volume Data per Platform:</div>", unsafe_allow_html=True)
         cp1, cp2, cp3, cp4 = st.columns(4)
         with cp1: st.metric("𝕏 Twitter / X", f"{tw_pct_r:.1f}%", delta=f"{tw_cnt_r:,} data", delta_color="off")
-        with cp2: st.metric("📸 Instagram", f"{ig_pct_r:.1f}%", delta=f"{ig_cnt_r:,} data", delta_color="off")
+        with cp2: st.metric("🧵 Threads", f"{th_pct_r:.1f}%", delta=f"{th_cnt_r:,} data", delta_color="off")
         with cp3: st.metric("💼 LinkedIn", f"{li_pct_r:.1f}%", delta=f"{li_cnt_r:,} data", delta_color="off")
         with cp4: st.metric("🌐 Website / Dokumen Publik", f"{web_pct_r:.1f}%", delta=f"{web_cnt_r:,} data", delta_color="off")
 
@@ -2259,12 +2340,14 @@ with tab_viz:
     # Distribusi Data per Platform Sumber (dengan Logo/Icon)
     if 'source_platform' in df_viz_filtered.columns and not df_viz_filtered.empty:
         tw_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Twitter', case=False, na=False).sum())
+        th_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Threads', case=False, na=False).sum())
         ig_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Instagram', case=False, na=False).sum())
         li_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('LinkedIn', case=False, na=False).sum())
         web_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Website|News|Portal|http|\.com|\.go\.id|\.id', case=False, na=False).sum())
         tot_p_v = total_volume_viz if total_volume_viz > 0 else 1
         
         tw_pct_v = tw_cnt_v / tot_p_v * 100
+        th_pct_v = th_cnt_v / tot_p_v * 100
         ig_pct_v = ig_cnt_v / tot_p_v * 100
         li_pct_v = li_cnt_v / tot_p_v * 100
         web_pct_v = web_cnt_v / tot_p_v * 100
@@ -2272,7 +2355,7 @@ with tab_viz:
         st.markdown("<div style='margin-top: 10px; margin-bottom: 2px; font-weight: 600; font-size: 0.9em; color: #444;'>🌐 Distribusi Volume Data per Platform:</div>", unsafe_allow_html=True)
         cp1, cp2, cp3, cp4 = st.columns(4)
         with cp1: st.metric("𝕏 Twitter / X", f"{tw_pct_v:.1f}%", delta=f"{tw_cnt_v:,} data", delta_color="off")
-        with cp2: st.metric("📸 Instagram", f"{ig_pct_v:.1f}%", delta=f"{ig_cnt_v:,} data", delta_color="off")
+        with cp2: st.metric("🧵 Threads", f"{th_pct_v:.1f}%", delta=f"{th_cnt_v:,} data", delta_color="off")
         with cp3: st.metric("💼 LinkedIn", f"{li_pct_v:.1f}%", delta=f"{li_cnt_v:,} data", delta_color="off")
         with cp4: st.metric("🌐 Website / Dokumen Publik", f"{web_pct_v:.1f}%", delta=f"{web_cnt_v:,} data", delta_color="off")
 

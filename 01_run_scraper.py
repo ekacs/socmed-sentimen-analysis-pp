@@ -392,12 +392,149 @@ def scrape_instagram(client, general_cfg, log_activity: str = "", user_app: str 
     #                 "views": 0,
     #                 "source_platform": "Instagram",
     #                 "log_activity": log_activity,
-    #                 "user_app": user_app
-    #             })
     #     except Exception as e2:
     #         print(f"[ERROR] Kesalahan saat memanggil Aktor apify/instagram-post-scraper: {e2}")
     # 
-    # return all_results
+    return all_results
+
+def scrape_threads(client, general_cfg, log_activity: str = "", user_app: str = "local_user"):
+    """
+    Penarikan data Meta Threads menggunakan Aktor official 'futurizerush/meta-threads-scraper'
+    Mendukung dua mode:
+    1. 'search': Pencarian postingan berdasarkan Kata Kunci / Hashtag (search_filter: 'recent' / 'top')
+    2. 'user': Penarikan postingan dari username profil Threads
+    """
+    print("[INFO] Memulai penarikan data dari Meta Threads (Aktor: futurizerush/meta-threads-scraper)...")
+    keywords = general_cfg.get("keywords", []) or []
+    hashtags = general_cfg.get("hashtags", []) or []
+    profiles = general_cfg.get("profiles", []) or []
+    
+    search_filter = general_cfg.get("search_filter", "recent")
+    max_results = general_cfg.get("max_results_threads")
+    if max_results is None:
+        max_results = general_cfg.get("max_results", 100)
+    max_results = int(max_results)
+
+    clean_keywords = [str(k).strip() for k in keywords + hashtags if str(k).strip()]
+    clean_profiles = [str(p).strip().lstrip("@") for p in profiles if str(p).strip()]
+
+    if not clean_keywords and not clean_profiles:
+        print("[WARNING] Tidak ada Kata Kunci/Hashtag maupun Username Threads yang dikonfigurasi. Penarikan Threads dibatalkan.")
+        return []
+
+    all_results = []
+
+    # Mode 1: Search Mode jika kata kunci / tagar tersedia
+    if clean_keywords:
+        print(f"[INFO] >>> Menjalankan Threads Search Mode (Keywords: {clean_keywords} | Filter: {search_filter} | Max: {max_results})...")
+        run_input_search = {
+            "mode": "search",
+            "keywords": clean_keywords,
+            "search_filter": search_filter,
+            "max_posts": max_results
+        }
+        start_date = general_cfg.get("start_date")
+        end_date = general_cfg.get("end_date")
+        if start_date:
+            run_input_search["start_date"] = str(start_date)
+        if end_date:
+            run_input_search["end_date"] = str(end_date)
+
+        try:
+            print(f"[INFO] Memanggil actor futurizerush/meta-threads-scraper (Search Mode) dengan input: {run_input_search}")
+            try:
+                run_s = client.actor("futurizerush/meta-threads-scraper").call(run_input=run_input_search)
+            except Exception:
+                run_s = client.actor("lct1dlYksEDIG9If9").call(run_input=run_input_search)
+                
+            ds_id_s = run_s["defaultDatasetId"]
+            
+            for item in client.dataset(ds_id_s).iterate_items():
+                record_type = item.get("record_type", "post")
+                if record_type != "post" and "text_content" not in item and "text" not in item:
+                    continue
+                
+                post_code = item.get("post_code") or item.get("id") or item.get("post_id")
+                if not post_code:
+                    continue
+                
+                raw_date = item.get("created_at") or item.get("created_at_display") or item.get("timestamp")
+                username = item.get("username") or "unknown"
+                if not username.startswith("@"):
+                    username = f"@{username}"
+                
+                raw_text = item.get("text_content") or item.get("text") or "No Content"
+                likes = int(item.get("like_count", 0) or item.get("likes", 0) or 0)
+                reposts = int(item.get("repost_count", 0) or item.get("reply_count", 0) or 0)
+                views = int(item.get("view_count", 0) or item.get("views", 0) or 0)
+
+                all_results.append({
+                    "platform_id": f"THREADS_{post_code}",
+                    "date": parse_to_wib_iso(raw_date),
+                    "username": username,
+                    "raw_text": raw_text,
+                    "likes": likes,
+                    "retweets": reposts,
+                    "views": views,
+                    "source_platform": "Threads",
+                    "log_activity": log_activity,
+                    "user_app": user_app
+                })
+        except Exception as e_s:
+            print(f"[ERROR] Kesalahan saat memanggil Aktor Threads Search: {e_s}")
+
+    # Mode 2: User Mode jika profil tersedia
+    if clean_profiles:
+        print(f"[INFO] >>> Menjalankan Threads User Mode (Profiles: {clean_profiles} | Max: {max_results})...")
+        run_input_user = {
+            "mode": "user",
+            "usernames": clean_profiles,
+            "max_posts": max_results
+        }
+        try:
+            print(f"[INFO] Memanggil actor futurizerush/meta-threads-scraper (User Mode) dengan input: {run_input_user}")
+            try:
+                run_u = client.actor("futurizerush/meta-threads-scraper").call(run_input=run_input_user)
+            except Exception:
+                run_u = client.actor("lct1dlYksEDIG9If9").call(run_input=run_input_user)
+                
+            ds_id_u = run_u["defaultDatasetId"]
+            
+            for item in client.dataset(ds_id_u).iterate_items():
+                record_type = item.get("record_type", "post")
+                if record_type != "post" and "text_content" not in item and "text" not in item:
+                    continue
+                
+                post_code = item.get("post_code") or item.get("id") or item.get("post_id")
+                if not post_code:
+                    continue
+                
+                raw_date = item.get("created_at") or item.get("created_at_display") or item.get("timestamp")
+                username = item.get("username") or "unknown"
+                if not username.startswith("@"):
+                    username = f"@{username}"
+                
+                raw_text = item.get("text_content") or item.get("text") or "No Content"
+                likes = int(item.get("like_count", 0) or item.get("likes", 0) or 0)
+                reposts = int(item.get("repost_count", 0) or item.get("reply_count", 0) or 0)
+                views = int(item.get("view_count", 0) or item.get("views", 0) or 0)
+
+                all_results.append({
+                    "platform_id": f"THREADS_USER_{post_code}",
+                    "date": parse_to_wib_iso(raw_date),
+                    "username": username,
+                    "raw_text": raw_text,
+                    "likes": likes,
+                    "retweets": reposts,
+                    "views": views,
+                    "source_platform": "Threads",
+                    "log_activity": log_activity,
+                    "user_app": user_app
+                })
+        except Exception as e_u:
+            print(f"[ERROR] Kesalahan saat memanggil Aktor Threads User Posts: {e_u}")
+
+    return all_results
 
 def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str = "local_user"):
     """
@@ -1016,7 +1153,7 @@ def main():
     # Simpan riwayat keysearch ke database dari seluruh platform aktif
     try:
         all_kw, all_prof, all_hash = [], [], []
-        for c_key in ["general", "twitter", "instagram", "linkedin", "portal_berita", "website"]:
+        for c_key in ["general", "twitter", "threads", "instagram", "linkedin", "portal_berita", "website"]:
             sub_cfg = cfg_base.get(c_key, {})
             if isinstance(sub_cfg, dict):
                 all_kw.extend(sub_cfg.get("keywords", []))
@@ -1050,6 +1187,9 @@ def main():
         if source_type.startswith("twitter"):
             plat_cfg = cfg_base.get("twitter", general_cfg)
             return scrape_twitter(client, plat_cfg, log_activity=log_activity, user_app=user_app)
+        elif source_type == "threads":
+            plat_cfg = cfg_base.get("threads", general_cfg)
+            return scrape_threads(client, plat_cfg, log_activity=log_activity, user_app=user_app)
         elif source_type == "instagram":
             # Instagram scraper dinonaktifkan sementara
             print("[INFO] Scraper Instagram saat ini dinonaktifkan.")
