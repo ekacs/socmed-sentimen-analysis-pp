@@ -244,156 +244,160 @@ def scrape_twitter(client, general_cfg, log_activity: str = "", user_app: str = 
 
 def scrape_instagram(client, general_cfg, log_activity: str = "", user_app: str = "local_user"):
     """
-    Penarikan data Instagram multi-mode / multi-aktor:
-    1. Aktor 'apify/instagram-scraper' (reGe1ST3OBgYZSsZJ) untuk Kata Kunci/Hashtag (mode: hashtags / search)
-    2. Aktor 'apify/instagram-post-scraper' (nH2AHrwxeTRJoN5hX) untuk Username Profil (mode: username / profiles)
-    Jika kedua input terisi, kedua aktor akan dijalankan berurutan (Hashtag terlebih dahulu, lalu Username).
+    Penarikan data Instagram multi-mode / multi-aktor (FUNGSI DINONAKTIFKAN / COMMENTED OUT).
+    Untuk mengaktifkan kembali, hapus return [] di bawah dan hilangkan tanda komentar (#) pada kode di bawahnya.
     """
-    print("[INFO] Memulai penarikan data dari Instagram...")
-    keywords = general_cfg.get("keywords", []) or []
-    hashtags = general_cfg.get("hashtags", []) or []
-    profiles = general_cfg.get("profiles", []) or []
-    
-    search_mode = general_cfg.get("search_mode", "hashtags")
-    profile_mode = general_cfg.get("profile_mode", "username")
-    
-    max_results = general_cfg.get("max_results_instagram")
-    if max_results is None:
-        max_results = general_cfg.get("max_results", 100)
-    max_results = int(max_results)
+    print("[INFO] Scraper Instagram saat ini dinonaktifkan.")
+    return []
 
-    has_keywords = bool(keywords or hashtags)
-    has_profiles = bool(profiles)
-
-    if not has_keywords and not has_profiles:
-        print("[WARNING] Tidak ada Kata Kunci/Hashtag maupun Username Instagram yang dikonfigurasi. Penarikan Instagram dibatalkan.")
-        return []
-
-    all_results = []
-
-    # -----------------------------------------------------------------
-    # AKTOR 1: apify/instagram-hashtag-scraper (reGe1ST3OBgYZSsZJ) -> Hashtag / Search
-    # -----------------------------------------------------------------
-    if has_keywords:
-        print(f"[INFO] >>> Menjalankan Aktor 1: apify/instagram-hashtag-scraper (reGe1ST3OBgYZSsZJ) (keywordSearch=True)...")
-        kw_list = keywords if keywords else hashtags
-        clean_tags = [str(k).strip().lstrip("#") for k in kw_list if str(k).strip()]
-        
-        run_input_kw = {
-            "hashtags": clean_tags,
-            "keywordSearch": True,
-            "resultsLimit": max_results,
-            "resultsType": "posts"
-        }
-            
-        try:
-            print(f"[INFO] Memanggil actor apify/instagram-hashtag-scraper (reGe1ST3OBgYZSsZJ) dengan input: {run_input_kw}")
-            # Coba panggil via slug 'apify/instagram-hashtag-scraper', fallback ke ID 'reGe1ST3OBgYZSsZJ'
-            try:
-                run1 = client.actor("apify/instagram-hashtag-scraper").call(run_input=run_input_kw)
-            except Exception:
-                run1 = client.actor("reGe1ST3OBgYZSsZJ").call(run_input=run_input_kw)
-                
-            ds_id1 = run1["defaultDatasetId"]
-            
-            for item in client.dataset(ds_id1).iterate_items():
-                post_id = item.get("id") or item.get("shortCode") or item.get("code")
-                if not post_id:
-                    continue
-                raw_date = item.get("timestamp") or item.get("datetime") or item.get("takenAt")
-                username = item.get("ownerUsername") or (item.get("owner", {}) if isinstance(item.get("owner"), dict) else {}).get("username") or "unknown"
-                if not username.startswith("@"):
-                    username = f"@{username}"
-                
-                all_results.append({
-                    "platform_id": f"IG_HASHTAG_{post_id}",
-                    "date": parse_to_wib_iso(raw_date),
-                    "username": username,
-                    "raw_text": item.get("caption") or item.get("text") or "No Caption",
-                    "likes": int(item.get("likesCount", 0) or item.get("likes", 0) or 0),
-                    "retweets": 0,
-                    "views": 0,
-                    "source_platform": "Instagram",
-                    "log_activity": log_activity,
-                    "user_app": user_app
-                })
-                
-                # Ekstrak komentar terbaru jika ada
-                latest_comments = item.get("latestComments", []) or []
-                if isinstance(latest_comments, list):
-                    for comment in latest_comments:
-                        if not isinstance(comment, dict):
-                            continue
-                        comm_id = comment.get("id")
-                        if not comm_id:
-                            continue
-                        comm_user = (comment.get("owner", {}) if isinstance(comment.get("owner"), dict) else {}).get("username") or "unknown"
-                        if not comm_user.startswith("@"):
-                            comm_user = f"@{comm_user}"
-                        all_results.append({
-                            "platform_id": f"IG_COMM_{comm_id}",
-                            "date": parse_to_wib_iso(comment.get("createdAt") or comment.get("date") or raw_date),
-                            "username": comm_user,
-                            "raw_text": comment.get("text") or "",
-                            "likes": 0,
-                            "retweets": 0,
-                            "views": 0,
-                            "source_platform": "Instagram",
-                            "log_activity": log_activity,
-                            "user_app": user_app
-                        })
-        except Exception as e1:
-            print(f"[ERROR] Kesalahan saat memanggil Aktor apify/instagram-scraper: {e1}")
-
-    # -----------------------------------------------------------------
-    # AKTOR 2: apify/instagram-post-scraper (nH2AHrwxeTRJoN5hX) -> Username / Profiles
-    # -----------------------------------------------------------------
-    if has_profiles:
-        print(f"[INFO] >>> Menjalankan Aktor 2: apify/instagram-post-scraper (nH2AHrwxeTRJoN5hX) | Mode: {profile_mode}...")
-        prof_list = [str(p).strip().lstrip("@") for p in profiles if str(p).strip()]
-        
-        if profile_mode == "username":
-            run_input_prof = {
-                "username": prof_list,
-                "resultsLimit": max_results
-            }
-        else:  # "profiles"
-            run_input_prof = {
-                "profiles": prof_list,
-                "directUrls": [f"https://www.instagram.com/{p}/" for p in prof_list],
-                "resultsLimit": max_results
-            }
-            
-        try:
-            print(f"[INFO] Memanggil actor apify/instagram-post-scraper dengan input: {run_input_prof}")
-            run2 = client.actor("apify/instagram-post-scraper").call(run_input=run_input_prof)
-            ds_id2 = run2["defaultDatasetId"]
-            
-            for item in client.dataset(ds_id2).iterate_items():
-                post_id = item.get("id") or item.get("shortCode") or item.get("code")
-                if not post_id:
-                    continue
-                raw_date = item.get("timestamp") or item.get("datetime") or item.get("takenAt")
-                username = item.get("ownerUsername") or (item.get("owner", {}) if isinstance(item.get("owner"), dict) else {}).get("username") or "unknown"
-                if not username.startswith("@"):
-                    username = f"@{username}"
-                
-                all_results.append({
-                    "platform_id": f"IG_PROFILE_POST_{post_id}",
-                    "date": parse_to_wib_iso(raw_date),
-                    "username": username,
-                    "raw_text": item.get("caption") or item.get("text") or "No Caption",
-                    "likes": int(item.get("likesCount", 0) or item.get("likes", 0) or 0),
-                    "retweets": 0,
-                    "views": 0,
-                    "source_platform": "Instagram",
-                    "log_activity": log_activity,
-                    "user_app": user_app
-                })
-        except Exception as e2:
-            print(f"[ERROR] Kesalahan saat memanggil Aktor apify/instagram-post-scraper: {e2}")
-
-    return all_results
+    # =================================================================
+    # KODE SCRAPER INSTAGRAM (DISABLED / COMMENTED OUT):
+    # =================================================================
+    # print("[INFO] Memulai penarikan data dari Instagram...")
+    # keywords = general_cfg.get("keywords", []) or []
+    # hashtags = general_cfg.get("hashtags", []) or []
+    # profiles = general_cfg.get("profiles", []) or []
+    # 
+    # search_mode = general_cfg.get("search_mode", "hashtags")
+    # profile_mode = general_cfg.get("profile_mode", "username")
+    # 
+    # max_results = general_cfg.get("max_results_instagram")
+    # if max_results is None:
+    #     max_results = general_cfg.get("max_results", 100)
+    # max_results = int(max_results)
+    #
+    # has_keywords = bool(keywords or hashtags)
+    # has_profiles = bool(profiles)
+    #
+    # if not has_keywords and not has_profiles:
+    #     print("[WARNING] Tidak ada Kata Kunci/Hashtag maupun Username Instagram yang dikonfigurasi. Penarikan Instagram dibatalkan.")
+    #     return []
+    #
+    # all_results = []
+    #
+    # # -----------------------------------------------------------------
+    # # AKTOR 1: apify/instagram-hashtag-scraper (reGe1ST3OBgYZSsZJ) -> Hashtag / Search
+    # # -----------------------------------------------------------------
+    # if has_keywords:
+    #     print(f"[INFO] >>> Menjalankan Aktor 1: apify/instagram-hashtag-scraper (reGe1ST3OBgYZSsZJ) (keywordSearch=True)...")
+    #     kw_list = keywords if keywords else hashtags
+    #     clean_tags = [str(k).strip().lstrip("#") for k in kw_list if str(k).strip()]
+    #     
+    #     run_input_kw = {
+    #         "hashtags": clean_tags,
+    #         "keywordSearch": True,
+    #         "resultsLimit": max_results,
+    #         "resultsType": "posts"
+    #     }
+    #         
+    #     try:
+    #         print(f"[INFO] Memanggil actor apify/instagram-hashtag-scraper (reGe1ST3OBgYZSsZJ) dengan input: {run_input_kw}")
+    #         # Coba panggil via slug 'apify/instagram-hashtag-scraper', fallback ke ID 'reGe1ST3OBgYZSsZJ'
+    #         try:
+    #             run1 = client.actor("apify/instagram-hashtag-scraper").call(run_input=run_input_kw)
+    #         except Exception:
+    #             run1 = client.actor("reGe1ST3OBgYZSsZJ").call(run_input=run_input_kw)
+    #             
+    #         ds_id1 = run1["defaultDatasetId"]
+    #         
+    #         for item in client.dataset(ds_id1).iterate_items():
+    #             post_id = item.get("id") or item.get("shortCode") or item.get("code")
+    #             if not post_id:
+    #                 continue
+    #             raw_date = item.get("timestamp") or item.get("datetime") or item.get("takenAt")
+    #             username = item.get("ownerUsername") or (item.get("owner", {}) if isinstance(item.get("owner"), dict) else {}).get("username") or "unknown"
+    #             if not username.startswith("@"):
+    #                 username = f"@{username}"
+    #             
+    #             all_results.append({
+    #                 "platform_id": f"IG_HASHTAG_{post_id}",
+    #                 "date": parse_to_wib_iso(raw_date),
+    #                 "username": username,
+    #                 "raw_text": item.get("caption") or item.get("text") or "No Caption",
+    #                 "likes": int(item.get("likesCount", 0) or item.get("likes", 0) or 0),
+    #                 "retweets": 0,
+    #                 "views": 0,
+    #                 "source_platform": "Instagram",
+    #                 "log_activity": log_activity,
+    #                 "user_app": user_app
+    #             })
+    #             
+    #             # Ekstrak komentar terbaru jika ada
+    #             latest_comments = item.get("latestComments", []) or []
+    #             if isinstance(latest_comments, list):
+    #                 for comment in latest_comments:
+    #                     if not isinstance(comment, dict):
+    #                         continue
+    #                     comm_id = comment.get("id")
+    #                     if not comm_id:
+    #                         continue
+    #                     comm_user = (comment.get("owner", {}) if isinstance(comment.get("owner"), dict) else {}).get("username") or "unknown"
+    #                     if not comm_user.startswith("@"):
+    #                         comm_user = f"@{comm_user}"
+    #                     all_results.append({
+    #                         "platform_id": f"IG_COMM_{comm_id}",
+    #                         "date": parse_to_wib_iso(comment.get("createdAt") or comment.get("date") or raw_date),
+    #                         "username": comm_user,
+    #                         "raw_text": comment.get("text") or "",
+    #                         "likes": 0,
+    #                         "retweets": 0,
+    #                         "views": 0,
+    #                         "source_platform": "Instagram",
+    #                         "log_activity": log_activity,
+    #                         "user_app": user_app
+    #                     })
+    #     except Exception as e1:
+    #         print(f"[ERROR] Kesalahan saat memanggil Aktor apify/instagram-scraper: {e1}")
+    # 
+    # # -----------------------------------------------------------------
+    # # AKTOR 2: apify/instagram-post-scraper (nH2AHrwxeTRJoN5hX) -> Username / Profiles
+    # # -----------------------------------------------------------------
+    # if has_profiles:
+    #     print(f"[INFO] >>> Menjalankan Aktor 2: apify/instagram-post-scraper (nH2AHrwxeTRJoN5hX) | Mode: {profile_mode}...")
+    #     prof_list = [str(p).strip().lstrip("@") for p in profiles if str(p).strip()]
+    #     
+    #     if profile_mode == "username":
+    #         run_input_prof = {
+    #             "username": prof_list,
+    #             "resultsLimit": max_results
+    #         }
+    #     else:  # "profiles"
+    #         run_input_prof = {
+    #             "profiles": prof_list,
+    #             "directUrls": [f"https://www.instagram.com/{p}/" for p in prof_list],
+    #             "resultsLimit": max_results
+    #         }
+    #         
+    #     try:
+    #         print(f"[INFO] Memanggil actor apify/instagram-post-scraper dengan input: {run_input_prof}")
+    #         run2 = client.actor("apify/instagram-post-scraper").call(run_input=run_input_prof)
+    #         ds_id2 = run2["defaultDatasetId"]
+    #         
+    #         for item in client.dataset(ds_id2).iterate_items():
+    #             post_id = item.get("id") or item.get("shortCode") or item.get("code")
+    #             if not post_id:
+    #                 continue
+    #             raw_date = item.get("timestamp") or item.get("datetime") or item.get("takenAt")
+    #             username = item.get("ownerUsername") or (item.get("owner", {}) if isinstance(item.get("owner"), dict) else {}).get("username") or "unknown"
+    #             if not username.startswith("@"):
+    #                 username = f"@{username}"
+    #             
+    #             all_results.append({
+    #                 "platform_id": f"IG_PROFILE_POST_{post_id}",
+    #                 "date": parse_to_wib_iso(raw_date),
+    #                 "username": username,
+    #                 "raw_text": item.get("caption") or item.get("text") or "No Caption",
+    #                 "likes": int(item.get("likesCount", 0) or item.get("likes", 0) or 0),
+    #                 "retweets": 0,
+    #                 "views": 0,
+    #                 "source_platform": "Instagram",
+    #                 "log_activity": log_activity,
+    #                 "user_app": user_app
+    #             })
+    #     except Exception as e2:
+    #         print(f"[ERROR] Kesalahan saat memanggil Aktor apify/instagram-post-scraper: {e2}")
+    # 
+    # return all_results
 
 def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str = "local_user"):
     """
@@ -1047,8 +1051,11 @@ def main():
             plat_cfg = cfg_base.get("twitter", general_cfg)
             return scrape_twitter(client, plat_cfg, log_activity=log_activity, user_app=user_app)
         elif source_type == "instagram":
-            plat_cfg = cfg_base.get("instagram", general_cfg)
-            return scrape_instagram(client, plat_cfg, log_activity=log_activity, user_app=user_app)
+            # Instagram scraper dinonaktifkan sementara
+            print("[INFO] Scraper Instagram saat ini dinonaktifkan.")
+            return []
+            # plat_cfg = cfg_base.get("instagram", general_cfg)
+            # return scrape_instagram(client, plat_cfg, log_activity=log_activity, user_app=user_app)
         elif source_type == "linkedin":
             plat_cfg = cfg_base.get("linkedin", general_cfg)
             return scrape_linkedin(client, plat_cfg, log_activity=log_activity, user_app=user_app)

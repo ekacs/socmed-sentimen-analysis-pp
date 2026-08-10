@@ -865,7 +865,12 @@ with tab_scrape:
         "LinkedIn": "linkedin",
         "Website / Dokumen Publik": "website"
     }
-    platform_options = ["Twitter (X)", "Instagram", "LinkedIn", "Website / Dokumen Publik"]
+    platform_options = [
+        "Twitter (X)", 
+        # "Instagram",  # Dinonaktifkan sementara (dijadikan komentar)
+        "LinkedIn", 
+        "Website / Dokumen Publik"
+    ]
     
     # Default awal: Ikuti konfigurasi tersimpan (kosong jika belum ada yang dipilih)
     default_selected = [mapping_source_types.get(s) for s in raw_source_list if mapping_source_types.get(s)]
