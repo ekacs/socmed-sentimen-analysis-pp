@@ -3,10 +3,12 @@ pandas
 plotly
 google-genai
 apify-client<3.0.0
-scikit-learn==1.9.0
+scikit-learn
 joblib
 python-dotenv
 psycopg2-binary
 SQLAlchemy
 reportlab
 matplotlib
+wordcloud
+openpyxl
