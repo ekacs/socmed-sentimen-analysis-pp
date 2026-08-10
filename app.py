@@ -3350,7 +3350,7 @@ with tab_viz:
                         f"menggunakan <b>Large Language Model (LLM) Google Gemini (Model: {model_active})</b> berdasarkan ekstraksi data "
                         f"statistik opini publik. Hasil analisis naratif ini berfungsi sebagai bahan rujukan dan masukan awal perumusan kebijakan, "
                         f"sehingga dalam pemanfaatannya <b>diperlukan verifikasi dan pertimbangan yang bijaksana</b> "
-                        f"oleh pihak pimpinan/manajemen yang berwenang sebelum mengambil keputusan strategis atau tindakan berdampak hukum."
+                        f"oleh pihak pimpinan/manajemen yang berwenang sebelum mengambil keputusan strategis atau tindakan berdampak hukum ."
                     )
 
                     t_disclaimer = Table(
