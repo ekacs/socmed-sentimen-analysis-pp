@@ -1,14 +1,16 @@
 {
     "source_types": [
         "twitter",
-        "website"
+        "website",
+        "threads",
+        "linkedin"
     ],
     "config": {
         "twitter": {
             "start_date": "2026-08-03",
             "end_date": "2026-08-10",
             "keywords": [
-                "pesugihan gunung kawi"
+                "maudy ayunda"
             ],
             "profiles": [],
             "hashtags": [],
@@ -23,7 +25,10 @@
             "max_results_instagram": 100
         },
         "linkedin": {
-            "keywords": [],
+            "start_date": "2026-08-17",
+            "keywords": [
+                "mindfullness"
+            ],
             "max_results": 100,
             "max_results_linkedin": 100
         },
@@ -31,15 +36,12 @@
             "start_date": "2026-07-27",
             "end_date": "2026-08-10",
             "keywords": [
-                "kapal"
+                "maudy ayunda"
             ],
             "hashtags": [
-                "kapal"
+                "maudy ayunda"
             ],
-            "profiles": [
-                "kemenhub151",
-                "djplkemenhub151"
-            ],
+            "profiles": [],
             "search_filter": "top",
             "max_results": 100,
             "max_results_threads": 100
@@ -47,10 +49,14 @@
         "website": {
             "start_date": "2026-07-07",
             "end_date": "2026-08-06",
-            "website_urls": [],
-            "start_urls": [],
+            "website_urls": [
+                "maudy ayunda"
+            ],
+            "start_urls": [
+                "maudy ayunda"
+            ],
             "keywords": [
-                "pesugihan gunung kawi"
+                "maudy ayunda"
             ],
             "max_results": 100,
             "max_results_website": 100
@@ -58,18 +64,25 @@
         "general": {
             "start_date": "2026-07-07",
             "end_date": "2026-08-06",
-            "website_urls": [],
-            "start_urls": [],
+            "website_urls": [
+                "maudy ayunda"
+            ],
+            "start_urls": [
+                "maudy ayunda"
+            ],
             "keywords": [
-                "pesugihan gunung kawi"
+                "maudy ayunda"
             ],
             "max_results": 100,
             "max_results_website": 100,
-            "hashtags": [],
+            "hashtags": [
+                "maudy ayunda"
+            ],
             "profiles": [],
             "search_filter": "top",
             "max_results_threads": 100,
-            "max_results_twitter": 50
+            "max_results_twitter": 50,
+            "max_results_linkedin": 100
         }
     }
 }

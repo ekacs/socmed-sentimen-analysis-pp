@@ -24,11 +24,17 @@ def resolve_db_url(db_url=None):
 def get_db_type(db_url=None):
     """
     Menentukan tipe database yang digunakan berdasarkan preferensi mode & DATABASE_URL.
-    Default mode: 'postgresql' (Supabase Cloud).
+    Default mode: 'sqlite' (Database Lokal).
     """
     try:
         import session_credentials
-        if session_credentials.get_active_db_mode() == "sqlite" and not db_url:
+        active_mode = session_credentials.get_active_db_mode()
+        if active_mode == "sqlite" and not db_url:
+            return "sqlite"
+        if active_mode == "postgresql":
+            db_url = resolve_db_url(db_url)
+            if db_url and ("postgresql://" in db_url or "postgres://" in db_url) and "YOUR_DATABASE_URL" not in db_url:
+                return "postgresql"
             return "sqlite"
     except Exception:
         pass
@@ -37,8 +43,8 @@ def get_db_type(db_url=None):
     if db_url and ("postgresql://" in db_url or "postgres://" in db_url) and "YOUR_DATABASE_URL" not in db_url:
         return "postgresql"
     
-    # Jika mode diset postgresql tapi URL belum terisi, tetap laporkan mode postgresql
-    return "postgresql"
+    # Default aman ke database lokal (SQLite)
+    return "sqlite"
 
 def get_connection(db_url=None):
     """
@@ -334,12 +340,24 @@ def simpan_keysearch_history(keywords=None, profiles=None, hashtags=None, terms=
                         except Exception as _ex_sub:
                             conn.rollback()
             else:
-                query = f"""
-                    INSERT OR IGNORE INTO keysearch_history (search_term, keywords, created_at)
-                    VALUES ({placeholder}, {placeholder}, {placeholder})
-                """
-                cursor.execute(query, (t, t, created_at))
-                conn.commit()
+                try:
+                    query = f"""
+                        INSERT OR IGNORE INTO keysearch_history (search_term, created_at)
+                        VALUES ({placeholder}, {placeholder})
+                    """
+                    cursor.execute(query, (t, created_at))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+                    try:
+                        query = f"""
+                            INSERT OR IGNORE INTO keysearch_history (search_term, keywords, created_at)
+                            VALUES ({placeholder}, {placeholder}, {placeholder})
+                        """
+                        cursor.execute(query, (t, t, created_at))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
     except Exception as e:
         print(f"[ERROR] Gagal menyimpan keysearch_history: {e}")
     finally:

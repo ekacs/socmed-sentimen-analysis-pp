@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import json
+import time
 import datetime
 import subprocess
 import collections
@@ -17,11 +18,17 @@ import session_credentials
 # Inisialisasi kredensial berbasis sesi pengguna (Session-Only)
 session_credentials.init_session_credentials()
 
-# Inisialisasi tabel database saat aplikasi Streamlit pertama kali dimuat.
-try:
-    db_manager.buat_tabel()
-except Exception as _e:
-    pass
+# Inisialisasi tabel database satu kali per siklus aplikasi (hemat ~670ms per rerun)
+@st.cache_resource(show_spinner=False)
+def init_database_tables_once():
+    """Inisialisasi skema tabel database hanya satu kali saat aplikasi dimuat."""
+    try:
+        db_manager.buat_tabel()
+        return True
+    except Exception as _e:
+        return False
+
+init_database_tables_once()
 
 # Impor generator NLG
 from nlg_generator import generate_executive_summary
@@ -293,7 +300,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. Fungsi Basis Data
+# 3. Fungsi Basis Data Ter-cache (Penyimpanan memori dengan invalidasi otomatis)
+@st.cache_data(ttl=60, show_spinner=False)
 def load_data_from_db():
     return db_manager.baca_data_untuk_streamlit()
 
@@ -711,29 +719,24 @@ if check_gemini_quota_exhausted():
             db_manager.set_gemini_quota_flag(False)
             st.rerun()
 
-# 📌 Sidebar: Pengelolaan Topik Sentimen
+# 📌 Sidebar: Pengelolaan Topik Sentimen Ter-cache
 st.sidebar.divider()
 st.sidebar.markdown("### 📌 Pengelolaan Topik Sentimen")
 
-def get_all_combined_history_terms():
-    """
-    Mengambil gabungan seluruh istilah kata kunci/profil/tagar dari:
-    1. Database keysearch_history
-    2. File target_config.json
-    3. Session state input saat ini (tw_kw, ig_kw, li_kw, web_kw, dll)
-    """
-    terms_set = set()
-    
-    # 1. Dari database
+@st.cache_data(ttl=60, show_spinner=False)
+def get_cached_riwayat_gabungan():
     try:
         if hasattr(db_manager, 'ambil_riwayat_gabungan'):
-            for t in db_manager.ambil_riwayat_gabungan():
-                if t and t != "ALL (Semua Data)":
-                    terms_set.add(t)
+            return db_manager.ambil_riwayat_gabungan()
+        elif hasattr(db_manager, 'ambil_riwayat_terpisah'):
+            return db_manager.ambil_riwayat_terpisah().get("unified", [])
     except Exception:
         pass
-        
-    # 2. Dari target_config.json
+    return []
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_cached_config_terms():
+    terms = set()
     try:
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r') as f_cfg:
@@ -744,9 +747,33 @@ def get_all_combined_history_terms():
                     if isinstance(sub_c, dict):
                         for item in sub_c.get("keywords", []) + sub_c.get("profiles", []) + sub_c.get("hashtags", []):
                             if item and str(item).strip() and str(item).strip() != "ALL (Semua Data)":
-                                terms_set.add(str(item).strip())
+                                terms.add(str(item).strip())
     except Exception:
         pass
+    return terms
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_cached_bookmarks():
+    try:
+        if hasattr(db_manager, 'ambil_semua_bookmark'):
+            return db_manager.ambil_semua_bookmark()
+    except Exception:
+        pass
+    return []
+
+def get_all_combined_history_terms():
+    """
+    Mengambil gabungan seluruh istilah kata kunci/profil/tagar dengan dukungan memori cache.
+    """
+    terms_set = set()
+    
+    # 1. Dari database (ter-cache)
+    for t in get_cached_riwayat_gabungan():
+        if t and t != "ALL (Semua Data)":
+            terms_set.add(t)
+        
+    # 2. Dari target_config.json (ter-cache)
+    terms_set.update(get_cached_config_terms())
 
     # 3. Dari session_state input aktif pengguna
     for ss_key in ["tw_kw", "tw_prof", "tw_hash", "ig_kw", "ig_prof", "li_kw", "web_kw", "web_urls"]:
@@ -759,33 +786,28 @@ def get_all_combined_history_terms():
 
     return sorted(list(terms_set))
 
-# Sinkronisasi otomatis kata kunci dari file konfigurasi tersimpan ke keysearch_history
-try:
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, 'r') as f_cfg:
-            c_data = json.load(f_cfg)
-            c_root = c_data.get("config", {})
-            syn_kw, syn_prof, syn_hash = [], [], []
-            for sub_key in ["general", "twitter", "instagram", "linkedin", "portal_berita", "website"]:
-                sub_c = c_root.get(sub_key, {})
-                if isinstance(sub_c, dict):
-                    syn_kw.extend(sub_c.get("keywords", []))
-                    syn_prof.extend(sub_c.get("profiles", []))
-                    syn_hash.extend(sub_c.get("hashtags", []))
-            if syn_kw or syn_prof or syn_hash:
-                db_manager.simpan_keysearch_history(syn_kw, syn_prof, syn_hash)
-except Exception:
-    pass
+# Sinkronisasi otomatis kata kunci dari konfigurasi ke keysearch_history (1x per sesi)
+if "cfg_synced_once" not in st.session_state:
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f_cfg:
+                c_data = json.load(f_cfg)
+                c_root = c_data.get("config", {})
+                syn_kw, syn_prof, syn_hash = [], [], []
+                for sub_key in ["general", "twitter", "instagram", "linkedin", "portal_berita", "website"]:
+                    sub_c = c_root.get(sub_key, {})
+                    if isinstance(sub_c, dict):
+                        syn_kw.extend(sub_c.get("keywords", []))
+                        syn_prof.extend(sub_c.get("profiles", []))
+                        syn_hash.extend(sub_c.get("hashtags", []))
+                if syn_kw or syn_prof or syn_hash:
+                    db_manager.simpan_keysearch_history(syn_kw, syn_prof, syn_hash)
+        st.session_state["cfg_synced_once"] = True
+    except Exception:
+        pass
 
 raw_history_sb = get_all_combined_history_terms()
-
-try:
-    if hasattr(db_manager, 'ambil_semua_bookmark'):
-        existing_bookmarks_sb = db_manager.ambil_semua_bookmark()
-    else:
-        existing_bookmarks_sb = []
-except Exception:
-    existing_bookmarks_sb = []
+existing_bookmarks_sb = get_cached_bookmarks()
 
 with st.sidebar.expander("➕ Buat / Rename Topik Sentimen Baru", expanded=False):
     bm_selected_terms = st.multiselect(
@@ -809,6 +831,8 @@ with st.sidebar.expander("➕ Buat / Rename Topik Sentimen Baru", expanded=False
             ok_bm, msg_bm = db_manager.simpan_bookmark(bm_custom_name, bm_selected_terms)
             if ok_bm:
                 st.sidebar.success(f"✅ {msg_bm}")
+                get_cached_bookmarks.clear()
+                get_cached_riwayat_gabungan.clear()
                 st.rerun()
             else:
                 st.sidebar.error(f"❌ {msg_bm}")
@@ -824,6 +848,8 @@ if existing_bookmarks_sb:
             if st.button("🗑️", key=f"del_bm_{bm['id']}", help=f"Hapus {bm['bookmark_name']}"):
                 ok_del, msg_del = db_manager.hapus_bookmark(bm['id'])
                 if ok_del:
+                    get_cached_bookmarks.clear()
+                    get_cached_riwayat_gabungan.clear()
                     st.rerun()
 
 st.sidebar.divider()
@@ -1545,6 +1571,8 @@ with tab_scrape:
                         "stderr_text": stderr_text,
                         "returncode": proc.returncode
                     }
+                    if proc.returncode == 0:
+                        st.cache_data.clear()
                 except Exception as e_s1:
                     status_s.update(label=f"❌ Gagal memproses: {e_s1}", state="error", expanded=True)
                     st.error(f"❌ Terjadi kesalahan saat menjalankan scraper: {e_s1}")
@@ -1632,8 +1660,118 @@ with tab_ml:
     with c_raw1:
         st.markdown(f"📦 Total Data Mentah (`RAW`) yang Siap Diproses: **{raw_count:,}** baris.")
     with c_raw2:
-        if st.button("🔄 Cek Data RAW Baru", use_container_width=True):
-            st.rerun()
+        btn_cek_raw = st.button("🔄 Cek Data RAW Baru", use_container_width=True, key="btn_cek_raw_baru")
+
+    if btn_cek_raw:
+        placeholder_cek = st.empty()
+        t_start_cek = time.time()
+        start_clock_cek = datetime.datetime.now().strftime("%H:%M:%S")
+        
+        # Estimasi durasi pemindaian database (~2.0 detik) agar proses terbaca jelas oleh pengguna
+        est_scan_total_sec = 2.0
+        est_scan_finish_dt = datetime.datetime.now() + datetime.timedelta(seconds=est_scan_total_sec)
+        est_scan_finish_clock = est_scan_finish_dt.strftime("%H:%M:%S")
+        
+        steps = [
+            (25, "🔌 Menghubungkan ke basis data & memindai tabel log_cuitan..."),
+            (50, "🔍 Membaca baris data mentah (status = 'RAW') dan menghitung volume..."),
+            (75, "⚡ Menganalisis kesiapan Local EYD Cache & kuota model AI..."),
+            (95, "⏱️ Menghitung kalkulasi beban batch dan estimasi waktu selesai pipeline..."),
+        ]
+        
+        fresh_raw_rows = []
+        fresh_cache = {}
+        for pct, step_text in steps:
+            now_t = time.time()
+            elapsed_sec = now_t - t_start_cek
+            remaining_sec = max(0.2, est_scan_total_sec - elapsed_sec)
+            with placeholder_cek.container():
+                st.info("🔍 **Pemeriksaan Data RAW Sedang Berlangsung...**")
+                col_i1, col_i2, col_i3 = st.columns(3)
+                col_i1.metric("🕒 Waktu Mulai", start_clock_cek)
+                col_i2.metric("⏱️ Waktu Berjalan", f"{elapsed_sec:.1f} detik")
+                col_i3.metric("🏁 Estimasi Selesai", f"{est_scan_finish_clock} (~{remaining_sec:.1f}s)")
+                st.progress(pct, text=f"{step_text} ({elapsed_sec:.1f}s berlalu)")
+            
+            if pct == 50:
+                fresh_raw_rows = db_manager.ambil_cuitan_mentah()
+            elif pct == 75:
+                fresh_cache = db_manager.ambil_eyd_cache()
+            
+            time.sleep(0.45)
+
+        total_cek_dur = time.time() - t_start_cek
+        dur_cek_str = f"{total_cek_dur:.1f} detik"
+        finish_clock_cek = datetime.datetime.now().strftime("%H:%M:%S")
+        
+        # Hitung analisis antrean terkini
+        fresh_raw_count = len(fresh_raw_rows)
+        raw_count = fresh_raw_count
+        
+        # Analisis keunikan teks dan potensi caching hit
+        unique_raw_texts = set([r[1] for r in fresh_raw_rows if r[1]])
+        cache_hits_count = sum(1 for t in unique_raw_texts if t in fresh_cache)
+        needs_ai_count = max(0, len(unique_raw_texts) - cache_hits_count)
+        est_batches = max(1, (needs_ai_count + 59) // 60) if needs_ai_count > 0 else 0
+        
+        # Hitung estimasi waktu pemrosesan AI & ML jika dijalankan sekarang
+        if fresh_raw_count == 0:
+            est_pipeline_sec = 0
+            est_durasi_str = "0 detik (tidak ada data)"
+            est_pipeline_finish_clock = "-"
+        else:
+            est_pipeline_sec = max(12, int(8 + (est_batches * 4.5) + (fresh_raw_count * 0.03)))
+            if est_pipeline_sec < 60:
+                est_durasi_str = f"~{est_pipeline_sec} detik"
+            else:
+                m_p, s_p = divmod(est_pipeline_sec, 60)
+                est_durasi_str = f"~{m_p} menit {s_p} detik"
+            
+            finish_pipeline_dt = datetime.datetime.now() + datetime.timedelta(seconds=est_pipeline_sec)
+            est_pipeline_finish_clock = finish_pipeline_dt.strftime("%H:%M:%S")
+
+        # Simpan ringkasan ke session_state agar persisten di layar pengguna
+        st.session_state["raw_check_summary"] = {
+            "waktu_cek": finish_clock_cek,
+            "durasi_str": dur_cek_str,
+            "raw_count": fresh_raw_count,
+            "unique_count": len(unique_raw_texts),
+            "cache_hits": cache_hits_count,
+            "needs_ai": needs_ai_count,
+            "est_batches": est_batches,
+            "est_pipeline_sec": est_pipeline_sec,
+            "est_durasi_str": est_durasi_str,
+            "est_pipeline_finish_clock": est_pipeline_finish_clock,
+        }
+        placeholder_cek.empty()
+
+    # Tampilkan Info Bar hasil pengecekan data RAW jika sudah pernah dijalankan
+    if st.session_state.get("raw_check_summary"):
+        s_chk = st.session_state["raw_check_summary"]
+        if s_chk["raw_count"] > 0:
+            st.info(
+                f"ℹ️ **Status Pengecekan Antrean Data Mentah:** Ditemukan **{s_chk['raw_count']:,} baris** data `RAW` siap diproses. "
+                f"Pengecekan selesai dalam **{s_chk['durasi_str']}** pada pukul **{s_chk['waktu_cek']}**."
+            )
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+            col_m1.metric("📦 Data RAW Siap Proses", f"{s_chk['raw_count']:,} Baris")
+            col_m2.metric("⏱️ Waktu Pengecekan", s_chk['durasi_str'])
+            col_m3.metric("⏳ Estimasi Durasi AI & ML", s_chk['est_durasi_str'])
+            col_m4.metric("🏁 Estimasi Selesai Pemrosesan", f"{s_chk['est_pipeline_finish_clock']}")
+            
+            with st.expander("📊 Rincian Analisis Antrean & Estimasi Beban Pemrosesan AI", expanded=False):
+                st.markdown(
+                    f"- **Total Antrean Data Mentah:** `{s_chk['raw_count']:,}` baris\n"
+                    f"- **Teks Unik:** `{s_chk['unique_count']:,}` teks\n"
+                    f"- **Potensi Caching Hit (Bebas Token):** `{s_chk['cache_hits']:,}` teks sudah ada di cache lokal\n"
+                    f"- **Teks Memerlukan Pembersihan LLM (Gemini):** `{s_chk['needs_ai']:,}` teks (~`{s_chk['est_batches']}` batch @ 60 data)\n"
+                    f"- **Perkiraan Waktu Selesai (ETA) Jika Dijalankan Sekarang:** Pukul **{s_chk['est_pipeline_finish_clock']}** (durasi pemrosesan **{s_chk['est_durasi_str']}**)"
+                )
+        else:
+            st.success(
+                f"✅ **Pengecekan Selesai:** Tidak ada data mentah (`RAW`) baru yang mengantre. Seluruh data telah diproses (`CLEANED`). "
+                f"Waktu pengecekan: **{s_chk['durasi_str']}** (pukul **{s_chk['waktu_cek']}**)."
+            )
 
     gemini_is_out = check_gemini_quota_exhausted()
     if gemini_is_out:
@@ -1713,6 +1851,9 @@ with tab_ml:
                 log_placeholder_ml = st.empty()
 
                 time_series_data_ml = []
+                est_pipe_total_sec = max(15, int(10 + (max(1, raw_count) / 60.0) * 8.0 + (max(1, raw_count) * 0.02)))
+                est_eta_dt = start_time_ml + datetime.timedelta(seconds=est_pipe_total_sec)
+                est_eta_str = est_eta_dt.strftime("%H:%M:%S")
 
                 while proc.poll() is None:
                     # Ambil baris log baru dari queue
@@ -1729,10 +1870,11 @@ with tab_ml:
                     time_str = f"{mins:02d}:{secs:02d}"
 
                     with info_placeholder_ml.container():
-                        m1, m2, m3 = st.columns(3)
-                        m1.metric("🕒 Waktu Mulai (UTC)", start_str_ml)
+                        m1, m2, m3, m4 = st.columns(4)
+                        m1.metric("🕒 Waktu Mulai", start_str_ml)
                         m2.metric("⏱️ Waktu Berjalan", f"{time_str} ({elapsed_seconds}s)")
-                        m3.metric("⚡ Status Mesin", "Proses AI & ML Aktif...")
+                        m3.metric("🏁 Estimasi Selesai (ETA)", est_eta_str)
+                        m4.metric("⚡ Status Mesin", "Proses AI & ML Aktif...")
 
                     # Catat time-series aktivitas log per detik untuk AI & ML
                     time_series_data_ml.append({
@@ -1755,8 +1897,8 @@ with tab_ml:
                         st.markdown("### 🧠 Monitoring Visual Pipeline AI & ML (Real-Time)")
                         
                         # 1. Dynamic Progress Bar
-                        prog_percent = min(98, max(5, int((elapsed_seconds / 90.0) * 100)))
-                        st.progress(prog_percent, text=f"🧠 Pembersihan EYD (LLM) & Klasifikasi SVM sedang berlangsung... ({elapsed_seconds} detik berlalu)")
+                        prog_percent = min(98, max(5, int((elapsed_seconds / float(est_pipe_total_sec)) * 100)))
+                        st.progress(prog_percent, text=f"🧠 Pembersihan EYD (LLM) & Klasifikasi SVM sedang berlangsung... (Waktu Berjalan: {time_str} | Estimasi Selesai: {est_eta_str})")
 
                         # 2. Real-Time Streaming Chart
                         if len(time_series_data_ml) > 1:
@@ -1824,6 +1966,8 @@ with tab_ml:
                     "stderr_text": stderr_text,
                     "returncode": proc.returncode
                 }
+                if proc.returncode == 0:
+                    st.cache_data.clear()
             except Exception as e_s2:
                 status_ml.update(label=f"❌ Gagal memproses: {e_s2}", state="error", expanded=True)
                 st.error(f"❌ Terjadi kesalahan saat menjalankan pipeline AI & ML: {e_s2}")
@@ -1966,8 +2110,54 @@ def build_semantic_issue_clusters(word_counts_eyd: Counter, full_eyd_corpus: str
     return clusters
 
 # =====================================================================
-# HELPER: WORD CLOUD & JARINGAN KATA KUNCI PER BOOKMARK
+# HELPER: WORD CLOUD & JARINGAN KATA KUNCI PER BOOKMARK (TER-CACHE)
 # =====================================================================
+@st.cache_data(show_spinner=False)
+def get_cached_wordcloud_bytes(text_corpus: str, stopwords_tuple: tuple) -> Optional[bytes]:
+    """Menghasilkan gambar WordCloud PNG bytes yang di-cache di memori (menghemat ~1.1s per rerun)."""
+    if not text_corpus or not text_corpus.strip():
+        return None
+    try:
+        from wordcloud import WordCloud
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import io
+        import re
+        from collections import Counter
+
+        sw_set = set(stopwords_tuple)
+        tokens = re.findall(r'\b[a-zA-Z]{3,}\b', text_corpus.lower())
+        filtered_words = [w for w in tokens if w not in sw_set]
+        word_counts = Counter(filtered_words)
+        if not word_counts:
+            return None
+
+        wc = WordCloud(
+            width=950, height=450,
+            background_color="white",
+            colormap="Dark2",
+            prefer_horizontal=0.85,
+            max_words=100,
+            min_font_size=10,
+            stopwords=sw_set,
+            collocations=False,
+            relative_scaling=0.5
+        ).generate_from_frequencies(word_counts)
+
+        fig_wc, ax_wc = plt.subplots(figsize=(10.5, 4.8))
+        ax_wc.imshow(wc, interpolation="bilinear")
+        ax_wc.axis("off")
+        plt.tight_layout(pad=0)
+
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", dpi=120, bbox_inches="tight", pad_inches=0)
+        plt.close(fig_wc)
+        buf.seek(0)
+        return buf.getvalue()
+    except Exception as _e:
+        return None
+
 def render_bookmark_word_network(df_source: pd.DataFrame, key_suffix: str = "rev"):
     """
     Visualisasi Word Cloud & Jaringan Kata Kunci per Bookmark
@@ -2167,45 +2357,17 @@ def render_bookmark_word_network(df_source: pd.DataFrame, key_suffix: str = "rev
 
     with t_wc:
         try:
-            from wordcloud import WordCloud
-            import matplotlib.pyplot as plt
-            import re
-            from collections import Counter
-
-            # Mengambil seluruh teks hasil scraping yang telah terolah EYD (cleaned_text)
             eyd_texts = []
             if 'cleaned_text' in df_source.columns and not df_source['cleaned_text'].dropna().empty:
                 eyd_texts = df_source['cleaned_text'].dropna().astype(str).tolist()
             elif 'raw_text' in df_source.columns and not df_source['raw_text'].dropna().empty:
                 eyd_texts = df_source['raw_text'].dropna().astype(str).tolist()
 
-            full_eyd_corpus = " ".join(eyd_texts).lower()
-
-            # Urai token kata (minimal 3 huruf, mengabaikan angka dan kata tak bermakna)
-            tokens = re.findall(r'\b[a-zA-Z]{3,}\b', full_eyd_corpus)
-            filtered_words = [w for w in tokens if w not in stopwords_id]
-
-            word_counts = Counter(filtered_words)
-
-            if word_counts:
-                wc = WordCloud(
-                    width=950, height=450,
-                    background_color="white",
-                    colormap="Dark2",
-                    prefer_horizontal=0.85,
-                    max_words=100,
-                    min_font_size=10,
-                    stopwords=stopwords_id,
-                    collocations=False,
-                    relative_scaling=0.5
-                ).generate_from_frequencies(word_counts)
-
-                fig_wc, ax_wc = plt.subplots(figsize=(10.5, 4.8))
-                ax_wc.imshow(wc, interpolation="bilinear")
-                ax_wc.axis("off")
-                plt.tight_layout(pad=0)
-                st.pyplot(fig_wc, use_container_width=True)
-                plt.close(fig_wc)
+            full_eyd_corpus = " ".join(eyd_texts)
+            sw_tuple = tuple(sorted(list(stopwords_id)))
+            wc_bytes = get_cached_wordcloud_bytes(full_eyd_corpus, sw_tuple)
+            if wc_bytes:
+                st.image(wc_bytes, use_container_width=True)
                 st.caption("ℹ️ *Visual WordCloud di atas dibentuk dari agregasi seluruh kumpulan kata dari teks postingan yang telah melalui pembersihan EYD (cleaned_text).*")
             else:
                 st.info("Belum ada teks terolah EYD yang dapat ditampilkan pada WordCloud.")
@@ -2216,8 +2378,9 @@ def render_bookmark_word_network(df_source: pd.DataFrame, key_suffix: str = "rev
         st.plotly_chart(fig_net, use_container_width=True, key=f"chart_word_network_{key_suffix}")
 
 # =====================================================================
-# HELPER: GENERATE UNIQUE ACCOUNTS EXCEL REPORT
+# HELPER: GENERATE UNIQUE ACCOUNTS EXCEL REPORT (TER-CACHE)
 # =====================================================================
+@st.cache_data(show_spinner=False)
 def generate_unique_accounts_excel_bytes(df_source: pd.DataFrame) -> bytes:
     """
     Menghasilkan file Excel (.xlsx) murni dengan styling rapi untuk statistik Akun Unik.

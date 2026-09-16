@@ -27,25 +27,30 @@ def init_session_credentials():
     if KEY_GEMINI_MODEL not in st.session_state:
         st.session_state[KEY_GEMINI_MODEL] = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
     if KEY_DB_MODE not in st.session_state:
-        # Default mode utama aplikasi: Cloud PostgreSQL (Supabase)
-        st.session_state[KEY_DB_MODE] = "postgresql"
+        # Default mode utama aplikasi: Database Lokal (SQLite)
+        st.session_state[KEY_DB_MODE] = "sqlite"
 
 def get_active_db_mode() -> str:
     """
     Mengembalikan mode DB aktif ('sqlite' atau 'postgresql').
-    Jika pengguna memilih 'sqlite' atau alamat Supabase kosong/tidak ada, gunakan penyimpanan lokal (sqlite).
-    Jika alamat Supabase terisi/tersedia, gunakan cloud (postgresql).
+    Default awal: 'sqlite' (Database Lokal).
+    Jika pengguna memilih 'sqlite' atau mode default, gunakan penyimpanan lokal (sqlite).
+    Hanya jika pengguna secara eksplisit memilih 'postgresql' dan alamat Supabase terisi/tersedia, gunakan cloud (postgresql).
     """
     if hasattr(st, "session_state"):
-        explicit_mode = st.session_state.get(KEY_DB_MODE, "")
+        explicit_mode = st.session_state.get(KEY_DB_MODE, "sqlite")
         if explicit_mode == "sqlite":
             return "sqlite"
         if explicit_mode == "postgresql":
             url = get_active_supabase_url()
             return "postgresql" if url else "sqlite"
             
-    url = get_active_supabase_url()
-    return "postgresql" if url else "sqlite"
+    # Di luar session Streamlit (misal script CLI mandiri), cek env var DB_MODE atau default ke sqlite
+    env_db_mode = os.getenv("DB_MODE", "").lower()
+    if env_db_mode == "postgresql":
+        url = get_active_supabase_url()
+        return "postgresql" if url else "sqlite"
+    return "sqlite"
 
 def get_active_apify_token() -> str:
     """Mengembalikan Apify token kustom pengguna jika ada, jika tidak fallback ke .env."""
