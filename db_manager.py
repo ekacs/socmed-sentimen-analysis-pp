@@ -554,6 +554,9 @@ def ambil_semua_bookmark():
     finally:
         conn.close()
 
+# Alias kompatibilitas
+ambil_keysearch_bookmarks = ambil_semua_bookmark
+
 def import_backup_log_cuitan(file_obj, file_format: str = "csv"):
     """
     Mengimpor data cadangan (backup) tabel log_cuitan dari file CSV, XLSX, atau SQL query.

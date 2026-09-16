@@ -444,6 +444,36 @@ def get_top_keywords_df(df, top_n=10):
     df_res = df_res.sort_values(by='Frekuensi', ascending=True)
     return df_res
 
+def _parse_robust_date(val):
+    """
+    Konversi nilai tanggal beragam format (ISO 8601, JSON LinkedIn, string) ke datetime.date secara aman & robust.
+    """
+    if pd.isna(val) or val is None or str(val).strip() in ["", "-", "None", "NaT"]:
+        return None
+    val_s = str(val).strip()
+    if val_s.startswith('{') and 'date' in val_s:
+        try:
+            val_clean_json = val_s.replace("'", '"')
+            d_obj = json.loads(val_clean_json)
+            if 'date' in d_obj:
+                val_s = str(d_obj['date'])
+        except Exception:
+            pass
+    try:
+        dt = pd.to_datetime(val_s, utc=True, errors='coerce')
+        if pd.notna(dt):
+            return dt.date()
+    except Exception:
+        pass
+    import re
+    m = re.search(r'(\d{4}-\d{2}-\d{2})', val_s)
+    if m:
+        try:
+            return datetime.datetime.strptime(m.group(1), "%Y-%m-%d").date()
+        except Exception:
+            pass
+    return None
+
 # Dashboard Header
 st.title("🏛️ Aplikasi Analisis Sentimen Publik")
 st.markdown("Dasbor eksekutif berbasis AI untuk merangkum sentimen publik sebagai bahan pertimbangan kebijakan.")
@@ -1968,6 +1998,8 @@ with tab_ml:
                 }
                 if proc.returncode == 0:
                     st.cache_data.clear()
+                    st.session_state.pop("df_reviewed_final", None)
+                    st.session_state.pop("active_selected_batch", None)
             except Exception as e_s2:
                 status_ml.update(label=f"❌ Gagal memproses: {e_s2}", state="error", expanded=True)
                 st.error(f"❌ Terjadi kesalahan saat menjalankan pipeline AI & ML: {e_s2}")
@@ -2011,7 +2043,7 @@ from collections import Counter
 
 def generate_semantic_group_name(terms: list, existing_names: set = None) -> str:
     """
-    Menghasilkan nama kelompok isu kontekstual dan UNIK berbasis kata kunci (semantic topic labeling).
+    Menghasilkan nama kelompok isu kontekstual dan UNIK berbasis kata kunci nyata di dataset.
     """
     if existing_names is None:
         existing_names = set()
@@ -2019,31 +2051,18 @@ def generate_semantic_group_name(terms: list, existing_names: set = None) -> str
     if not terms:
         base_name = "Kelompok Isu Utama"
     else:
-        terms_set = set([t.lower().strip() for t in terms])
-
-        if terms_set.intersection({"mbg", "makan", "bergizi", "gizi", "dapur", "keracunan"}):
-            if "mbg" in terms_set or "bergizi" in terms_set:
-                base_name = "Isu Program Makan Bergizi (MBG)"
-            else:
-                base_name = "Isu Layanan Kesehatan & Dapur Gizi"
-        elif terms_set.intersection({"kapal", "pelabuhan", "pemanduan", "perhubungan", "laut", "dermaga", "armada"}):
-            base_name = "Isu Pelayaran & Layanan Maritim"
-        elif terms_set.intersection({"pendidikan", "guru", "sekolah", "siswa", "kelas", "kuliah"}):
-            base_name = "Isu Sektor Pendidikan & Sekolah"
-        elif terms_set.intersection({"koperasi", "anggaran", "dana", "apbn", "keuangan", "pemerintah", "triliun"}):
-            base_name = "Isu Kebijakan Anggaran & Koperasi"
-        elif terms_set.intersection({"korupsi", "hukum", "putusan", "sidang", "kasus", "pengawasan"}):
-            base_name = "Isu Penegakan Hukum & Pengawasan"
-        elif terms_set.intersection({"prabowo", "presiden", "menteri", "pemerintah", "negara", "rakyat"}):
-            base_name = "Isu Kebijakan Pemerintah & Negara"
+        top_clean = [t.strip().title() for t in terms if t.strip()][:2]
+        if len(top_clean) >= 2:
+            base_name = f"Isu: {' & '.join(top_clean)}"
+        elif len(top_clean) == 1:
+            base_name = f"Isu: {top_clean[0]}"
         else:
-            top_terms = [t.title() for t in terms[:2]]
-            base_name = f"Fokus Isu: {' & '.join(top_terms)}"
+            base_name = "Kelompok Isu Utama"
 
     # Garansi 100% UNIK di legenda tanpa duplikasi nama
     candidate = base_name
     if candidate in existing_names:
-        sub_kw = " & ".join([t.title() for t in terms[:2]])
+        sub_kw = " & ".join([t.strip().title() for t in terms[:2]])
         candidate = f"{base_name} ({sub_kw})"
         
         idx = 2
@@ -2054,58 +2073,88 @@ def generate_semantic_group_name(terms: list, existing_names: set = None) -> str
     existing_names.add(candidate)
     return candidate
 
-def build_semantic_issue_clusters(word_counts_eyd: Counter, full_eyd_corpus: str) -> list:
+def build_semantic_issue_clusters(word_counts_eyd: Counter, full_eyd_corpus: str, active_bookmarks: list = None) -> list:
     """
-    Mengelompokkan kata-kata baku EYD ke dalam kluster tema isu yang 100% kontekstual & akurat.
+    Mengelompokkan kata-kata baku EYD ke dalam kluster tema isu yang 100% dinamis, kontekstual,
+    dan murni diturunkan dari data nyata yang sedang diproses/dianalisis (bukan seed statis lama).
     """
-    domain_seeds = [
-        {
-            "name": "Isu Program Makan Bergizi (MBG)",
-            "keywords": ["mbg", "makan", "bergizi", "dapur", "keracunan", "gizi", "siswa"]
-        },
-        {
-            "name": "Isu Pelayaran & Layanan Maritim",
-            "keywords": ["kapal", "pelabuhan", "pemanduan", "perhubungan", "laut", "dermaga", "armada"]
-        },
-        {
-            "name": "Isu Kebijakan Anggaran & Koperasi",
-            "keywords": ["anggaran", "dana", "koperasi", "pemerintah", "prabowo", "program", "negara", "rakyat", "kepala"]
-        },
-        {
-            "name": "Isu Sektor Pendidikan & Hukum",
-            "keywords": ["pendidikan", "sekolah", "korupsi", "putusan", "nasional", "indonesia", "gratis"]
-        }
-    ]
-
-    top_words = [w for w, c in word_counts_eyd.most_common(40)]
-    used_words = set()
+    import re
+    from collections import Counter
+    
     clusters = []
+    used_words = set()
+    existing_names = set()
+    
+    # 1. Integrasikan Bookmark Topik jika ada istilahnya yang muncul di korpus aktif
+    if active_bookmarks and isinstance(active_bookmarks, list):
+        for bm in active_bookmarks:
+            if isinstance(bm, dict):
+                b_name = bm.get("bookmark_name") or "Topik"
+                b_terms = bm.get("terms") or []
+            elif isinstance(bm, (tuple, list)) and len(bm) >= 3:
+                b_name = bm[1]
+                b_terms = bm[2]
+            else:
+                continue
+            
+            if isinstance(b_terms, str):
+                b_terms = [t.strip().lower() for t in b_terms.split(",") if t.strip()]
+            elif isinstance(b_terms, (list, tuple)):
+                b_terms = [str(t).strip().lower() for t in b_terms if str(t).strip()]
+                
+            matched = [t for t in b_terms if t in word_counts_eyd and t not in used_words]
+            if matched:
+                used_words.update(matched)
+                c_clean_name = generate_semantic_group_name(matched, existing_names)
+                if str(b_name).startswith("📌"):
+                    c_clean_name = f"{b_name}"
+                clusters.append({"name": c_clean_name, "terms": matched[:7]})
 
-    for dom in domain_seeds:
-        d_name = dom["name"]
-        seeds = dom["keywords"]
+    # 2. Dynamic Co-occurrence Clustering dari sisa kata-kata frekuensi tertinggi
+    top_words = [w for w, c in word_counts_eyd.most_common(60) if w not in used_words and len(w) >= 3 and c >= 2]
+    
+    if top_words:
+        docs = [d.strip() for d in re.split(r'[\n\.\?!]+', full_eyd_corpus) if len(d.strip()) > 15]
+        doc_word_sets = []
+        for d in docs:
+            tokens_in_d = set(re.findall(r'\b[a-zA-Z]{3,}\b', d))
+            doc_word_sets.append(tokens_in_d)
+
+        max_new_clusters = max(1, 4 - len(clusters))
         
-        # Kata-kata yang persis cocok dari seed
-        matched = [w for w in seeds if w in word_counts_eyd and w not in used_words]
-        
-        # Kata-kata lain dari corpus yang relevan
-        for w in top_words:
-            if w not in used_words and w not in matched:
-                if any(s in w or w in s for s in seeds):
-                    matched.append(w)
-                    if len(matched) >= 6:
-                        break
-
-        if matched:
-            used_words.update(matched)
-            clusters.append({"name": d_name, "terms": matched[:7]})
-
-    # Tangkap sisa kata bermakna (max 1 kluster tambahan jika ada)
-    remaining = [w for w in top_words if w not in used_words]
-    if remaining and len(clusters) < 4:
-        rem_terms = remaining[:6]
-        rem_name = generate_semantic_group_name(rem_terms)
-        clusters.append({"name": rem_name, "terms": rem_terms})
+        for _ in range(max_new_clusters):
+            avail = [w for w in top_words if w not in used_words]
+            if not avail:
+                break
+            anchor = avail[0]
+            used_words.add(anchor)
+            
+            # Hitung co-occurrence kata lain bersama anchor dalam dokumen yang sama
+            co_scores = Counter()
+            for d_set in doc_word_sets:
+                if anchor in d_set:
+                    for w in d_set:
+                        if w != anchor and w in top_words and w not in used_words:
+                            co_scores[w] += 1
+            
+            matched = [anchor]
+            for related, score in co_scores.most_common(5):
+                if score >= 1:
+                    matched.append(related)
+                    used_words.add(related)
+            
+            # Jika anchor kurang punya co-occurrence, tambahkan kata paling sering berikutnya
+            if len(matched) < 4:
+                for rem in avail[1:]:
+                    if rem not in used_words:
+                        matched.append(rem)
+                        used_words.add(rem)
+                        if len(matched) >= 5:
+                            break
+            
+            if matched:
+                cl_name = generate_semantic_group_name(matched, existing_names)
+                clusters.append({"name": cl_name, "terms": matched[:7]})
 
     return clusters
 
@@ -2203,9 +2252,12 @@ def render_bookmark_word_network(df_source: pd.DataFrame, key_suffix: str = "rev
         "masih", "belum", "agak", "sangat", "amat", "paling", "pula", "punya", "adanya", "yakni", "yaitu",
         "selain", "mengenai", "tetap", "satu", "dua", "tiga", "empat", "lima", "kawi", "badan",
 
-        # Kata Percakapan, Kata Ganti, & Slang/Informal
+        # Kata Percakapan, Kata Ganti, Slang, & Noise Media Sosial
         "kalian", "nya", "gak", "udah", "aja", "pak", "aku", "nih", "dong", "sih", "deh", "kan",
-        "kok", "ya", "yuk", "lho", "ga", "ngga", "ngggak", "the", "and", "for", "you", "that"
+        "kok", "ya", "yuk", "lho", "ga", "ngga", "ngggak", "the", "and", "for", "you", "that",
+        "content", "creator", "media", "video", "foto", "post", "status", "thread", "threads",
+        "tweet", "twitter", "instagram", "linkedin", "klik", "link", "pict", "pic", "baca",
+        "lengkap", "selengkapnya", "komentar", "caption"
     ])
 
     import re
@@ -2218,32 +2270,20 @@ def render_bookmark_word_network(df_source: pd.DataFrame, key_suffix: str = "rev
     word_counts_eyd = Counter(filtered_eyd_words)
 
     # Ambil Bookmark dari Database jika ada
-    parsed_bookmarks = []
+    bm_raw = []
     try:
-        if hasattr(db_manager, 'ambil_keysearch_bookmarks'):
+        if hasattr(db_manager, 'ambil_semua_bookmark'):
+            bm_raw = db_manager.ambil_semua_bookmark()
+        elif hasattr(db_manager, 'ambil_keysearch_bookmarks'):
             bm_raw = db_manager.ambil_keysearch_bookmarks()
-            if isinstance(bm_raw, list):
-                for item in bm_raw:
-                    if isinstance(item, dict):
-                        b_name = item.get("bookmark_name") or "Bookmark"
-                        terms_str = item.get("terms") or ""
-                    elif isinstance(item, (tuple, list)) and len(item) >= 3:
-                        b_name = item[1]
-                        terms_str = item[2]
-                    else:
-                        continue
-                    t_list = [t.strip().lower() for t in str(terms_str).split(",") if t.strip() and t.strip().lower() not in stopwords_id]
-                    if t_list:
-                        parsed_bookmarks.append({"name": str(b_name), "terms": t_list})
     except Exception:
-        parsed_bookmarks = []
+        bm_raw = []
 
-    # Bentuk kluster tema isu yang 100% kontekstual & akurat
-    if not parsed_bookmarks:
-        parsed_bookmarks = build_semantic_issue_clusters(word_counts_eyd, full_eyd_corpus)
+    # Bentuk kluster tema isu yang 100% dinamis, kontekstual & linier dengan data aktif
+    parsed_bookmarks = build_semantic_issue_clusters(word_counts_eyd, full_eyd_corpus, active_bookmarks=bm_raw)
 
     if not parsed_bookmarks:
-        st.info("Belum ada teks terolah EYD yang dapat ditampilkan pada Jaringan Kata.")
+        st.info("Belum ada kata kunci yang cukup dominan untuk membentuk visualisasi Jaringan Kata.")
         return
 
     # Skala Frekuensi Global untuk Perbedaan Ukuran Lingkaran yang Signifikan
@@ -2570,8 +2610,57 @@ with tab_review:
         'sentiment_label', 'confidence_score', 'source_platform',
         'likes', 'retweets', 'views', 'log_activity', 'user_app'
     ]
-    
-    df_live_full = df_all.copy()
+
+    # Ekstraksi Daftar Batch / Sesi Scraping & Pemrosesan
+    all_batches = []
+    if 'log_activity' in df_all.columns and not df_all.empty:
+        batch_counts = df_all['log_activity'].value_counts()
+        for b_name, b_cnt in batch_counts.items():
+            if pd.notna(b_name) and str(b_name).strip() and str(b_name).strip() != "-":
+                all_batches.append((str(b_name).strip(), int(b_cnt)))
+
+    latest_batch_name = all_batches[0][0] if all_batches else None
+
+    # Bentuk opsi dropdown yang informatif
+    batch_options = []
+    batch_map = {}
+    if all_batches:
+        opt_latest = f"🚀 Sesi Terkini yang Baru Diproses ({latest_batch_name} — {all_batches[0][1]:,} Data)"
+        batch_options.append(opt_latest)
+        batch_map[opt_latest] = latest_batch_name
+        for b_name, b_cnt in all_batches[1:]:
+            opt_hist = f"📁 Sesi Historis ({b_name} — {b_cnt:,} Data)"
+            batch_options.append(opt_hist)
+            batch_map[opt_hist] = b_name
+        opt_all = f"📦 Semua Riwayat Data ({len(df_all):,} Data Gabungan)"
+        batch_options.append(opt_all)
+        batch_map[opt_all] = "ALL"
+    else:
+        opt_all = f"📦 Semua Riwayat Data ({len(df_all):,} Data)"
+        batch_options.append(opt_all)
+        batch_map[opt_all] = "ALL"
+
+    col_batch_sel, col_batch_info = st.columns([3, 2])
+    with col_batch_sel:
+        cur_batch_choice = st.selectbox(
+            "📂 Pilih Sesi / Batch Data yang Ditinjau & Dianalisis:",
+            options=batch_options,
+            index=0,
+            key="sel_active_batch_choice",
+            help="Secara default sistem menampilkan data dari sesi scraping/pemrosesan terkini agar analisis linier, atau pilih 'Semua Riwayat Data' untuk melihat data gabungan."
+        )
+    with col_batch_info:
+        st.markdown("<br>", unsafe_allow_html=True)
+        selected_batch_target = batch_map.get(cur_batch_choice, "ALL")
+        st.session_state['active_selected_batch'] = selected_batch_target
+
+        if selected_batch_target == "ALL":
+            df_live_full = df_all.copy()
+            st.info(f"🌐 Menampilkan **Seluruh Database**: {len(df_live_full):,} baris data.")
+        else:
+            df_live_full = df_all[df_all['log_activity'] == selected_batch_target].copy()
+            st.success(f"🎯 Menampilkan **Sesi {selected_batch_target}**: {len(df_live_full):,} baris data.")
+
     for col in _all_cols_needed:
         if col not in df_live_full.columns:
             df_live_full[col] = "-"
@@ -2716,7 +2805,7 @@ with tab_review:
         th_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Threads', case=False, na=False).sum())
         ig_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Instagram', case=False, na=False).sum())
         li_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('LinkedIn', case=False, na=False).sum())
-        web_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains('Website|News|Portal|http|\.com|\.go\.id|\.id', case=False, na=False).sum())
+        web_cnt_r = int(df_reviewed_final['source_platform'].astype(str).str.contains(r'Website|News|Portal|http|\.com|\.go\.id|\.id', case=False, na=False).sum())
         tot_p_r = total_volume_rev if total_volume_rev > 0 else 1
         
         tw_pct_r = tw_cnt_r / tot_p_r * 100
@@ -2742,26 +2831,6 @@ with tab_review:
             if 'date' in df_reviewed_final.columns and not df_reviewed_final.empty:
                 try:
                     df_rev_copy = df_reviewed_final.copy()
-                    
-                    def _parse_robust_date(val):
-                        if pd.isna(val) or val is None or str(val).strip() in ["", "-", "None", "NaT"]:
-                            return None
-                        val_s = str(val).strip()
-                        try:
-                            dt = pd.to_datetime(val_s, utc=True, errors='coerce')
-                            if pd.notna(dt):
-                                return dt.date()
-                        except Exception:
-                            pass
-                        import re
-                        m = re.search(r'(\d{4}-\d{2}-\d{2})', val_s)
-                        if m:
-                            try:
-                                return datetime.strptime(m.group(1), "%Y-%m-%d").date()
-                            except Exception:
-                                pass
-                        return None
-
                     df_rev_copy['date_parsed'] = df_rev_copy['date'].apply(_parse_robust_date)
                     v_df = df_rev_copy.dropna(subset=['date_parsed'])
                     total_rev_all = len(df_reviewed_final)
@@ -2973,7 +3042,30 @@ with tab_viz:
     st.subheader("📊 Tahapan 4: Visualisasi & Analisis Dashboard Eksekutif")
     st.markdown("Pengaturan kriteria analisis sentimen, perumusan narasi AI 250+ kata, dan cetak laporan resmi berformat PDF.")
     
-    df_base_viz = st.session_state.get('df_reviewed_final', df_all).copy()
+    # Sinkronisasi Basis Data Analisis agar Linier dengan Data yang Diproses
+    if 'df_reviewed_final' in st.session_state and not st.session_state['df_reviewed_final'].empty:
+        df_base_viz = st.session_state['df_reviewed_final'].copy()
+    else:
+        active_b = st.session_state.get('active_selected_batch')
+        if active_b and active_b != "ALL" and 'log_activity' in df_all.columns:
+            df_base_viz = df_all[df_all['log_activity'] == active_b].copy()
+        elif 'log_activity' in df_all.columns and not df_all.empty:
+            b_counts = df_all['log_activity'].value_counts()
+            if not b_counts.empty:
+                latest_b = b_counts.index[0]
+                df_base_viz = df_all[df_all['log_activity'] == latest_b].copy()
+            else:
+                df_base_viz = df_all.copy()
+        else:
+            df_base_viz = df_all.copy()
+
+    active_b_name = st.session_state.get('active_selected_batch')
+    if active_b_name and active_b_name != "ALL":
+        st.info(f"🎯 **Basis Data Analisis:** Menampilkan data dari sesi pemrosesan **{active_b_name}** ({len(df_base_viz):,} baris data).")
+    elif active_b_name == "ALL":
+        st.info(f"🌐 **Basis Data Analisis:** Menampilkan **Seluruh Riwayat Database** ({len(df_base_viz):,} baris data).")
+    else:
+        st.info(f"📊 **Basis Data Analisis:** Menampilkan **{len(df_base_viz):,} baris data** dari review Tahapan 3.")
     
     # 6.1 Pengaturan Analisis
     st.markdown("### ⚙️ Pengaturan Parameter Analisis")
@@ -3152,7 +3244,7 @@ with tab_viz:
         th_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Threads', case=False, na=False).sum())
         ig_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Instagram', case=False, na=False).sum())
         li_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('LinkedIn', case=False, na=False).sum())
-        web_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains('Website|News|Portal|http|\.com|\.go\.id|\.id', case=False, na=False).sum())
+        web_cnt_v = int(df_viz_filtered['source_platform'].astype(str).str.contains(r'Website|News|Portal|http|\.com|\.go\.id|\.id', case=False, na=False).sum())
         tot_p_v = total_volume_viz if total_volume_viz > 0 else 1
         
         tw_pct_v = tw_cnt_v / tot_p_v * 100
@@ -3389,7 +3481,7 @@ with tab_viz:
                         tw_cnt = int(df_viz_cleaned['source_platform'].astype(str).str.contains('Twitter', case=False, na=False).sum())
                         th_cnt = int(df_viz_cleaned['source_platform'].astype(str).str.contains('Threads', case=False, na=False).sum())
                         li_cnt = int(df_viz_cleaned['source_platform'].astype(str).str.contains('LinkedIn', case=False, na=False).sum())
-                        web_cnt = int(df_viz_cleaned['source_platform'].astype(str).str.contains('Website|News|Portal|http|\.com|\.go\.id|\.id', case=False, na=False).sum())
+                        web_cnt = int(df_viz_cleaned['source_platform'].astype(str).str.contains(r'Website|News|Portal|http|\.com|\.go\.id|\.id', case=False, na=False).sum())
 
                         tw_pct = tw_cnt / tot_p_pdf * 100
                         th_pct = th_cnt / tot_p_pdf * 100
