@@ -5,7 +5,7 @@
 
 ---
 
-## 1. Overview Aplikasi.
+## 1. Overview Aplikasi
 
 **Aplikasi Analisis Sentimen Publik terintegrasi AI** adalah platform analitik komprehensif yang dirancang untuk mengumpulkan, memproses, mengklasifikasikan, dan menganalisis persepsi masyarakat di media sosial serta media berita daring terkait isu dan kebijakan publik di Indonesia.
 
@@ -15,7 +15,7 @@ Platform ini mengintegrasikan teknologi AI fokus pada **Large Language Model (LL
 
 [socmed-sentimen-analysis-pp.streamlit.app](https://socmed-sentimen-analysis-pp.streamlit.app/)
 
-### Fitur Utama.
+### Fitur Utama
 
 - **Penarikan Data Multi-Platform (Multi-Source Scraping)**: Mengambil data percakapan publik secara otomatis dari Twitter/X, Instagram, LinkedIn, dan Portal Berita Utama Indonesia (Kompas, CNN Indonesia, Katadata, Detik, Tribunnews, Liputan6, Tempo, Republika, dll.) via Apify API dengan konfigurasi terstruktur per platform.
 - **Prapemrosesan & Standardisasi Teks EYD berbasis LLM & Local Caching**: Saat Menggunakan Google Gemini API dalam mode *high-speed parallel batching* terintegrasi *Local EYD Cache* (`ambil_eyd_cache`) untuk mengoreksi typo, slang, dan singkatan menjadi Bahasa Indonesia Baku (EYD) secara hemat token tanpa pengulangan teks yang pernah dibersihkan.
@@ -56,31 +56,31 @@ graph TD
 
 ### Komponen Utama Sistem
 
-| Komponen                        | File Utama                                                                                                      | Tanggung Jawab / Fungsi                                                                               |
-| :------------------------------ | :-------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------- |
-| **User Interface Layer**  | [`app.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/app.py)                                 | Dashboard utama Streamlit (visualisasi 4-tahapan, review 13 kolom, pilihan 3 narasi AI, ekspor PDF).  |
-| **Desktop Launcher**      | [`desktop_launcher.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/desktop_launcher.py)       | Pembungkus aplikasi desktop Windows menggunakan PyWebView & headless Streamlit server.                |
-| **Scraper Engine**        | [`01_run_scraper.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/01_run_scraper.py)           | Orkestrator penarikan data Apify (Twitter, Instagram, LinkedIn, News) & pendaftaran kata riwayat.     |
-| **Config & Query Parser** | [`config_parser.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/config_parser.py)             | Mengolah`target_config.json` per-platform dan merangkai kueri logika pencarian Twitter Boolean.     |
-| **AI & ML Pipeline**      | [`01_pipeline_data.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/01_pipeline_data.py)       | Pemrosesan deduplikasi RAW, EYD batch cleaning (dengan local cache), dan inferensi sentimen SVM.      |
-| **Model Trainer**         | [`02_train_model.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/02_train_model.py)           | Pelatihan model Support Vector Machine (Linear SVM) dan ekspor pickle file (`svm_model.pkl`).       |
-| **NLG Generator**         | [`nlg_generator.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/nlg_generator.py)             | Generasi Laporan Ringkasan Eksekutif AI persona Analis Kebijakan Publik (versi narasi terstruktur).   |
-| **Database Manager**      | [`db_manager.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/db_manager.py)                   | Abstraksi dual DB (SQLite & Supabase PostgreSQL), sync`keysearch_history`, dan `ambil_eyd_cache`. |
-| **Session Credentials**   | [`session_credentials.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/session_credentials.py) | Pengelolaan kredensial terisolasi per-sesi (Session State) & fungsi penilai API Key kustom.           |
-| **License Manager**       | [`license_manager.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/license_manager.py)         | Verifikasi Hardware Fingerprint (Machine ID WMI UUID) untuk aktivasi aplikasi desktop.                |
-| **Build & Obfuscation**   | [`build_desktop.py`](file:///d:/Documents/%23ptincap/socmed-sentimen-analysis-pp/build_desktop.py)             | Pengacak kode PyArmor & kompilator executable PyInstaller ke format`.exe`.                          |
+| Komponen                  | File Utama                                                                                          | Tanggung Jawab / Fungsi                                                                              |
+| :------------------------ | :-------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------- |
+| **User Interface Layer**  | [`app.py`](file:///d:/Documents/socmed-sentimen-analysis-pp/app.py)                                 | Dashboard utama Streamlit (visualisasi 4-tahapan, review 13 kolom, pilihan 3 narasi AI, ekspor PDF). |
+| **Desktop Launcher**      | [`desktop_launcher.py`](file:///d:/Documents/socmed-sentimen-analysis-pp/desktop_launcher.py)       | Pembungkus aplikasi desktop Windows menggunakan PyWebView & headless Streamlit server.               |
+| **Scraper Engine**        | [`01_run_scraper.py`](file:///d:/Documents/socmed-sentimen-analysis-pp/01_run_scraper.py)           | Orkestrator penarikan data Apify (Twitter, Instagram, LinkedIn, News) & pendaftaran kata riwayat.    |
+| **Config & Query Parser** | [`config_parser.py`](file:///d:/Documents/socmed-sentimen-analysis-pp/config_parser.py)             | Mengolah `target_config.json` per-platform dan merangkai kueri logika pencarian Twitter Boolean.     |
+| **AI & ML Pipeline**      | [`01_pipeline_data.py`](file:///d:/Documents/socmed-sentimen-analysis-pp/01_pipeline_data.py)       | Pemrosesan deduplikasi RAW, EYD batch cleaning (dengan local cache), dan inferensi sentimen SVM.     |
+| **Model Trainer**         | [`02_train_model.py`](file:///d:/Documents/socmed-sentimen-analysis-pp/02_train_model.py)           | Pelatihan model Support Vector Machine (Linear SVM) dan ekspor pickle file (`svm_model.pkl`).        |
+| **NLG Generator**         | [`nlg_generator.py`](file:///d:/Documents/socmed-sentimen-analysis-pp/nlg_generator.py)             | Generasi Laporan Ringkasan Eksekutif AI persona Analis Kebijakan Publik (versi narasi terstruktur).  |
+| **Database Manager**      | [`db_manager.py`](file:///d:/Documents/socmed-sentimen-analysis-pp/db_manager.py)                   | Abstraksi dual DB (SQLite & Supabase PostgreSQL), sync `keysearch_history`, dan `ambil_eyd_cache`.   |
+| **Session Credentials**   | [`session_credentials.py`](file:///d:/Documents/socmed-sentimen-analysis-pp/session_credentials.py) | Pengelolaan kredensial terisolasi per-sesi (Session State) & fungsi penilai API Key kustom.          |
+| **License Manager**       | [`license_manager.py`](file:///d:/Documents/socmed-sentimen-analysis-pp/license_manager.py)         | Verifikasi Hardware Fingerprint (Machine ID WMI UUID) untuk aktivasi aplikasi desktop.               |
+| **Build & Obfuscation**   | [`build_desktop.py`](file:///d:/Documents/socmed-sentimen-analysis-pp/build_desktop.py)             | Pengacak kode PyArmor & kompilator executable PyInstaller ke format `.exe`.                          |
 
 ---
 
-## 3. Pipeline Data & ML.
+## 3. Pipeline Data & ML
 
 Pipa pemrosesan data berjalan dalam 6 tahapan utama secara terstruktur dari hulu ke hilir:
 
-```
+```text
 [1. Konfigurasi Kueri] ➔ [2. Penarikan Data (Scraper)] ➔ [3. Deduplikasi RAW] ➔ [4. Standardisasi EYD (Gemini)] ➔ [5. Inferensi Sentimen (SVM)] ➔ [6. Visualisasi & NLG AI]
 ```
 
-### Rincian Tahapan Pipeline:
+### Rincian Tahapan Pipeline
 
 1. **Tahap 1: Konfigurasi & Inisialisasi Kueri**
 
@@ -198,12 +198,14 @@ atau jalankan (klik) file *'Jalankan_Aplikasi_Desktop.bat'*
 
 ##### 8. Membangun Paket Aplikasi Desktop Executable (.exe Windows) (unstable)
 
-1. Buat sertifikasi keamanan software secara mandiri, untuk bypass windows security (windows defender)
-2. ```PowerShell
+1. Buat sertifikasi keamanan software secara mandiri, untuk bypass windows security (windows defender).
+2. Jalankan pembuatan sertifikat internal:
+
+   ```PowerShell
    python build_msi_installer.py
    ```
 
-   atau jalankan (klik) file *create_internal_ceet.ps1'*
+   atau jalankan (klik) file *create_internal_cert.ps1*.
 3. Lalu meng-obfuscate kode Python dengan PyArmor dan membungkusnya menjadi satu paket executable `.exe`:
 
 ```PowerShell
@@ -226,7 +228,7 @@ Untuk menjalankan aplikasi secara terpusat (*cloud server*) agar dapat diakses o
 - **Port**: 80 (HTTP), 4443 / 443 (HTTPS), 8501 (Streamlit Server Internal).
 - **Akses**: Akses root atau user dengan hak `sudo`.
 
-#### Langkah-Langkah Deployment Server:
+#### Langkah-Langkah Deployment Server
 
 ##### 1. Pembaruan Paket Sistem & Instalasi Prasyarat
 
@@ -381,7 +383,7 @@ sudo systemctl restart socmed-app
 
 Aplikasi memiliki antarmuka Streamlit yang terbagi ke dalam 4 Tab Utama dan 1 Sidebar Pengaturan Kredensial:
 
-```
+```text
 ┌────────────────────────────────────────────────────────────────────────┐
 │ 🔐 Sidebar Pengaturan Sesi API Key & Database Engine (SQLite / Supabase)│
 ├───────────────┬───────────────┬───────────────┬────────────────────────┤
