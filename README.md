@@ -18,7 +18,7 @@ Platform ini mengintegrasikan teknologi AI fokus pada **Large Language Model (LL
 ### Fitur Utama.
 
 - **Penarikan Data Multi-Platform (Multi-Source Scraping)**: Mengambil data percakapan publik secara otomatis dari Twitter/X, Instagram, LinkedIn, dan Portal Berita Utama Indonesia (Kompas, CNN Indonesia, Katadata, Detik, Tribunnews, Liputan6, Tempo, Republika, dll.) via Apify API dengan konfigurasi terstruktur per platform.
-- **Prapemrosesan & Standardisasi Teks EYD berbasis LLM & Local Caching**: Saat Menggunakan Google Gemini API (`gemini-3.1-flash-lite`) dalam mode *high-speed parallel batching* terintegrasi *Local EYD Cache* (`ambil_eyd_cache`) untuk mengoreksi typo, slang, dan singkatan menjadi Bahasa Indonesia Baku (EYD) secara hemat token tanpa pengulangan teks yang pernah dibersihkan.
+- **Prapemrosesan & Standardisasi Teks EYD berbasis LLM & Local Caching**: Saat Menggunakan Google Gemini API dalam mode *high-speed parallel batching* terintegrasi *Local EYD Cache* (`ambil_eyd_cache`) untuk mengoreksi typo, slang, dan singkatan menjadi Bahasa Indonesia Baku (EYD) secara hemat token tanpa pengulangan teks yang pernah dibersihkan.
 - **Klasifikasi Sentimen Machine Learning (SVM)**: Memprediksi sentimen publik (**Positif**, **Negatif**, **Netral**) beserta *confidence score* (skor keyakinan 0.0 - 1.0) menggunakan model Support Vector Classifier berbasis ekstraksi fitur TF-IDF.
 - **Generasi Ringkasan Eksekutif Otomatis & Pemilihan Multiversi (NLG AI)**: Menggunakan kecerdasan buatan dengan persona Analis Kebijakan Publik Senior untuk menyusun Laporan Ringkasan Eksekutif 3 bagian (Situasi Saat Ini, Analisis Permasalahan, Rekomendasi Kebijakan) dengan dukungan **hingga 3 model/versi narasi interaktif** yang dapat dipilih pengguna.
 - **Dukungan Penyimpanan Ganda & Penyelarasan Riwayat Topik (Dual Database Engine)**:
@@ -43,7 +43,7 @@ graph TD
   
     UI --> Pipeline[AI & ML Processing Pipeline<br/>01_pipeline_data.py]
     DB -->|Read RAW Data| Pipeline
-    Pipeline -->|Batch Cleaning| Gemini[Google Gemini LLM API<br/>gemini-3.1-flash-lite]
+    Pipeline -->|Batch Cleaning| Gemini[Google Gemini LLM API]
     Pipeline -->|Feature Extraction & Inference| SVMModel[SVM ML Model & TF-IDF Vectorizer<br/>models/svm_model.pkl & tfidf_vectorizer.pkl]
     Pipeline -->|Update CLEANED Data| DB
   
