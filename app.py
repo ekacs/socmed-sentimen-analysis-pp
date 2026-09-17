@@ -481,6 +481,11 @@ st.divider()
 
 # Load All Data
 df_all = load_data_from_db()
+if not df_all.empty and 'raw_text' in df_all.columns:
+    df_all = df_all[
+        df_all['raw_text'].notna() &
+        ~df_all['raw_text'].astype(str).str.strip().str.lower().isin(['no content', 'none', 'nan', 'null', ''])
+    ].copy()
 if df_all.empty:
     df_all = pd.DataFrame(columns=[
         'platform_id', 'date', 'username', 'raw_text', 'cleaned_text', 
@@ -2554,12 +2559,25 @@ def generate_unique_accounts_excel_bytes(df_source: pd.DataFrame) -> bytes:
 # TAB 3: REVIEW DATA
 # =====================================================================
 with tab_review:
-    c_tab3_h1, c_tab3_h2 = st.columns([4, 1])
+    c_tab3_h1, c_tab3_h2, c_tab3_h3 = st.columns([3.2, 1.4, 1.4])
     with c_tab3_h1:
         st.subheader("📋 Tahapan 3: Review Data & Kontrol Kualitas")
         st.markdown("Transparansi data lengkap dari platform sumber beserta fasilitas pemulihan (*restore*) file cadangan data database.")
     with c_tab3_h2:
+        if st.button("🧹 Bersihkan No Content", key="btn_clean_nocontent_tab3", use_container_width=True, help="Hapus seluruh data 'No Content' atau teks kosong dari basis data"):
+            if hasattr(db_manager, 'hapus_data_tanpa_konten'):
+                del_cnt = db_manager.hapus_data_tanpa_konten()
+                st.cache_data.clear()
+                st.session_state.pop("df_reviewed_final", None)
+                if del_cnt > 0:
+                    st.success(f"✅ Berhasil membersihkan {del_cnt:,} baris 'No Content'!")
+                else:
+                    st.info("ℹ️ Basis data sudah bersih dari data 'No Content'.")
+                st.rerun()
+    with c_tab3_h3:
         if st.button("🔄 Muat Ulang Data", key="btn_refresh_tab3_top", use_container_width=True, help="Segarkan seluruh data live dari database"):
+            st.cache_data.clear()
+            st.session_state.pop("df_reviewed_final", None)
             st.rerun()
 
     # =====================================================================
@@ -2625,18 +2643,18 @@ with tab_review:
     batch_options = []
     batch_map = {}
     if all_batches:
-        opt_latest = f"🚀 Sesi Terkini yang Baru Diproses ({latest_batch_name} — {all_batches[0][1]:,} Data)"
+        opt_latest = f"🚀 Sesi Terkini yang Baru Diproses ({latest_batch_name})"
         batch_options.append(opt_latest)
         batch_map[opt_latest] = latest_batch_name
         for b_name, b_cnt in all_batches[1:]:
-            opt_hist = f"📁 Sesi Historis ({b_name} — {b_cnt:,} Data)"
+            opt_hist = f"📁 Sesi Historis ({b_name})"
             batch_options.append(opt_hist)
             batch_map[opt_hist] = b_name
-        opt_all = f"📦 Semua Riwayat Data ({len(df_all):,} Data Gabungan)"
+        opt_all = "📦 Semua Riwayat Data"
         batch_options.append(opt_all)
         batch_map[opt_all] = "ALL"
     else:
-        opt_all = f"📦 Semua Riwayat Data ({len(df_all):,} Data)"
+        opt_all = "📦 Semua Riwayat Data"
         batch_options.append(opt_all)
         batch_map[opt_all] = "ALL"
 
@@ -2655,17 +2673,18 @@ with tab_review:
         st.session_state['active_selected_batch'] = selected_batch_target
 
         if selected_batch_target == "ALL":
-            df_live_full = df_all.copy()
-            st.info(f"🌐 Menampilkan **Seluruh Database**: {len(df_live_full):,} baris data.")
+            df_live_full = df_all.copy().reset_index(drop=True)
+            st.info("🌐 Menampilkan **Seluruh Riwayat Database**.")
         else:
-            df_live_full = df_all[df_all['log_activity'] == selected_batch_target].copy()
-            st.success(f"🎯 Menampilkan **Sesi {selected_batch_target}**: {len(df_live_full):,} baris data.")
+            df_live_full = df_all[df_all['log_activity'] == selected_batch_target].copy().reset_index(drop=True)
+            st.success(f"🎯 Menampilkan **Sesi {selected_batch_target}**.")
 
     for col in _all_cols_needed:
         if col not in df_live_full.columns:
             df_live_full[col] = "-"
             
-    df_live_display = df_live_full[_all_cols_needed].copy()
+    df_live_display = df_live_full[_all_cols_needed].copy().reset_index(drop=True)
+    df_live_display.index = df_live_display.index + 1
     col_rename_map = {
         'platform_id': 'ID Platform',
         'username': 'Username',
@@ -2898,7 +2917,8 @@ with tab_review:
         with c_tbl_btn:
             if st.button("🔄 Segarkan", key="btn_refresh_live_table", use_container_width=True, help="Muat ulang data terbaru dari database"):
                 st.rerun()
-        df_disp = df_reviewed_final[[c for c in _all_cols_needed if c in df_reviewed_final.columns]].copy()
+        df_disp = df_reviewed_final[[c for c in _all_cols_needed if c in df_reviewed_final.columns]].copy().reset_index(drop=True)
+        df_disp.index = df_disp.index + 1
         df_disp.rename(columns=col_rename_map, inplace=True)
         st.dataframe(
             df_disp,
@@ -3061,11 +3081,11 @@ with tab_viz:
 
     active_b_name = st.session_state.get('active_selected_batch')
     if active_b_name and active_b_name != "ALL":
-        st.info(f"🎯 **Basis Data Analisis:** Menampilkan data dari sesi pemrosesan **{active_b_name}** ({len(df_base_viz):,} baris data).")
+        st.info(f"🎯 **Basis Data Analisis:** Menampilkan data dari sesi pemrosesan **{active_b_name}**.")
     elif active_b_name == "ALL":
-        st.info(f"🌐 **Basis Data Analisis:** Menampilkan **Seluruh Riwayat Database** ({len(df_base_viz):,} baris data).")
+        st.info("🌐 **Basis Data Analisis:** Menampilkan **Seluruh Riwayat Database**.")
     else:
-        st.info(f"📊 **Basis Data Analisis:** Menampilkan **{len(df_base_viz):,} baris data** dari review Tahapan 3.")
+        st.info("📊 **Basis Data Analisis:** Menampilkan data dari review Tahapan 3.")
     
     # 6.1 Pengaturan Analisis
     st.markdown("### ⚙️ Pengaturan Parameter Analisis")
@@ -3153,6 +3173,7 @@ with tab_viz:
             "(Kata Kunci, Tagar, Profil Akun, atau Topik Sentimen) atau pilih **'ALL (Semua Data)'** untuk melakukan "
             "analisis komprehensif yang merepresentasikan seluruh data."
         )
+        df_viz_filtered = pd.DataFrame(columns=df_base_viz.columns)
     else:
         # Filter berdasarkan rentang tanggal
         if isinstance(viz_date_range, tuple) and len(viz_date_range) == 2:
@@ -3166,6 +3187,10 @@ with tab_viz:
         if has_specific_selected and not is_all_selected:
             for term in specific_terms:
                 if str(term).startswith("📌") and term in bookmark_map:
+                    # Ambil nama bookmark itu sendiri tanpa emoji
+                    clean_bm = re.sub(r'^[^\w]+', '', str(term)).strip().lower()
+                    if clean_bm and clean_bm not in selected_search_terms:
+                        selected_search_terms.append(clean_bm)
                     # Urai istilah di dalam bookmark
                     for sub_t in bookmark_map[term]:
                         ck = str(sub_t).strip().lower().lstrip("#@")
@@ -3177,9 +3202,33 @@ with tab_viz:
                         selected_search_terms.append(ck)
 
         if selected_search_terms and not df_viz_filtered.empty:
+            def _norm_search_txt(t):
+                if not t: return ""
+                t_clean = re.sub(r'[\(\)\[\]\{\}\-_/\\:;,\.\!\?\"\'`]', ' ', str(t).lower())
+                return re.sub(r'\s+', ' ', t_clean).strip()
+
+            norm_search_terms = [_norm_search_txt(s) for s in selected_search_terms if _norm_search_txt(s)]
+            expanded_terms = list(norm_search_terms)
+            for st_term in norm_search_terms:
+                # Mengakomodasi topik kopdes merah putih (termasuk variasi kurung, strip, merah putih, kopdes)
+                if "kopdes" in st_term and "merah putih" in st_term:
+                    for sub_w in ["kopdes merah putih", "merah putih", "kopdes", "koperasi desa", "kdmp"]:
+                        if sub_w not in expanded_terms:
+                            expanded_terms.append(sub_w)
+
             def _matches_keysearch(row):
-                txt = (str(row.get('cleaned_text') or '') + ' ' + str(row.get('raw_text') or '') + ' ' + str(row.get('username') or '')).lower()
-                return any(st_term in txt for st_term in selected_search_terms)
+                raw_full = f"{row.get('cleaned_text') or ''} {row.get('raw_text') or ''} {row.get('username') or ''}"
+                norm_target = _norm_search_txt(raw_full)
+                
+                for st_term in expanded_terms:
+                    if st_term in norm_target:
+                        return True
+                    words = st_term.split()
+                    if len(words) > 1:
+                        pattern = r'\b' + r'[\s\W]+'.join(re.escape(w) for w in words) + r'\b'
+                        if re.search(pattern, raw_full, re.IGNORECASE):
+                            return True
+                return False
 
             df_filtered_by_key = df_viz_filtered[df_viz_filtered.apply(_matches_keysearch, axis=1)]
             if not df_filtered_by_key.empty:

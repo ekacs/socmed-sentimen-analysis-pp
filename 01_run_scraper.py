@@ -205,6 +205,8 @@ def scrape_twitter(client, general_cfg, log_activity: str = "", user_app: str = 
                 
             # 4. raw_text: diambil dari field 'text' (sesuai spesifikasi)
             raw_text = item.get("text") or item.get("fullText") or item.get("full_text") or ""
+            if not raw_text or str(raw_text).strip().lower() in ["no content", "none", "nan", "null", ""]:
+                continue
             
             # 5. likes: diambil dari field 'likes' langsung (sesuai spesifikasi)
             likes = (
@@ -518,7 +520,9 @@ def scrape_threads(client, general_cfg, log_activity: str = "", user_app: str = 
                     if not username.startswith("@"):
                         username = f"@{username}"
 
-                    raw_text = item.get("caption") or item.get("text_content") or item.get("text") or item.get("body") or "No Content"
+                    raw_text = item.get("caption") or item.get("text_content") or item.get("text") or item.get("body") or ""
+                    if not raw_text or str(raw_text).strip().lower() in ["no content", "none", "nan", "null", ""]:
+                        continue
                     likes = int(item.get("like_count", 0) or item.get("likes", 0) or 0)
                     reposts = int(item.get("repost_count", 0) or item.get("reshare_count", 0) or item.get("comment_count", 0) or 0)
                     views = int(item.get("view_count", 0) or item.get("reshare_count", 0) or item.get("views", 0) or 0)
@@ -651,10 +655,10 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
                     or item.get("body")
                     or item.get("description")
                     or item.get("message")
-                    or "No Content"
+                    or ""
                 )
-            if raw_text is None:
-                raw_text = "No Content"
+            if not raw_text or str(raw_text).strip().lower() in ["no content", "none", "nan", "null", ""]:
+                continue
             
             # --- Engagement ---
             reactions_obj = item.get("reactions") if isinstance(item.get("reactions"), dict) else {}

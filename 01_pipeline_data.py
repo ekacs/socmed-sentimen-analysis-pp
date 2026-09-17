@@ -152,13 +152,15 @@ def process_pipeline():
     gemini_client = get_gemini_client()
     model, vectorizer = load_svm_model()
     rows = db_manager.ambil_cuitan_mentah()
+    # Filter proteksi: abaikan baris yang kosong atau bertuliskan 'No Content'
+    rows = [r for r in rows if r[1] and str(r[1]).strip().lower() not in ['no content', 'none', 'nan', 'null', '']]
     
     if not rows:
-        print("[INFO][NO_DATA] Tidak ada data cuitan mentah baru (status 'RAW') untuk diproses.")
+        print("[INFO][NO_DATA] Tidak ada data cuitan mentah valid (status 'RAW') untuk diproses.")
         print("[HINT] Jalankan dulu Langkah 1: Penarikan Data (Scraper) untuk mendapatkan data RAW baru.")
         sys.exit(2)
         
-    print(f"[INFO] Ditemukan {len(rows)} baris data RAW untuk diproses.")
+    print(f"[INFO] Ditemukan {len(rows)} baris data RAW valid untuk diproses.")
     
     # 2. Caching & Deduplikasi Teks Mentah
     eyd_cache = db_manager.ambil_eyd_cache()

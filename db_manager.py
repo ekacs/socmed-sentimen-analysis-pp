@@ -710,6 +710,15 @@ def simpan_data_ke_db(data_cuitan):
     """
     if not data_cuitan:
         return
+
+    # Filter ketat: Jangan pernah menyimpan data tanpa konten / 'No Content' ke database
+    data_cuitan = [
+        d for d in data_cuitan
+        if str(d.get('raw_text') or '').strip().lower() not in ['no content', 'none', 'nan', 'null', '']
+    ]
+    if not data_cuitan:
+        print("[INFO] Seluruh data yang akan disimpan berupa 'No Content' atau teks kosong. Data diabaikan.")
+        return
         
     db_type = get_db_type()
     conn = get_connection()
@@ -768,13 +777,20 @@ def simpan_data_ke_db(data_cuitan):
     finally:
         conn.close()
         
-    # Otomatis jalankan pembersihan duplikasi (username + raw_text sama, pertahankan date paling muda)
+    # Otomatis jalankan pembersihan duplikasi dan data tanpa konten
     try:
         deleted_dups = hapus_duplikasi_data_raw()
         if deleted_dups > 0:
             print(f"[INFO] Deduplikasi Tahapan 1: {deleted_dups} data duplikat (username & raw_text sama) dibersihkan, mempertahankan data tanggal paling muda.")
     except Exception as _ex:
         print(f"[WARNING] Gagal otomatis deduplikasi setelah simpan: {_ex}")
+
+    try:
+        deleted_nc = hapus_data_tanpa_konten()
+        if deleted_nc > 0:
+            print(f"[INFO] Pembersihan Tahapan 1: {deleted_nc} data tanpa konten ('No Content') dibersihkan.")
+    except Exception as _ex_nc:
+        pass
 
 def baca_data_untuk_streamlit():
     """
@@ -799,6 +815,15 @@ def baca_data_untuk_streamlit():
             engine = create_engine(sqlalchemy_url)
             df = pd.read_sql_query("SELECT * FROM log_cuitan ORDER BY date DESC", engine)
             if not df.empty:
+                # Filter proteksi ganda: pastikan baris 'No Content' tidak dimuat
+                if 'raw_text' in df.columns:
+                    mask_v = (
+                        df['raw_text'].notna() &
+                        ~df['raw_text'].astype(str).str.strip().str.lower().isin(['no content', 'none', 'nan', 'null', ''])
+                    )
+                    if 'cleaned_text' in df.columns:
+                        mask_v &= ~df['cleaned_text'].astype(str).str.strip().str.lower().isin(['no content', 'none', 'nan', 'null'])
+                    df = df[mask_v].copy()
                 return df
             print("[INFO] PostgreSQL Supabase terhubung tetapi belum memiliki data (0 baris). Memeriksa SQLite lokal...")
         except Exception as e:
@@ -810,7 +835,16 @@ def baca_data_untuk_streamlit():
             df_sqlite = pd.read_sql_query("SELECT * FROM log_cuitan ORDER BY date DESC", conn)
             conn.close()
             if not df_sqlite.empty:
-                print(f"[INFO] Menggunakan data dari SQLite lokal ({len(df_sqlite)} baris).")
+                # Filter proteksi ganda: pastikan baris 'No Content' tidak dimuat
+                if 'raw_text' in df_sqlite.columns:
+                    mask_v = (
+                        df_sqlite['raw_text'].notna() &
+                        ~df_sqlite['raw_text'].astype(str).str.strip().str.lower().isin(['no content', 'none', 'nan', 'null', ''])
+                    )
+                    if 'cleaned_text' in df_sqlite.columns:
+                        mask_v &= ~df_sqlite['cleaned_text'].astype(str).str.strip().str.lower().isin(['no content', 'none', 'nan', 'null'])
+                    df_sqlite = df_sqlite[mask_v].copy()
+                print(f"[INFO] Menggunakan data dari SQLite lokal ({len(df_sqlite)} baris valid).")
                 return df_sqlite
         except Exception as e:
             print(f"[ERROR] Gagal memuat data dari SQLite: {e}")
@@ -820,12 +854,19 @@ def baca_data_untuk_streamlit():
 def ambil_cuitan_mentah():
     """
     Mengambil konten mentah (status = 'RAW') dari database untuk diproses di pipeline AI.
-    Mengembalikan (platform_id, raw_text) untuk setiap baris RAW.
+    Mengabaikan data kosong / 'No Content'.
+    Mengembalikan (platform_id, raw_text) untuk setiap baris RAW valid.
     """
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT platform_id, raw_text FROM log_cuitan WHERE status = 'RAW'")
+        cursor.execute("""
+            SELECT platform_id, raw_text FROM log_cuitan 
+            WHERE status = 'RAW'
+              AND raw_text IS NOT NULL 
+              AND TRIM(raw_text) != '' 
+              AND LOWER(TRIM(raw_text)) NOT IN ('no content', 'none', 'nan', 'null')
+        """)
         rows = cursor.fetchall()
         return rows
     except Exception as e:
@@ -1028,6 +1069,35 @@ def hapus_duplikasi_data_raw():
         return deleted_count
     except Exception as e:
         print(f"[ERROR] Gagal menghapus duplikasi data: {e}")
+        return 0
+    finally:
+        conn.close()
+
+def hapus_data_tanpa_konten():
+    """
+    Menghapus data kosong / dummy seperti 'No Content', 'None', string kosong, atau NULL
+    baik di kolom raw_text maupun cleaned_text agar tidak membingungkan pengguna.
+    Return: jumlah baris yang dihapus.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    deleted_count = 0
+    try:
+        query = """
+            DELETE FROM log_cuitan 
+            WHERE raw_text IS NULL 
+               OR TRIM(raw_text) = '' 
+               OR LOWER(TRIM(raw_text)) IN ('no content', 'none', 'nan', 'null')
+               OR (cleaned_text IS NOT NULL AND LOWER(TRIM(cleaned_text)) IN ('no content', 'none', 'nan', 'null'))
+        """
+        cursor.execute(query)
+        deleted_count = cursor.rowcount if cursor.rowcount is not None and cursor.rowcount >= 0 else 0
+        conn.commit()
+        if deleted_count > 0:
+            print(f"[INFO] Pembersihan Data: Berhasil menghapus {deleted_count} data 'No Content' / teks kosong dari database.")
+        return deleted_count
+    except Exception as e:
+        print(f"[ERROR] Gagal menghapus data tanpa konten: {e}")
         return 0
     finally:
         conn.close()
