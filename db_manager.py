@@ -1314,4 +1314,46 @@ def migrate_database(source_url, target_url):
     except Exception as e:
         return False, {}, f"Gagal migrasi database: {str(e)}"
 
+def reset_database(clear_bookmarks=False, clear_history=True, db_url=None):
+    """
+    Membersihkan data dari database aktif (menghapus seluruh record dari log_cuitan,
+    serta opsi untuk menghapus keysearch_history dan keysearch_bookmarks).
+    Kompatibel dengan SQLite dan PostgreSQL.
+    """
+    conn = get_connection(db_url)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM log_cuitan;")
+        if clear_history:
+            try:
+                cursor.execute("DELETE FROM keysearch_history;")
+            except Exception:
+                pass
+        if clear_bookmarks:
+            try:
+                cursor.execute("DELETE FROM keysearch_bookmarks;")
+            except Exception:
+                pass
+        conn.commit()
+        
+        # Jika SQLite, jalankan VACUUM untuk membersihkan dan mengecilkan ukuran berkas fisik
+        if get_db_type(db_url) == "sqlite":
+            try:
+                cursor.execute("VACUUM;")
+            except Exception:
+                pass
+                
+        return True, "Database berhasil dibersihkan."
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return False, f"Gagal mereset database: {str(e)}"
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
 

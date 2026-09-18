@@ -90,7 +90,8 @@ def get_supabase_dashboard_url():
 
 # 1. Konfigurasi Halaman Streamlit
 st.set_page_config(
-    page_title="Analisis Sentimen Publik berbasis AI (v1.1)",
+    page_title="Machine Learning Penarik Data Multi-Platform untuk Analisis Sentimen",
+    page_icon="🏛️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -475,8 +476,26 @@ def _parse_robust_date(val):
     return None
 
 # Dashboard Header
-st.title("🏛️ Aplikasi Analisis Sentimen Publik")
-st.markdown("Dasbor eksekutif berbasis AI untuk merangkum sentimen publik sebagai bahan pertimbangan kebijakan.")
+st.markdown("""
+<div style='display: flex; align-items: center; gap: 18px; margin-top: 5px; margin-bottom: 12px;'>
+    <div style='display: flex; align-items: center; justify-content: center; width: 56px; height: 56px; min-width: 56px; border-radius: 16px; background: linear-gradient(135deg, #0F2B5C 0%, #1E40AF 50%, #3B82F6 100%); box-shadow: 0 8px 20px -4px rgba(15, 43, 92, 0.45); flex-shrink: 0;'>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="21" x2="21" y2="21"></line>
+            <line x1="12" y1="3" x2="2" y2="8"></line>
+            <line x1="12" y1="3" x2="22" y2="8"></line>
+            <line x1="2" y1="8" x2="22" y2="8"></line>
+            <line x1="5" y1="11" x2="5" y2="18"></line>
+            <line x1="9" y1="11" x2="9" y2="18"></line>
+            <line x1="15" y1="11" x2="15" y2="18"></line>
+            <line x1="19" y1="11" x2="19" y2="18"></line>
+            <line x1="2" y1="18" x2="22" y2="18"></line>
+        </svg>
+    </div>
+    <h1 style='margin: 0; padding: 0; font-size: 2.05rem; font-weight: 700; line-height: 1.25;'>
+        Machine Learning Penarik Data Multi-Platform untuk Analisis Sentimen
+    </h1>
+</div>
+""", unsafe_allow_html=True)
 st.divider()
 
 # Load All Data
@@ -738,6 +757,29 @@ with col_db2:
             pass
         st.toast(f"🔄 Data berhasil dimuat ulang dari Database ({session_credentials.get_active_db_mode().upper()})!")
         st.rerun()
+
+with st.sidebar.popover("🗑️ Reset Database", use_container_width=True, help="Bersihkan dan kosongkan seluruh data dari database aktif."):
+    st.markdown("#### 🗑️ Bersihkan Database")
+    st.warning("Tindakan ini akan menghapus seluruh data cuitan / konten sosial media dari database aktif.")
+    
+    cb_rst_hist = st.checkbox("Hapus juga riwayat kata kunci pencarian", value=True, key="cb_reset_history_sb")
+    cb_rst_bm = st.checkbox("Hapus juga topik sentimen (bookmark)", value=False, key="cb_reset_bm_sb")
+    
+    st.caption("🚨 **Perhatian:** Tindakan ini permanen. Data yang telah dihapus tidak dapat dikembalikan.")
+    if st.button("🚨 Ya, Bersihkan Database Sekarang", type="primary", use_container_width=True, key="btn_do_reset_db_sb"):
+        ok_rst, msg_rst = db_manager.reset_database(
+            clear_bookmarks=cb_rst_bm,
+            clear_history=cb_rst_hist
+        )
+        if ok_rst:
+            try:
+                st.cache_data.clear()
+            except Exception:
+                pass
+            st.toast("✅ Database berhasil dibersihkan!")
+            st.rerun()
+        else:
+            st.error(f"❌ {msg_rst}")
 
 if check_db_storage_full():
     st.sidebar.error("🚨 Status Storage DB: Penyimpanan Penuh (Hubungi Developer untuk Pembersihan Storage)")
@@ -3452,22 +3494,51 @@ with tab_viz:
                     doc_pdf = SimpleDocTemplate(
                         pdf_buf, pagesize=A4,
                         rightMargin=1.5*cm, leftMargin=1.5*cm,
-                        topMargin=1.5*cm, bottomMargin=1.5*cm
+                        topMargin=1.5*cm, bottomMargin=2.7*cm
                     )
                     story_p = []
                     styles_p = getSampleStyleSheet()
 
-                    sTitle = ParagraphStyle('DocTitle', parent=styles_p['Heading1'], fontSize=16, leading=20, alignment=1, textColor=colors.HexColor('#1a365d'))
+                    sTitle = ParagraphStyle('DocTitle', parent=styles_p['Heading1'], fontSize=15, leading=19, textColor=colors.HexColor('#1a365d'), fontName='Helvetica-Bold')
+                    sDocSub = ParagraphStyle('DocSubCustom', parent=styles_p['Normal'], fontSize=9.5, leading=13, textColor=colors.HexColor('#2d3748'), fontName='Helvetica-Bold')
+                    sDocDate = ParagraphStyle('DocDateCustom', parent=styles_p['Normal'], fontSize=8, leading=11, textColor=colors.HexColor('#718096'))
+
                     sH1 = ParagraphStyle('SectionH1', parent=styles_p['Heading2'], fontSize=12, leading=16, textColor=colors.HexColor('#1a365d'), spaceBefore=10, spaceAfter=6)
                     sH2 = ParagraphStyle('SectionH2', parent=styles_p['Heading3'], fontSize=10, leading=14, textColor=colors.HexColor('#2c5282'), spaceBefore=8, spaceAfter=4)
                     sB = ParagraphStyle('BodyTextCustom', parent=styles_p['Normal'], fontSize=9, leading=13)
                     sBodyJustified = ParagraphStyle('BodyJustified', parent=styles_p['Normal'], fontSize=9, leading=14, alignment=4)
 
                     tgl_s = datetime.date.today().strftime('%d %B %Y')
-                    story_p.append(Paragraph('LAPORAN HASIL ANALISIS SENTIMEN PUBLIK', sTitle))
-                    story_p.append(Spacer(1, 0.2*cm))
-                    story_p.append(Paragraph(f'Tanggal Laporan: <b>{tgl_s}</b>', ParagraphStyle('Sub', parent=styles_p['Normal'], alignment=1)))
-                    story_p.append(Spacer(1, 0.8*cm))
+                    logo_pdf_path = os.path.join(os.path.dirname(__file__), "UNPAR.PNG")
+
+                    header_text_flowables = [
+                        Paragraph("Machine Learning Penarik Data Multi-Platform untuk Analisis Sentimen", sTitle),
+                        Spacer(1, 0.15*cm),
+                        Paragraph("TUTIK RACHMAWATI, SYAYU ZHUKHRUFFA &amp; MARISKHA TRI ADITHIA", sDocSub),
+                        Spacer(1, 0.15*cm),
+                        Paragraph(f"Tanggal Laporan: <b>{tgl_s}</b>", sDocDate)
+                    ]
+
+                    if os.path.exists(logo_pdf_path):
+                        img_unpar_pdf = Image(logo_pdf_path, width=2.4*cm, height=2.4*cm)
+                        t_header = Table([[img_unpar_pdf, header_text_flowables]], colWidths=[2.8*cm, 15.2*cm])
+                        t_header.setStyle(TableStyle([
+                            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                            ('LEFTPADDING', (1,0), (1,0), 8),
+                            ('RIGHTPADDING', (0,0), (-1,-1), 0),
+                            ('TOPPADDING', (0,0), (-1,-1), 0),
+                            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                            ('LINEBELOW', (0,0), (-1,-1), 1.2, colors.HexColor('#1a365d')),
+                        ]))
+                    else:
+                        t_header = Table([[header_text_flowables]], colWidths=[18.0*cm])
+                        t_header.setStyle(TableStyle([
+                            ('LINEBELOW', (0,0), (-1,-1), 1.2, colors.HexColor('#1a365d')),
+                            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                        ]))
+
+                    story_p.append(t_header)
+                    story_p.append(Spacer(1, 0.6*cm))
                     
                     t_m = Table([
                         ['Total Volume Data', 'Jumlah Akun Unik', 'Total Engagement'],
@@ -3673,11 +3744,39 @@ with tab_viz:
 
                     def _pn(canvas, doc):
                         canvas.saveState()
-                        canvas.setFont('Helvetica', 8)
-                        canvas.setFillColor(colors.HexColor('#718096'))
                         page_num = canvas.getPageNumber()
-                        canvas.drawRightString(A4[0] - 1.5*cm, 1.0*cm, f"Halaman {page_num}")
-                        canvas.drawString(1.5*cm, 1.0*cm, "Laporan Hasil Analisis Sentimen Publik")
+
+                        # Garis horizontal pemisah footer
+                        canvas.setStrokeColor(colors.HexColor('#CBD5E1'))
+                        canvas.setLineWidth(0.6)
+                        canvas.line(1.5*cm, 2.3*cm, A4[0] - 1.5*cm, 2.3*cm)
+
+                        # Logo Kiri: UNPAR
+                        unpar_pdf_ft = os.path.join(os.path.dirname(__file__), "UNPAR.PNG")
+                        if os.path.exists(unpar_pdf_ft):
+                            canvas.drawImage(unpar_pdf_ft, 1.5*cm, 0.65*cm, width=1.45*cm, height=1.45*cm, mask='auto', preserveAspectRatio=True)
+
+                        # Logo Kanan: BIMA
+                        bima_pdf_ft = os.path.join(os.path.dirname(__file__), "BIMA.jpg")
+                        if os.path.exists(bima_pdf_ft):
+                            canvas.drawImage(bima_pdf_ft, A4[0] - 2.95*cm, 0.65*cm, width=1.45*cm, height=1.45*cm, mask='auto', preserveAspectRatio=True)
+
+                        # Teks Tengah Footer
+                        mid_x = A4[0] / 2.0
+
+                        canvas.setFont('Helvetica-Bold', 7.5)
+                        canvas.setFillColor(colors.HexColor('#1E293B'))
+                        canvas.drawCentredString(mid_x, 1.9*cm, 'Dikembangkan oleh Tutik Rachmawati, Syayu Zhukruffa & Mariskha Tri Adithia')
+
+                        canvas.setFont('Helvetica', 6.8)
+                        canvas.setFillColor(colors.HexColor('#334155'))
+                        canvas.drawCentredString(mid_x, 1.5*cm, 'Pendanaan oleh Direktorat Penelitian dan Pengabdian kepada Masyarakat')
+                        canvas.drawCentredString(mid_x, 1.15*cm, 'Direktorat Jenderal Riset dan Pengembangan - Kementerian Pendidikan Tinggi, Sains, dan Teknologi 2026')
+
+                        canvas.setFont('Helvetica', 6.5)
+                        canvas.setFillColor(colors.HexColor('#64748B'))
+                        canvas.drawCentredString(mid_x, 0.75*cm, f'© Hak Cipta dilindungi Undang-Undang   •   Halaman {page_num}')
+
                         canvas.restoreState()
 
                     doc_pdf.build(story_p, onFirstPage=_pn, onLaterPages=_pn)
@@ -3696,3 +3795,49 @@ with tab_viz:
                 type="primary",
                 key="btn_dl_pdf_tab4_final"
             )
+
+# =====================================================================
+# FOOTER APLIKASI
+# =====================================================================
+st.markdown("<br><br>", unsafe_allow_html=True)
+st.divider()
+
+_ft_unpar_path = os.path.join(os.path.dirname(__file__), "UNPAR.PNG")
+_ft_bima_path = os.path.join(os.path.dirname(__file__), "BIMA.jpg")
+
+_ft_unpar_tag = ""
+if os.path.exists(_ft_unpar_path):
+    import base64
+    with open(_ft_unpar_path, "rb") as _f_u:
+        _u_b64 = base64.b64encode(_f_u.read()).decode("utf-8")
+    _ft_unpar_tag = f"<img src='data:image/png;base64,{_u_b64}' style='width: 75px; height: 75px; object-fit: contain; flex-shrink: 0;' alt='Logo UNPAR'>"
+
+_ft_bima_tag = ""
+if os.path.exists(_ft_bima_path):
+    import base64
+    with open(_ft_bima_path, "rb") as _f_b:
+        _b_b64 = base64.b64encode(_f_b.read()).decode("utf-8")
+    _ft_bima_tag = f"<img src='data:image/jpeg;base64,{_b_b64}' style='width: 80px; height: 75px; object-fit: contain; flex-shrink: 0;' alt='Logo BIMA'>"
+
+st.markdown(f"""
+<div style='display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 10px; margin-bottom: 35px; padding: 10px 10px;'>
+    <div style='flex-shrink: 0;'>
+        {_ft_unpar_tag}
+    </div>
+    <div style='text-align: center; flex-grow: 1; padding: 0 10px;'>
+        <p style='font-size: 1.05rem; font-weight: 700; opacity: 0.95; letter-spacing: 0.3px; margin: 0 0 6px 0;'>
+            Dikembangkan oleh Tutik Rachmawati, Syayu Zhukruffa &amp; Mariskha Tri Adithia
+        </p>
+        <p style='font-size: 0.95rem; font-weight: 600; opacity: 0.85; margin: 0 0 6px 0; line-height: 1.45;'>
+            Pendanaan oleh Direktorat Penelitian dan Pengabdian kepada Masyarakat - Direktorat Jenderal Riset dan Pengembangan Kementerian Pendidikan Tinggi, Sains, dan Teknologi 2026
+        </p>
+        <p style='font-size: 0.85rem; font-weight: 500; opacity: 0.7; margin: 0;'>
+            &copy; Hak Cipta dilindungi Undang-Undang
+        </p>
+    </div>
+    <div style='flex-shrink: 0;'>
+        {_ft_bima_tag}
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
