@@ -1534,10 +1534,24 @@ with tab_scrape:
                         })
 
                         # Deteksi error / warning / kendala secara real-time
-                        detected_issues = [
-                            l.strip() for l in log_lines 
-                            if ("ERROR" in l.upper() or "EXCEPTION" in l.upper() or "FAIL" in l.upper() or "QUOTA" in l.upper() or "HTTP 4" in l.upper() or "HTTP 5" in l.upper())
-                        ]
+                        detected_issues = []
+                        system_container_logs = []
+
+                        for l in log_lines:
+                            ls = l.strip()
+                            l_up = ls.upper()
+                            # 1. Pisahkan log inisialisasi kontainer sistem Apify (Warna Ungu)
+                            if any(k in l_up for k in ["WILL RUN COMMAND", "XVFB-RUN", "PIPEFAIL", "APIFY."]) and "ERROR" not in l_up and "EXCEPTION" not in l_up:
+                                if ls not in system_container_logs:
+                                    system_container_logs.append(ls)
+                                continue
+
+                            # 2. Deteksi kendala/error nyata (hindari false positive kata 'pipefail' dan '0 error')
+                            if any(k in l_up for k in ["ERROR", "EXCEPTION", "FAILED", "FAILURE", "HTTP 4", "HTTP 5"]):
+                                if "0 ERROR" not in l_up and "PIPEFAIL" not in l_up:
+                                    detected_issues.append(ls)
+                            elif "QUOTA" in l_up and any(q in l_up for q in ["EXHAUSTED", "HABIS", "LIMIT", "INSUFFICIENT"]):
+                                detected_issues.append(ls)
                         
                         latest_activity = [
                             l.strip() for l in log_lines 
@@ -1563,6 +1577,20 @@ with tab_scrape:
                                     st.code("\n".join(detected_issues[-8:]), language="text")
                             else:
                                 st.success("🟢 **Kesehatan Mesin & Koneksi:** Normal — Tidak ada kendala/error terdeteksi.")
+
+                            # 3b. Info Inisialisasi Kontainer Apify (Warna Ungu)
+                            if system_container_logs:
+                                latest_sys = system_container_logs[-1]
+                                st.markdown(f"""
+                                <div style='background: rgba(147, 51, 234, 0.08); border: 1px solid rgba(168, 85, 247, 0.4); border-left: 5px solid #9333EA; border-radius: 8px; padding: 10px 14px; margin: 8px 0;'>
+                                    <div style='display: flex; align-items: center; gap: 8px; font-weight: 600; color: #9333EA; font-size: 0.9rem; margin-bottom: 4px;'>
+                                        <span>🟣</span> <span>Info Inisialisasi Kontainer Apify (Virtual Display &amp; Perintah Sistem):</span>
+                                    </div>
+                                    <div style='font-size: 0.82rem; font-family: monospace; opacity: 0.9; word-break: break-all; line-height: 1.45;'>
+                                        {latest_sys}
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
 
                             # 4. Status Aktivitas Terkini
                             if latest_activity:
@@ -1962,7 +1990,7 @@ with tab_ml:
                     # Deteksi error / warning / kendala secara real-time untuk AI & ML
                     detected_issues_ml = [
                         l.strip() for l in log_lines_ml 
-                        if ("ERROR" in l.upper() or "EXCEPTION" in l.upper() or "FAIL" in l.upper() or "HTTP 4" in l.upper() or "HTTP 5" in l.upper())
+                        if ("ERROR" in l.upper() or "EXCEPTION" in l.upper() or "FAILED" in l.upper() or "FAILURE" in l.upper() or "HTTP 4" in l.upper() or "HTTP 5" in l.upper()) and "0 ERROR" not in l.upper() and "PIPEFAIL" not in l.upper()
                     ]
                     
                     latest_activity_ml = [
