@@ -237,8 +237,10 @@ def scrape_twitter(client, general_cfg, log_activity: str = "", user_app: str = 
                 "log_activity": log_activity,
                 "user_app": user_app
             })
+            if len(results) >= int(max_tweets):
+                break
             
-        return results
+        return results[:int(max_tweets)]
         
     except Exception as e:
         print(f"[ERROR] Kesalahan saat memanggil Aktor Twitter Apify (ghSpYIW3L1RvT57NT): {e}")
@@ -425,7 +427,12 @@ def scrape_threads(client, general_cfg, log_activity: str = "", user_app: str = 
         max_results = general_cfg.get("max_results", 100)
     max_results = int(max_results)
 
-    clean_keywords = [str(k).strip() for k in keywords + hashtags if str(k).strip()]
+    unique_kw = []
+    for k in (keywords + hashtags):
+        k_str = str(k).strip()
+        if k_str and k_str.lower() not in [u.lower() for u in unique_kw]:
+            unique_kw.append(k_str)
+    clean_keywords = unique_kw
     clean_profiles = [str(p).strip().lstrip("@") for p in profiles if str(p).strip()]
 
     # Mandatory searchQuery: Harus ada kata kunci atau profil
@@ -466,17 +473,20 @@ def scrape_threads(client, general_cfg, log_activity: str = "", user_app: str = 
             search_payloads.append({"searchQuery": kw})
 
     for pld in search_payloads:
+        if len(all_results) >= max_results:
+            break
+        remaining_needed = max_results - len(all_results)
         q_kw = pld["searchQuery"]
         p_from = pld.get("from")
         from_msg = f" | FromUser: '{p_from}'" if p_from else ""
-        print(f"[INFO] >>> Menjalankan Threads Search (Query: '{q_kw}'{from_msg} | Sort: {search_filter} | After: {start_date} | Before: {end_date} | Max: {max_results})...")
+        print(f"[INFO] >>> Menjalankan Threads Search (Query: '{q_kw}'{from_msg} | Sort: {search_filter} | After: {start_date} | Before: {end_date} | Max: {remaining_needed})...")
         
         run_input = {
             "searchQuery": q_kw,
             "sort": search_filter,
             "after": start_date,
             "before": end_date,
-            "maxPosts": max_results
+            "maxPosts": remaining_needed
         }
         if p_from:
             run_input["from"] = p_from
@@ -496,6 +506,8 @@ def scrape_threads(client, general_cfg, log_activity: str = "", user_app: str = 
                 print(f"[INFO] Dataset Apify ID '{ds_id}' mengembalikan {len(raw_items)} item raw.")
                 
                 for item in raw_items:
+                    if len(all_results) >= max_results:
+                        break
                     post_id = (
                         item.get("post_id") or 
                         item.get("thread_id") or 
@@ -567,18 +579,19 @@ def scrape_threads(client, general_cfg, log_activity: str = "", user_app: str = 
 
         n_got = _fetch_and_parse(run_input)
         # Jika filter username menghasilkan 0 data, lakukan fallback pencarian kata kunci secara umum
-        if n_got == 0 and p_from and q_kw:
-            print(f"[WARNING] Pencarian dengan filter username '{p_from}' tidak menemukan postingan. Melakukan fallback pencarian kata kunci '{q_kw}' secara umum...")
+        if n_got == 0 and p_from and q_kw and len(all_results) < max_results:
+            remaining_fb = max_results - len(all_results)
+            print(f"[WARNING] Pencarian dengan filter username '{p_from}' tidak menemukan postingan. Melakukan fallback pencarian kata kunci '{q_kw}' secara umum (Max: {remaining_fb})...")
             fb_input = {
                 "searchQuery": q_kw,
                 "sort": search_filter,
                 "after": start_date,
                 "before": end_date,
-                "maxPosts": max_results
+                "maxPosts": remaining_fb
             }
             _fetch_and_parse(fb_input)
 
-    return all_results
+    return all_results[:max_results]
 
 def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str = "local_user"):
     """
@@ -736,8 +749,12 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
                         "log_activity": log_activity,
                         "user_app": user_app
                     })
+                    if len(results) >= int(max_results):
+                        break
+            if len(results) >= int(max_results):
+                break
                     
-        return results
+        return results[:int(max_results)]
     except Exception as e:
         handle_apify_error("LinkedIn (harvestapi/linkedin-post-search)", e)
         return []

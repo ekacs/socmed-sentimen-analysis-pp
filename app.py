@@ -1128,7 +1128,7 @@ with tab_scrape:
                     "start_date": g_start_str,
                     "end_date": g_end_str,
                     "keywords": g_kw_list,
-                    "hashtags": [k.lstrip("#") for k in g_kw_list],
+                    "hashtags": [],
                     "profiles": th_prof_list,
                     "search_filter": "top",
                     "sort": "top",
