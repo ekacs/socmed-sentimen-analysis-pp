@@ -994,6 +994,12 @@ with tab_scrape:
     linkedin_cfg = cfg_all_root.get("linkedin", general_cfg)
     website_cfg = cfg_all_root.get("website", general_cfg)
 
+    def _parse_date(d_str, fallback_days=7):
+        if d_str:
+            try: return datetime.datetime.strptime(str(d_str), "%Y-%m-%d").date()
+            except Exception: pass
+        return datetime.date.today() - datetime.timedelta(days=fallback_days)
+
     # Inisialisasi nilai parameter global terpadu
     global_kw_val = ", ".join(general_cfg.get("keywords") or twitter_cfg.get("keywords") or threads_cfg.get("keywords") or website_cfg.get("keywords") or [])
     global_start_val = _parse_date(general_cfg.get("start_date") or twitter_cfg.get("start_date") or website_cfg.get("start_date"), 30)
@@ -1071,12 +1077,6 @@ with tab_scrape:
         with open(CONFIG_FILE, 'w') as f:
             json.dump(cfg_store, f, indent=4)
         return True
-
-    def _parse_date(d_str, fallback_days=7):
-        if d_str:
-            try: return datetime.datetime.strptime(str(d_str), "%Y-%m-%d").date()
-            except Exception: pass
-        return datetime.date.today() - datetime.timedelta(days=fallback_days)
 
     # Helper untuk simpan semua konfigurasi platform aktif saat ini dari session state
     def do_save_all_current_configs(show_toast=False):
