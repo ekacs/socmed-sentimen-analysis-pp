@@ -513,19 +513,40 @@ def scrape_threads(client, general_cfg, log_activity: str = "", user_app: str = 
                         continue
                     seen_ids.add(str(post_id))
 
-                    raw_date = item.get("timestamp") or item.get("created_at") or item.get("created_at_display") or item.get("date")
+                    raw_date = (
+                        item.get("takenAtISO")
+                        or item.get("takenAtFormatted")
+                        or item.get("takenAt")
+                        or item.get("timestamp")
+                        or item.get("created_at")
+                        or item.get("created_at_display")
+                        or item.get("date")
+                    )
                     
                     user_info = item.get("user") if isinstance(item.get("user"), dict) else {}
-                    username = user_info.get("username") or item.get("username") or item.get("from_user") or p_from or "unknown"
+                    username = (
+                        item.get("username")
+                        or user_info.get("username")
+                        or item.get("from_user")
+                        or p_from
+                        or "unknown"
+                    )
                     if not username.startswith("@"):
                         username = f"@{username}"
 
-                    raw_text = item.get("caption") or item.get("text_content") or item.get("text") or item.get("body") or ""
+                    raw_text = (
+                        item.get("captionText")
+                        or item.get("caption")
+                        or item.get("text_content")
+                        or item.get("text")
+                        or item.get("body")
+                        or ""
+                    )
                     if not raw_text or str(raw_text).strip().lower() in ["no content", "none", "nan", "null", ""]:
                         continue
-                    likes = int(item.get("like_count", 0) or item.get("likes", 0) or 0)
-                    reposts = int(item.get("repost_count", 0) or item.get("reshare_count", 0) or item.get("comment_count", 0) or 0)
-                    views = int(item.get("view_count", 0) or item.get("reshare_count", 0) or item.get("views", 0) or 0)
+                    likes = int(item.get("likeCount", 0) or item.get("like_count", 0) or item.get("likes", 0) or 0)
+                    reposts = int(item.get("repostCount", 0) or item.get("repost_count", 0) or item.get("reshareCount", 0) or item.get("reshare_count", 0) or item.get("comment_count", 0) or 0)
+                    views = int(item.get("viewCount", 0) or item.get("view_count", 0) or item.get("views", 0) or 0)
 
                     all_results.append({
                         "platform_id": f"THREADS_{post_id}",
@@ -643,14 +664,16 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
                 username = "LinkedIn User"
             
             # --- Konten Teks ---
-            content_obj = item.get("content") if isinstance(item.get("content"), dict) else None
-            if content_obj:
+            content_val = item.get("content")
+            if isinstance(content_val, dict):
                 raw_text = (
-                    content_obj.get("text")
-                    or content_obj.get("markdown")
-                    or content_obj.get("html")
+                    content_val.get("text")
+                    or content_val.get("markdown")
+                    or content_val.get("html")
                     or ""
                 )
+            elif isinstance(content_val, str):
+                raw_text = content_val
             else:
                 raw_text = (
                     item.get("text")

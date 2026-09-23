@@ -1228,7 +1228,7 @@ with tab_scrape:
         web_c = c_root.get("website", gen_c)
 
         with st.container(border=True):
-            st.markdown(f"#### 📌 Status Konfigurasi Terpasang & Siap Digunakan {save_badge}")
+            st.markdown(f"#### 📌 Informasi Konfigurasi Penarikan Data {save_badge}")
             st.caption("Berikut adalah rangkuman parameter pencarian per platform yang aktif dan tersimpan saat ini:")
             
             cols = st.columns(len(selected_platforms))
@@ -1270,10 +1270,10 @@ with tab_scrape:
     # 1. PARAMETER UTAMA PENARIKAN DATA (TERPADU UNTUK SEMUA MESIN)
     # -----------------------------------------------------------------
     with st.container(border=True):
-        st.markdown("### 🎯 Parameter Utama Penarikan Data (Berlaku Otomatis untuk Semua Mesin)")
+        st.markdown("### 🎯 Parameter Utama Penarikan Data")
         st.markdown(
             "Cukup tentukan kata kunci, rentang tanggal, dan batas data di bawah ini. "
-            "Parameter ini **otomatis berlaku untuk seluruh mesin scraping** yang Anda pilih di atas (*Twitter, Threads, LinkedIn, Website Berita*)."
+            "Parameter ini **otomatis berlaku untuk seluruh mesin scraping** (*Twitter, Threads, LinkedIn, Website Berita*)."
         )
 
         # Target Kata Kunci Utama
@@ -1306,7 +1306,7 @@ with tab_scrape:
     # 2. TARGET AKUN, TAGAR, & DOMAIN SPESIFIK (OPSIONAL)
     # -----------------------------------------------------------------
     with st.container(border=True):
-        st.markdown("### 📌 Target Akun & Domain Spesifik (Opsional)")
+        st.markdown("### 📌 Target Akun & Domain (Opsional)")
         st.caption(
             "Isian di bawah bersifat opsional. Anda dapat mengisinya untuk membatasi pencarian ke akun atau situs tertentu, "
             "atau mengosongkannya jika ingin mencakup seluruh percakapan publik secara umum."
