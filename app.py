@@ -1289,20 +1289,20 @@ with tab_scrape:
             col_tw1, col_tw2 = st.columns(2)
             with col_tw1:
                 tw_start_val = _parse_date(twitter_cfg.get("start_date"), 7)
-                tw_start_input = st.date_input("Tanggal Mulai Target (Twitter)", value=tw_start_val, key="tw_start")
+                tw_start_input = st.date_input("Tanggal Mulai Twitter", value=tw_start_val, key="tw_start")
             with col_tw2:
                 tw_end_val = _parse_date(twitter_cfg.get("end_date"), 0)
-                tw_end_input = st.date_input("Tanggal Akhir Target (Twitter)", value=tw_end_val, key="tw_end")
+                tw_end_input = st.date_input("Tanggal Akhir Twitter", value=tw_end_val, key="tw_end")
 
             tw_kw_val = ", ".join(twitter_cfg.get("keywords", []))
             tw_prof_val = ", ".join(twitter_cfg.get("profiles", []))
             tw_hash_val = ", ".join(twitter_cfg.get("hashtags", []))
             tw_max_val = int(twitter_cfg.get("max_results_twitter") or twitter_cfg.get("max_results", 500))
 
-            tw_kw_input = st.text_input("Target Kata Kunci / Search Key (Twitter):", value=tw_kw_val, help="Dapat menggunakan operator pencarian lanjutan Twitter seperti tabel panduan di atas.", key="tw_kw")
-            tw_prof_input = st.text_input("Target Profil Akun (Twitter):", value=tw_prof_val, key="tw_prof")
-            tw_hash_input = st.text_input("Target Tagar/Hashtag (Twitter):", value=tw_hash_val, key="tw_hash")
-            tw_max_input = st.slider("Batas maksimal cuitan (Twitter):", 10, 5000, tw_max_val, 10, key="tw_max")
+            tw_kw_input = st.text_input("Target Kata Kunci (lebih dari satu, pisahkan koma) - Mandatory (Wajib Diisi):", value=tw_kw_val, help="Dapat menggunakan operator pencarian lanjutan Twitter seperti tabel panduan di atas.", key="tw_kw")
+            tw_prof_input = st.text_input("Target Akun (lebih dari satu, pisahkan koma) - Optional:", value=tw_prof_val, key="tw_prof")
+            tw_hash_input = st.text_input("Target Tagar (lebih dari satu, pisahkan koma) - Optional:", value=tw_hash_val, key="tw_hash")
+            tw_max_input = st.slider("Batas maksimal data yang discrape:", 10, 5000, tw_max_val, 10, key="tw_max")
 
     # -----------------------------------------------------------------
     # 2. KONFIGURASI META THREADS
@@ -1324,8 +1324,8 @@ with tab_scrape:
             th_prof_val = ", ".join(threads_cfg.get("profiles", []))
             th_max_val = int(threads_cfg.get("max_results_threads") or threads_cfg.get("max_results", 100))
 
-            th_kw_input = st.text_input("Kata Kunci / Hashtag (Threads, pisahkan koma) — Mandatory (Wajib Diisi):", value=th_kw_val, key="th_kw")
-            th_prof_input = st.text_input("Username Profil Threads (pisahkan koma) — Optional (Default Kosong):", value=th_prof_val, key="th_prof")
+            th_kw_input = st.text_input("Target Kata Kunci (lebih dari satu, pisahkan koma) — Mandatory (Wajib Diisi):", value=th_kw_val, key="th_kw")
+            th_prof_input = st.text_input("Target Akun (lebih dari satu, pisahkan koma) — Optional:", value=th_prof_val, key="th_prof")
 
             th_filter_val = threads_cfg.get("search_filter", "top")
             th_filter_radio = st.radio(
@@ -1351,7 +1351,7 @@ with tab_scrape:
             ig_prof_val = ", ".join(instagram_cfg.get("profiles", []))
             ig_max_val = int(instagram_cfg.get("max_results_instagram") or instagram_cfg.get("max_results", 100))
 
-            ig_kw_input = st.text_input("Kata Kunci / Hashtag (Instagram):", value=ig_kw_val, key="ig_kw")
+            ig_kw_input = st.text_input("Target Kata Kunci (lebih dari satu, pisahkan koma) - Mandatory (Wajib Diisi):", value=ig_kw_val, key="ig_kw")
 
             ig_prof_input = st.text_input("Username Instagram (pisahkan koma):", value=ig_prof_val, key="ig_prof")
 
@@ -1379,7 +1379,7 @@ with tab_scrape:
             li_kw_val = ", ".join(linkedin_cfg.get("keywords", []))
             li_max_val = int(linkedin_cfg.get("max_results_linkedin") or linkedin_cfg.get("max_results", 100))
 
-            li_kw_input = st.text_input("Kata Kunci / Search Terms LinkedIn", value=li_kw_val, key="li_kw")
+            li_kw_input = st.text_input("Target Kata Kunci LinkedIn - Mandatory (Wajib Diisi)", value=li_kw_val, key="li_kw")
             li_max_input = st.slider("Batas maksimal data yang discrape (LinkedIn):", 5, 500, li_max_val, 5, key="li_max")
 
     # -----------------------------------------------------------------
@@ -1401,7 +1401,7 @@ with tab_scrape:
             web_url_input = st.text_input("Target Domain / URL Website (Opsional — pisahkan koma):", value=web_urls_str, help="Contoh: kompas.com, detik.com, kemendagri.go.id (Kosongkan jika ingin mencakup seluruh situs berita)", key="web_urls")
 
             web_kw_val = ", ".join(website_cfg.get("keywords", []))
-            web_kw_input = st.text_input("Kata Kunci / Frasa Pencarian (Searchbar — Mendukung sintaks Google Dork):", value=web_kw_val, help='Mendukung kaidah Google Dork! Contoh: "makan bergizi gratis", intitle:"stunting", inurl:nasional, atau -politik', key="web_kw")
+            web_kw_input = st.text_input("Kata Kunci / Frasa Pencarian - Mandatory (Wajib Diisi):", value=web_kw_val, help='Mendukung kaidah Google Dork! Contoh: "makan bergizi gratis", intitle:"stunting", inurl:nasional, atau -politik', key="web_kw")
 
             web_max_val = int(website_cfg.get("max_results_website") or website_cfg.get("max_results", 100))
             web_max_input = st.slider("Batas Maksimal Artikel Berita (Minimal 100):", 10, 1000, web_max_val, 10, key="web_max")
