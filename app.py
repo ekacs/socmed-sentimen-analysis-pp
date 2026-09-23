@@ -1105,7 +1105,7 @@ with tab_scrape:
 
             th_prof_raw = str(st.session_state.get("th_prof", "")).strip()
             th_prof_list = [p.strip() for p in th_prof_raw.split(",") if p.strip()]
-            th_filter_val = str(st.session_state.get("th_filter_radio", "top"))
+            th_filter_val = "top"  # Default permanen 'top'
             all_prof.extend(th_prof_list)
 
             li_prof_raw = str(st.session_state.get("li_prof", "")).strip()
@@ -1124,6 +1124,8 @@ with tab_scrape:
                     "keywords": g_kw_list,
                     "profiles": tw_prof_list,
                     "hashtags": tw_hash_list,
+                    "search_type": "Top",
+                    "sort": "Top",
                     "max_results": g_max_num,
                     "max_results_twitter": g_max_num
                 }
@@ -1138,7 +1140,8 @@ with tab_scrape:
                     "keywords": g_kw_list,
                     "hashtags": [k.lstrip("#") for k in g_kw_list],
                     "profiles": th_prof_list,
-                    "search_filter": th_filter_val,
+                    "search_filter": "top",
+                    "sort": "top",
                     "max_results": g_max_num,
                     "max_results_threads": g_max_num
                 }
@@ -1152,6 +1155,8 @@ with tab_scrape:
                     "end_date": g_end_str,
                     "keywords": g_kw_list,
                     "profiles": li_prof_list,
+                    "sort_by": "relevance",
+                    "sortBy": "relevance",
                     "max_results": g_max_num,
                     "max_results_linkedin": g_max_num
                 }
@@ -1182,6 +1187,10 @@ with tab_scrape:
                 "max_results_threads": g_max_num,
                 "max_results_linkedin": g_max_num,
                 "max_results_website": g_max_num,
+                "search_filter": "top",
+                "sort": "top",
+                "search_type": "Top",
+                "sort_by": "relevance",
                 "profiles": tw_prof_list + th_prof_list + li_prof_list,
                 "hashtags": tw_hash_list,
                 "website_urls": web_urls_list
@@ -1241,14 +1250,13 @@ with tab_scrape:
                         prof = ", ".join(tw_c.get("profiles", [])) or "*(Kosong)*"
                         hash_t = ", ".join(tw_c.get("hashtags", [])) or "*(Kosong)*"
                         mx = tw_c.get("max_results_twitter") or tw_c.get("max_results", 500)
-                        st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Profil:** `{prof}`\n• **Hashtag:** `{hash_t}`\n• **Batas Max:** `{mx}` cuitan")
+                        st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Profil:** `{prof}`\n• **Hashtag:** `{hash_t}`\n• **Mode Sortir:** `Top`\n• **Batas Max:** `{mx}` cuitan")
                     elif sp == "Threads":
                         st.markdown("##### 🧵 Meta Threads")
                         kw = ", ".join(th_c.get("keywords", [])) or "*(Kosong)*"
                         prof = ", ".join(th_c.get("profiles", [])) or "*(Kosong)*"
-                        flt = th_c.get("search_filter", "recent")
                         mx = th_c.get("max_results_threads") or th_c.get("max_results", 100)
-                        st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Username:** `{prof}`\n• **Filter:** `{flt}`\n• **Batas Max:** `{mx}` posting")
+                        st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Username:** `{prof}`\n• **Mode Sortir:** `Top`\n• **Batas Max:** `{mx}` posting")
                     elif sp == "Instagram":
                         st.markdown("##### 📸 Instagram")
                         kw = ", ".join(ig_c.get("keywords", [])) or "*(Kosong)*"
@@ -1260,7 +1268,7 @@ with tab_scrape:
                         st.markdown("##### 💼 LinkedIn")
                         kw = ", ".join(li_c.get("keywords", [])) or "*(Kosong)*"
                         mx = li_c.get("max_results_linkedin") or li_c.get("max_results", 100)
-                        st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Batas Max:** `{mx}` posting")
+                        st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Mode Sortir:** `Relevance`\n• **Batas Max:** `{mx}` posting")
                     elif sp == "Website / Dokumen Publik":
                         st.markdown("##### 🌐 Website")
                         urls = ", ".join(web_c.get("website_urls", [])) or "Semua Portal Berita"
@@ -1357,17 +1365,6 @@ with tab_scrape:
             help="Contoh: kompas.com, detik.com, tempo.co (Kosongkan jika ingin mencakup seluruh portal berita publik)",
             key="web_urls"
         )
-
-        if "Threads" in selected_platforms:
-            th_filter_val = threads_cfg.get("search_filter", "top")
-            th_filter_radio = st.radio(
-                "Mode Filter Pencarian Threads:",
-                options=["top", "recent"],
-                index=0 if th_filter_val == "top" else 1,
-                horizontal=True,
-                help="'top' menampilkan postingan paling relevan/populer (default); 'recent' kronologis postingan terbaru.",
-                key="th_filter_radio"
-            )
 
     st.divider()
     render_active_config_summary_card()

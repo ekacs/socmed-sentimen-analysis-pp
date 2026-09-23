@@ -586,6 +586,8 @@ def scrape_linkedin(client, general_cfg, log_activity: str = "", user_app: str =
     run_input = {
         "searchQueries": clean_keywords,
         "searchTerms": clean_keywords,
+        "sortBy": "relevance",
+        "sort_by": "relevance",
         "maxPosts": int(max_results),
         "maxItems": int(max_results),
         "scrapeComments": False,
