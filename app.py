@@ -853,7 +853,7 @@ def get_all_combined_history_terms():
     terms_set.update(get_cached_config_terms())
 
     # 3. Dari session_state input aktif pengguna
-    for ss_key in ["tw_kw", "tw_prof", "tw_hash", "ig_kw", "ig_prof", "li_kw", "web_kw", "web_urls"]:
+    for ss_key in ["global_kw", "tw_kw", "tw_prof", "tw_hash", "th_prof", "ig_kw", "ig_prof", "li_kw", "li_prof", "web_kw", "web_urls"]:
         raw_val = str(st.session_state.get(ss_key, "")).strip()
         if raw_val:
             for sub in raw_val.split(","):
@@ -989,9 +989,16 @@ with tab_scrape:
     cfg_all_root = current_config.get("config", {})
     general_cfg = cfg_all_root.get("general", {})
     twitter_cfg = cfg_all_root.get("twitter", general_cfg)
+    threads_cfg = cfg_all_root.get("threads", general_cfg)
     instagram_cfg = cfg_all_root.get("instagram", general_cfg)
     linkedin_cfg = cfg_all_root.get("linkedin", general_cfg)
     website_cfg = cfg_all_root.get("website", general_cfg)
+
+    # Inisialisasi nilai parameter global terpadu
+    global_kw_val = ", ".join(general_cfg.get("keywords") or twitter_cfg.get("keywords") or threads_cfg.get("keywords") or website_cfg.get("keywords") or [])
+    global_start_val = _parse_date(general_cfg.get("start_date") or twitter_cfg.get("start_date") or website_cfg.get("start_date"), 30)
+    global_end_val = _parse_date(general_cfg.get("end_date") or twitter_cfg.get("end_date") or website_cfg.get("end_date"), 0)
+    global_max_val = int(general_cfg.get("max_results") or twitter_cfg.get("max_results") or website_cfg.get("max_results") or 100)
 
     raw_source_list = current_config.get("source_types")
     if not raw_source_list:
@@ -1071,134 +1078,115 @@ with tab_scrape:
             except Exception: pass
         return datetime.date.today() - datetime.timedelta(days=fallback_days)
 
-    # -----------------------------------------------------------------
-    # 1. FORM TWITTER (X)
-    # -----------------------------------------------------------------
     # Helper untuk simpan semua konfigurasi platform aktif saat ini dari session state
     def do_save_all_current_configs(show_toast=False):
         saved_count = 0
         all_kw, all_prof, all_hash = [], [], []
         try:
+            # 1. Parameter Utama Global (Otomatis berlaku untuk semua mesin scraping)
+            g_kw_raw = str(st.session_state.get("global_kw", "")).strip()
+            g_start_d = st.session_state.get("global_start")
+            g_end_d = st.session_state.get("global_end")
+            g_max_num = int(st.session_state.get("global_max", 100))
+
+            g_kw_list = [k.strip() for k in g_kw_raw.split(",") if k.strip()]
+            g_start_str = g_start_d.strftime("%Y-%m-%d") if hasattr(g_start_d, 'strftime') else str(g_start_d or "")
+            g_end_str = g_end_d.strftime("%Y-%m-%d") if hasattr(g_end_d, 'strftime') else str(g_end_d or "")
+
+            all_kw.extend(g_kw_list)
+
+            # 2. Parameter Opsional Spesifik per Platform
+            tw_prof_raw = str(st.session_state.get("tw_prof", "")).strip()
+            tw_hash_raw = str(st.session_state.get("tw_hash", "")).strip()
+            tw_prof_list = [p.strip() for p in tw_prof_raw.split(",") if p.strip()]
+            tw_hash_list = [h.strip() for h in tw_hash_raw.split(",") if h.strip()]
+            all_prof.extend(tw_prof_list)
+            all_hash.extend(tw_hash_list)
+
+            th_prof_raw = str(st.session_state.get("th_prof", "")).strip()
+            th_prof_list = [p.strip() for p in th_prof_raw.split(",") if p.strip()]
+            th_filter_val = str(st.session_state.get("th_filter_radio", "top"))
+            all_prof.extend(th_prof_list)
+
+            li_prof_raw = str(st.session_state.get("li_prof", "")).strip()
+            li_prof_list = [p.strip() for p in li_prof_raw.split(",") if p.strip()]
+            all_prof.extend(li_prof_list)
+
+            web_urls_raw = str(st.session_state.get("web_urls", "")).strip()
+            web_urls_list = [u.strip() for u in web_urls_raw.split(",") if u.strip()]
+            all_prof.extend(web_urls_list)
+
+            # Simpan Twitter (X) jika dipilih
             if "Twitter (X)" in selected_platforms:
-                tw_kw_raw = str(st.session_state.get("tw_kw", ""))
-                tw_prof_raw = str(st.session_state.get("tw_prof", ""))
-                tw_hash_raw = str(st.session_state.get("tw_hash", ""))
-                tw_start_d = st.session_state.get("tw_start")
-                tw_end_d = st.session_state.get("tw_end")
-                tw_max_num = int(st.session_state.get("tw_max", 500))
-
-                tw_kw_list = [k.strip() for k in tw_kw_raw.split(",") if k.strip()]
-                tw_prof_list = [p.strip() for p in tw_prof_raw.split(",") if p.strip()]
-                tw_hash_list = [h.strip() for h in tw_hash_raw.split(",") if h.strip()]
-
-                all_kw.extend(tw_kw_list)
-                all_prof.extend(tw_prof_list)
-                all_hash.extend(tw_hash_list)
-
                 tw_obj = {
-                    "start_date": tw_start_d.strftime("%Y-%m-%d") if hasattr(tw_start_d, 'strftime') else str(tw_start_d or ""),
-                    "end_date": tw_end_d.strftime("%Y-%m-%d") if hasattr(tw_end_d, 'strftime') else str(tw_end_d or ""),
-                    "keywords": tw_kw_list,
+                    "start_date": g_start_str,
+                    "end_date": g_end_str,
+                    "keywords": g_kw_list,
                     "profiles": tw_prof_list,
                     "hashtags": tw_hash_list,
-                    "max_results": tw_max_num,
-                    "max_results_twitter": tw_max_num
+                    "max_results": g_max_num,
+                    "max_results_twitter": g_max_num
                 }
                 if save_platform_config("twitter", tw_obj):
                     saved_count += 1
 
+            # Simpan Meta Threads jika dipilih
             if "Threads" in selected_platforms:
-                th_kw_raw = str(st.session_state.get("th_kw", ""))
-                th_prof_raw = str(st.session_state.get("th_prof", ""))
-                th_start_d = st.session_state.get("th_start")
-                th_end_d = st.session_state.get("th_end")
-                th_filter_val = str(st.session_state.get("th_filter_radio", "top"))
-                th_max_num = int(st.session_state.get("th_max", 100))
-
-                th_kw_list = [k.strip() for k in th_kw_raw.split(",") if k.strip()]
-                th_prof_list = [p.strip() for p in th_prof_raw.split(",") if p.strip()]
-
-                all_kw.extend(th_kw_list)
-                all_prof.extend(th_prof_list)
-
                 th_obj = {
-                    "start_date": th_start_d.strftime("%Y-%m-%d") if hasattr(th_start_d, 'strftime') else str(th_start_d or ""),
-                    "end_date": th_end_d.strftime("%Y-%m-%d") if hasattr(th_end_d, 'strftime') else str(th_end_d or ""),
-                    "keywords": th_kw_list,
-                    "hashtags": [k.lstrip("#") for k in th_kw_list],
+                    "start_date": g_start_str,
+                    "end_date": g_end_str,
+                    "keywords": g_kw_list,
+                    "hashtags": [k.lstrip("#") for k in g_kw_list],
                     "profiles": th_prof_list,
                     "search_filter": th_filter_val,
-                    "max_results": th_max_num,
-                    "max_results_threads": th_max_num
+                    "max_results": g_max_num,
+                    "max_results_threads": g_max_num
                 }
                 if save_platform_config("threads", th_obj):
                     saved_count += 1
 
-            if "Instagram" in selected_platforms:
-                ig_kw_raw = str(st.session_state.get("ig_kw", ""))
-                ig_prof_raw = str(st.session_state.get("ig_prof", ""))
-                ig_start_d = st.session_state.get("ig_start")
-                ig_mode_val = str(st.session_state.get("ig_profile_mode_radio", "username"))
-                ig_max_num = int(st.session_state.get("ig_max", 100))
-
-                ig_kw_list = [k.strip() for k in ig_kw_raw.split(",") if k.strip()]
-                ig_prof_list = [p.strip() for p in ig_prof_raw.split(",") if p.strip()]
-
-                all_kw.extend(ig_kw_list)
-                all_prof.extend(ig_prof_list)
-
-                ig_obj = {
-                    "start_date": ig_start_d.strftime("%Y-%m-%d") if hasattr(ig_start_d, 'strftime') else str(ig_start_d or ""),
-                    "keywords": ig_kw_list,
-                    "hashtags": [k.lstrip("#") for k in ig_kw_list],
-                    "profiles": ig_prof_list,
-                    "profile_mode": ig_mode_val,
-                    "max_results": ig_max_num,
-                    "max_results_instagram": ig_max_num
-                }
-                if save_platform_config("instagram", ig_obj):
-                    saved_count += 1
-
+            # Simpan LinkedIn jika dipilih
             if "LinkedIn" in selected_platforms:
-                li_kw_raw = str(st.session_state.get("li_kw", ""))
-                li_start_d = st.session_state.get("li_start")
-                li_max_num = int(st.session_state.get("li_max", 100))
-
-                li_kw_list = [k.strip() for k in li_kw_raw.split(",") if k.strip()]
-                all_kw.extend(li_kw_list)
-
                 li_obj = {
-                    "start_date": li_start_d.strftime("%Y-%m-%d") if hasattr(li_start_d, 'strftime') else str(li_start_d or ""),
-                    "keywords": li_kw_list,
-                    "max_results": li_max_num,
-                    "max_results_linkedin": li_max_num
+                    "start_date": g_start_str,
+                    "end_date": g_end_str,
+                    "keywords": g_kw_list,
+                    "profiles": li_prof_list,
+                    "max_results": g_max_num,
+                    "max_results_linkedin": g_max_num
                 }
                 if save_platform_config("linkedin", li_obj):
                     saved_count += 1
 
+            # Simpan Website / Dokumen Publik jika dipilih
             if "Website / Dokumen Publik" in selected_platforms:
-                web_urls_raw = str(st.session_state.get("web_urls", ""))
-                web_kw_raw = str(st.session_state.get("web_kw", ""))
-                web_start_d = st.session_state.get("web_start")
-                web_end_d = st.session_state.get("web_end")
-                web_max_num = int(st.session_state.get("web_max", 100))
-
-                web_urls_list = [u.strip() for u in web_urls_raw.split(",") if u.strip()]
-                web_kw_list = [k.strip() for k in web_kw_raw.split(",") if k.strip()]
-                all_kw.extend(web_kw_list)
-                all_prof.extend(web_urls_list)
-
                 web_obj = {
-                    "start_date": web_start_d.strftime("%Y-%m-%d") if hasattr(web_start_d, 'strftime') else str(web_start_d or ""),
-                    "end_date": web_end_d.strftime("%Y-%m-%d") if hasattr(web_end_d, 'strftime') else str(web_end_d or ""),
+                    "start_date": g_start_str,
+                    "end_date": g_end_str,
                     "website_urls": web_urls_list,
                     "start_urls": web_urls_list,
-                    "keywords": web_kw_list,
-                    "max_results": web_max_num,
-                    "max_results_website": web_max_num
+                    "keywords": g_kw_list,
+                    "max_results": g_max_num,
+                    "max_results_website": g_max_num
                 }
                 if save_platform_config("website", web_obj):
                     saved_count += 1
+
+            # Update general fallback di config agar kompatibel
+            gen_obj = {
+                "start_date": g_start_str,
+                "end_date": g_end_str,
+                "keywords": g_kw_list,
+                "max_results": g_max_num,
+                "max_results_twitter": g_max_num,
+                "max_results_threads": g_max_num,
+                "max_results_linkedin": g_max_num,
+                "max_results_website": g_max_num,
+                "profiles": tw_prof_list + th_prof_list + li_prof_list,
+                "hashtags": tw_hash_list,
+                "website_urls": web_urls_list
+            }
+            save_platform_config("general", gen_obj)
 
             # Simpan kata kunci/istilah pencarian ke tabel keysearch_history di database secara instan
             if all_kw or all_prof or all_hash:
@@ -1281,130 +1269,105 @@ with tab_scrape:
                         st.markdown(f"• **Target Domain:** `{urls}`\n• **Frasa Cari:** `{kw}`\n• **Batas Max:** `{mx}` artikel")
 
     # -----------------------------------------------------------------
-    # 1. KONFIGURASI TWITTER (X)
+    # 1. PARAMETER UTAMA PENARIKAN DATA (TERPADU UNTUK SEMUA MESIN)
     # -----------------------------------------------------------------
-    if "Twitter (X)" in selected_platforms:
-        with st.container(border=True):
-            st.markdown("### 🐦 Konfigurasi Penarikan Twitter (X)")
-            col_tw1, col_tw2 = st.columns(2)
-            with col_tw1:
-                tw_start_val = _parse_date(twitter_cfg.get("start_date"), 7)
-                tw_start_input = st.date_input("Tanggal Mulai Twitter", value=tw_start_val, key="tw_start")
-            with col_tw2:
-                tw_end_val = _parse_date(twitter_cfg.get("end_date"), 0)
-                tw_end_input = st.date_input("Tanggal Akhir Twitter", value=tw_end_val, key="tw_end")
+    with st.container(border=True):
+        st.markdown("### 🎯 Parameter Utama Penarikan Data (Berlaku Otomatis untuk Semua Mesin)")
+        st.markdown(
+            "Cukup tentukan kata kunci, rentang tanggal, dan batas data di bawah ini. "
+            "Parameter ini **otomatis berlaku untuk seluruh mesin scraping** yang Anda pilih di atas (*Twitter, Threads, LinkedIn, Website Berita*)."
+        )
 
-            tw_kw_val = ", ".join(twitter_cfg.get("keywords", []))
+        # Target Kata Kunci Utama
+        global_kw_input = st.text_input(
+            "Target Kata Kunci / Frasa Pencarian (pisahkan dengan koma) — Mandatory (Wajib Diisi):",
+            value=global_kw_val,
+            help='Kata kunci ini otomatis dicari pada seluruh platform terpilih (Twitter/X, Threads, LinkedIn, dan Website Berita). Contoh: "kebakaran hutan", stunting, ikn nusantara',
+            key="global_kw"
+        )
+
+        # Rentang Tanggal Target (Mulai & Akhir)
+        col_g_d1, col_g_d2 = st.columns(2)
+        with col_g_d1:
+            global_start_input = st.date_input("Tanggal Mulai Target (Semua Platform):", value=global_start_val, key="global_start")
+        with col_g_d2:
+            global_end_input = st.date_input("Tanggal Akhir Target (Semua Platform):", value=global_end_val, key="global_end")
+
+        # Batas Maksimal Data
+        global_max_input = st.slider(
+            "Batas Maksimal Data yang Ditarik (berlaku per platform):",
+            min_value=10,
+            max_value=2000,
+            value=global_max_val,
+            step=10,
+            help="Jumlah batas maksimal data yang akan ditarik oleh masing-masing mesin platform terpilih.",
+            key="global_max"
+        )
+
+    # -----------------------------------------------------------------
+    # 2. TARGET AKUN, TAGAR, & DOMAIN SPESIFIK (OPSIONAL)
+    # -----------------------------------------------------------------
+    with st.container(border=True):
+        st.markdown("### 📌 Target Akun & Domain Spesifik (Opsional)")
+        st.caption(
+            "Isian di bawah bersifat opsional. Anda dapat mengisinya untuk membatasi pencarian ke akun atau situs tertentu, "
+            "atau mengosongkannya jika ingin mencakup seluruh percakapan publik secara umum."
+        )
+
+        col_opt1, col_opt2 = st.columns(2)
+        with col_opt1:
             tw_prof_val = ", ".join(twitter_cfg.get("profiles", []))
-            tw_hash_val = ", ".join(twitter_cfg.get("hashtags", []))
-            tw_max_val = int(twitter_cfg.get("max_results_twitter") or twitter_cfg.get("max_results", 500))
+            tw_prof_input = st.text_input(
+                "Target Akun Twitter / X (pisahkan koma) — Opsional:",
+                value=tw_prof_val,
+                help="Target spesifik username akun Twitter (screen_name). Contoh: kemenhut_ri, detikcom",
+                key="tw_prof"
+            )
 
-            tw_kw_input = st.text_input("Target Kata Kunci (lebih dari satu, pisahkan koma) - Mandatory (Wajib Diisi):", value=tw_kw_val, help="Dapat menggunakan operator pencarian lanjutan Twitter seperti tabel panduan di atas.", key="tw_kw")
-            tw_prof_input = st.text_input("Target Akun (lebih dari satu, pisahkan koma) - Optional:", value=tw_prof_val, key="tw_prof")
-            tw_hash_input = st.text_input("Target Tagar (lebih dari satu, pisahkan koma) - Optional:", value=tw_hash_val, key="tw_hash")
-            tw_max_input = st.slider("Batas maksimal data yang discrape:", 10, 5000, tw_max_val, 10, key="tw_max")
-
-    # -----------------------------------------------------------------
-    # 2. KONFIGURASI META THREADS
-    # -----------------------------------------------------------------
-    threads_cfg = cfg_all_root.get("threads", general_cfg)
-    if "Threads" in selected_platforms:
-        with st.container(border=True):
-            st.markdown("### 🧵 Konfigurasi Penarikan Meta Threads")
-    #        st.caption("Menggunakan Aktor official Apify")
-            col_th1, col_th2 = st.columns(2)
-            with col_th1:
-                th_start_val = _parse_date(threads_cfg.get("start_date"), 14)
-                th_start_input = st.date_input("Tanggal Posting Terlama (Threads) — Mandatory", value=th_start_val, key="th_start")
-            with col_th2:
-                th_end_val = _parse_date(threads_cfg.get("end_date"), 0)
-                th_end_input = st.date_input("Tanggal Posting Terbaru (Threads) — Mandatory", value=th_end_val, key="th_end")
-
-            th_kw_val = ", ".join(threads_cfg.get("keywords", threads_cfg.get("hashtags", [])))
             th_prof_val = ", ".join(threads_cfg.get("profiles", []))
-            th_max_val = int(threads_cfg.get("max_results_threads") or threads_cfg.get("max_results", 100))
+            th_prof_input = st.text_input(
+                "Target Akun Threads (pisahkan koma) — Opsional:",
+                value=th_prof_val,
+                help="Target spesifik username akun Meta Threads. Contoh: kemenhut_ri",
+                key="th_prof"
+            )
 
-            th_kw_input = st.text_input("Target Kata Kunci (lebih dari satu, pisahkan koma) — Mandatory (Wajib Diisi):", value=th_kw_val, key="th_kw")
-            th_prof_input = st.text_input("Target Akun (lebih dari satu, pisahkan koma) — Optional:", value=th_prof_val, key="th_prof")
+        with col_opt2:
+            tw_hash_val = ", ".join(twitter_cfg.get("hashtags", []))
+            tw_hash_input = st.text_input(
+                "Target Tagar Twitter / X (pisahkan koma) — Opsional:",
+                value=tw_hash_val,
+                help="Contoh: #kebakaranhutan, #mbg (Kosongkan jika tidak membatasi tagar)",
+                key="tw_hash"
+            )
 
+            li_prof_val = ", ".join(linkedin_cfg.get("profiles", []))
+            li_prof_input = st.text_input(
+                "Target Akun / Profil LinkedIn (pisahkan koma) — Opsional:",
+                value=li_prof_val,
+                help="Target nama perusahaan atau profil LinkedIn spesifik.",
+                key="li_prof"
+            )
+
+        web_urls_raw = website_cfg.get("website_urls", website_cfg.get("start_urls", []))
+        web_urls_str = ", ".join(web_urls_raw) if isinstance(web_urls_raw, list) else str(web_urls_raw)
+        web_url_input = st.text_input(
+            "Target Domain / URL Website Berita (pisahkan koma) — Opsional:",
+            value=web_urls_str,
+            help="Contoh: kompas.com, detik.com, tempo.co (Kosongkan jika ingin mencakup seluruh portal berita publik)",
+            key="web_urls"
+        )
+
+        if "Threads" in selected_platforms:
             th_filter_val = threads_cfg.get("search_filter", "top")
             th_filter_radio = st.radio(
-                "Filter Pencarian Threads (Search Mode):",
+                "Mode Filter Pencarian Threads:",
                 options=["top", "recent"],
                 index=0 if th_filter_val == "top" else 1,
-                help="'top' menampilkan postingan paling relevan/populer (default); 'recent' menampilkan postingan terbaru secara kronologis.",
+                horizontal=True,
+                help="'top' menampilkan postingan paling relevan/populer (default); 'recent' kronologis postingan terbaru.",
                 key="th_filter_radio"
             )
-
-            th_max_input = st.slider("Batas maksimal data yang discrape (Threads):", 5, 1000, th_max_val, 5, key="th_max")
-
-    # -----------------------------------------------------------------
-    # 3. KONFIGURASI INSTAGRAM
-    # -----------------------------------------------------------------
-    if "Instagram" in selected_platforms:
-        with st.container(border=True):
-            st.markdown("### 📸 Konfigurasi Penarikan Instagram")
-            ig_start_val = _parse_date(instagram_cfg.get("start_date"), 14)
-            ig_start_input = st.date_input("Tanggal Posting Terlama (Instagram) — Mandatory jika Username diisi", value=ig_start_val, key="ig_start")
-
-            ig_kw_val = ", ".join(instagram_cfg.get("keywords", instagram_cfg.get("hashtags", [])))
-            ig_prof_val = ", ".join(instagram_cfg.get("profiles", []))
-            ig_max_val = int(instagram_cfg.get("max_results_instagram") or instagram_cfg.get("max_results", 100))
-
-            ig_kw_input = st.text_input("Target Kata Kunci (lebih dari satu, pisahkan koma) - Mandatory (Wajib Diisi):", value=ig_kw_val, key="ig_kw")
-
-            ig_prof_input = st.text_input("Username Instagram (pisahkan koma):", value=ig_prof_val, key="ig_prof")
-
-            # Mode Target Profil Instagram
-            ig_profile_mode_val = instagram_cfg.get("profile_mode", "username")
-            ig_profile_mode = st.radio(
-                "Mode Target Profil Instagram (Aktor: apify/instagram-post-scraper):",
-                options=["username", "profiles"],
-                index=0 if ig_profile_mode_val == "username" else 1,
-                help="Pilih 'username' untuk daftar handle username, atau 'profiles' untuk target URL profil.",
-                key="ig_profile_mode_radio"
-            )
-
-            ig_max_input = st.slider("Batas maksimal data yang discrape (Instagram):", 5, 500, ig_max_val, 5, key="ig_max")
-
-    # -----------------------------------------------------------------
-    # 3. KONFIGURASI LINKEDIN
-    # -----------------------------------------------------------------
-    if "LinkedIn" in selected_platforms:
-        with st.container(border=True):
-            st.markdown("### 💼 Konfigurasi Penarikan LinkedIn")
-            li_start_val = _parse_date(linkedin_cfg.get("start_date"), 30)
-            li_start_input = st.date_input("Tanggal Posting Terlama (LinkedIn)", value=li_start_val, key="li_start")
-
-            li_kw_val = ", ".join(linkedin_cfg.get("keywords", []))
-            li_max_val = int(linkedin_cfg.get("max_results_linkedin") or linkedin_cfg.get("max_results", 100))
-
-            li_kw_input = st.text_input("Target Kata Kunci LinkedIn - Mandatory (Wajib Diisi)", value=li_kw_val, key="li_kw")
-            li_max_input = st.slider("Batas maksimal data yang discrape (LinkedIn):", 5, 500, li_max_val, 5, key="li_max")
-
-    # -----------------------------------------------------------------
-    # 4. KONFIGURASI WEBSITE / DOKUMEN PUBLIK
-    # -----------------------------------------------------------------
-    if "Website / Dokumen Publik" in selected_platforms:
-        with st.container(border=True):
-            st.markdown("### 🌐 Konfigurasi Penarikan Website / Dokumen Publik")
-            col_w_d1, col_w_d2 = st.columns(2)
-            with col_w_d1:
-                web_start_val = _parse_date(website_cfg.get("start_date"), 30)
-                web_start_input = st.date_input("Tanggal Mulai Target (Website):", value=web_start_val, key="web_start")
-            with col_w_d2:
-                web_end_val = _parse_date(website_cfg.get("end_date"), 0)
-                web_end_input = st.date_input("Tanggal Akhir Target (Website):", value=web_end_val, key="web_end")
-
-            web_urls_raw = website_cfg.get("website_urls", website_cfg.get("start_urls", []))
-            web_urls_str = ", ".join(web_urls_raw) if isinstance(web_urls_raw, list) else str(web_urls_raw)
-            web_url_input = st.text_input("Target Domain / URL Website (Opsional — pisahkan koma):", value=web_urls_str, help="Contoh: kompas.com, detik.com, kemendagri.go.id (Kosongkan jika ingin mencakup seluruh situs berita)", key="web_urls")
-
-            web_kw_val = ", ".join(website_cfg.get("keywords", []))
-            web_kw_input = st.text_input("Kata Kunci / Frasa Pencarian - Mandatory (Wajib Diisi):", value=web_kw_val, help='Mendukung kaidah Google Dork! Contoh: "makan bergizi gratis", intitle:"stunting", inurl:nasional, atau -politik', key="web_kw")
-
-            web_max_val = int(website_cfg.get("max_results_website") or website_cfg.get("max_results", 100))
-            web_max_input = st.slider("Batas Maksimal Artikel Berita (Minimal 100):", 10, 1000, web_max_val, 10, key="web_max")
 
     st.divider()
     render_active_config_summary_card()
@@ -1420,23 +1383,19 @@ with tab_scrape:
             "Silakan masukkan token Anda pada **Sidebar (Pengaturan Kredensial)** di sebelah kiri."
         )
 
-    c_s1_save, c_s1_run, c_s1_stop = st.columns([2.5, 3.5, 2])
-    with c_s1_save:
-        btn_save_all = st.button("💾 Simpan Semua Konfigurasi", key="btn_save_all_configs", use_container_width=True, help="Simpan seluruh parameter tanpa menjalankan proses penarikan data.")
-    with c_s1_stop:
-        btn_stop_s1 = st.button("🛑 STOP / Hentikan Paksa", key="btn_stop_scraper_s1", use_container_width=True, help="Hentikan proses penarikan data yang sedang berjalan secara paksa.")
+    c_s1_run, c_s1_stop = st.columns([3.5, 1.2])
     with c_s1_run:
+        btn_label_s1 = "💾🚀 Menyimpan Konfigurasi dan Menjalankan Penarikan Data"
         if db_is_full:
-            st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", disabled=True, use_container_width=True, help="Penyimpanan database penuh (gagal menyimpan data ke Supabase). Penarikan data dinonaktifkan sementara.")
+            st.button(btn_label_s1, type="primary", disabled=True, use_container_width=True, help="Penyimpanan database penuh (gagal menyimpan data ke Supabase). Penarikan data dinonaktifkan sementara.")
             btn_run_s1 = False
         elif apify_is_out:
-            st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", disabled=True, use_container_width=True, help="Saldo/kuota paket APIFY habis. Penarikan data dinonaktifkan sementara.")
+            st.button(btn_label_s1, type="primary", disabled=True, use_container_width=True, help="Saldo/kuota paket APIFY habis. Penarikan data dinonaktifkan sementara.")
             btn_run_s1 = False
         else:
-            btn_run_s1 = st.button("🚀 Jalankan Penarikan Data Sekarang", type="primary", use_container_width=True, key="btn_run_scraper_main")
-
-    if btn_save_all:
-        do_save_all_current_configs(show_toast=True)
+            btn_run_s1 = st.button(btn_label_s1, type="primary", use_container_width=True, key="btn_run_scraper_main", help="Simpan seluruh parameter target aktif dan langsung jalankan proses penarikan data.")
+    with c_s1_stop:
+        btn_stop_s1 = st.button("🛑 STOP / Hentikan Paksa", key="btn_stop_scraper_s1", use_container_width=True, help="Hentikan proses penarikan data yang sedang berjalan secara paksa.")
 
     if btn_stop_s1:
         proc_s1 = st.session_state.get("proc_scraper_obj")
@@ -1448,12 +1407,14 @@ with tab_scrape:
             st.info("ℹ️ Tidak ada proses penarikan data yang sedang berjalan.")
 
     if btn_run_s1:
+        st.session_state["last_run_summary_s1"] = None
+        do_save_all_current_configs(show_toast=False)
+        st.toast("💾 Konfigurasi berhasil disimpan!")
+
         if not has_valid_apify_tok:
             show_apify_token_required_dialog()
             st.error("❌ **Penarikan data dibatalkan:** Token API Apify (`APIFY_API_TOKEN`) wajib diisi terlebih dahulu pada sidebar kredensial!")
         else:
-            st.session_state["last_run_summary_s1"] = None
-            do_save_all_current_configs(show_toast=False)
 
             import queue
             import threading
