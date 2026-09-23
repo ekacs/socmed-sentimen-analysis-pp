@@ -151,16 +151,31 @@ def process_pipeline():
     # 1. Inisialisasi Klien Gemini & Muat Model SVM
     gemini_client = get_gemini_client()
     model, vectorizer = load_svm_model()
-    rows = db_manager.ambil_cuitan_mentah()
+
+    target_session_id = os.environ.get("TARGET_SESSION_ID", "").strip()
+    if not target_session_id and len(sys.argv) > 1:
+        target_session_id = sys.argv[1].strip()
+    if target_session_id in ["ALL", "all", "none", "None", ""]:
+        target_session_id = None
+
+    if target_session_id:
+        print(f"[INFO] 🎯 Memproses pipeline AI & ML untuk Sesi: '{target_session_id}'")
+        rows = db_manager.ambil_cuitan_mentah(session_id=target_session_id)
+    else:
+        print("[INFO] 🌐 Memproses pipeline AI & ML untuk seluruh data RAW di database...")
+        rows = db_manager.ambil_cuitan_mentah()
+
     # Filter proteksi: abaikan baris yang kosong atau bertuliskan 'No Content'
     rows = [r for r in rows if r[1] and str(r[1]).strip().lower() not in ['no content', 'none', 'nan', 'null', '']]
     
     if not rows:
-        print("[INFO][NO_DATA] Tidak ada data cuitan mentah valid (status 'RAW') untuk diproses.")
-        print("[HINT] Jalankan dulu Langkah 1: Penarikan Data (Scraper) untuk mendapatkan data RAW baru.")
+        target_txt = f" pada sesi '{target_session_id}'" if target_session_id else ""
+        print(f"[INFO][NO_DATA] Tidak ada data cuitan mentah valid (status 'RAW'){target_txt} untuk diproses.")
+        print("[HINT] Seluruh data pada sesi ini telah diproses (CLEANED) atau jalankan Penarikan Data (Scraper) untuk sesi baru.")
         sys.exit(2)
         
-    print(f"[INFO] Ditemukan {len(rows)} baris data RAW valid untuk diproses.")
+    target_info = f" untuk sesi '{target_session_id}'" if target_session_id else ""
+    print(f"[INFO] Ditemukan {len(rows)} baris data RAW valid{target_info} untuk diproses.")
     
     # 2. Caching & Deduplikasi Teks Mentah
     eyd_cache = db_manager.ambil_eyd_cache()
@@ -187,6 +202,9 @@ def process_pipeline():
     if skipped_short_count > 0:
         print(f"[INFO] ⚡ Penghematan Token: {skipped_short_count} teks pendek/simbol dilewati dari panggilan AI.")
         
+    initial_clean_rows = sum(1 for _, raw in rows if raw in eyd_cache)
+    print(f"[PROGRESS_AI] Berhasil memproses EYD: {initial_clean_rows}/{len(rows)} baris data", flush=True)
+
     if gemini_client and eligible_unique_texts:
         batch_size = 60
         unique_indexed = list(enumerate(eligible_unique_texts))
@@ -210,9 +228,14 @@ def process_pipeline():
                         raw_orig = eligible_unique_texts[idx]
                         eyd_cache[raw_orig] = cleaned_t
                     pct = (completed_batches / total_batches) * 100
+                    cur_clean_rows = sum(1 for _, raw in rows if raw in eyd_cache)
                     print(f"[INFO] 🚀 Progres AI: Batch {completed_batches}/{total_batches} selesai ({pct:.0f}%)...", flush=True)
+                    print(f"[PROGRESS_AI] Berhasil memproses EYD: {cur_clean_rows}/{len(rows)} baris data", flush=True)
                 except Exception as e:
                     print(f"[ERROR] Eksekusi batch AI {completed_batches}/{total_batches} gagal/timeout: {e}", flush=True)
+    else:
+        all_clean_rows = sum(1 for _, raw in rows if raw in eyd_cache)
+        print(f"[PROGRESS_AI] Berhasil memproses EYD: {all_clean_rows}/{len(rows)} baris data", flush=True)
 
     # Map seluruh data RAW ke cleaned_texts menggunakan eyd_cache
     pids = [pid for pid, _ in rows]
@@ -223,19 +246,23 @@ def process_pipeline():
     confidence_scores = [0.0] * len(rows)
     
     if model and vectorizer:
-        print(f"[INFO] Melakukan inferensi ML (SVM) massal secara ter-vektorisasi untuk {len(rows)} data...")
+        print(f"[INFO] Melakukan inferensi ML (SVM) massal secara ter-vektorisasi untuk {len(rows)} data...", flush=True)
         try:
             vec_texts = vectorizer.transform(cleaned_texts)
             preds = model.predict(vec_texts)
             probs = model.predict_proba(vec_texts)
-            for i in range(len(rows)):
+            total_items = len(rows)
+            chunk_size = max(10, min(50, total_items // 5)) if total_items > 50 else 10
+            for i in range(total_items):
                 sentiment_labels[i] = preds[i]
                 confidence_scores[i] = float(np.max(probs[i]))
+                if (i + 1) % chunk_size == 0 or (i + 1) == total_items:
+                    print(f"[PROGRESS_SENTIMEN] Berhasil memproses sentimen: {i + 1}/{total_items} baris data", flush=True)
         except Exception as e:
-            print(f"[ERROR] Inferensi SVM massal gagal: {e}")
+            print(f"[ERROR] Inferensi SVM massal gagal: {e}", flush=True)
 
     # 4. Single-Transaction Bulk Database Update
-    print(f"[INFO] Menyimpan hasil pemrosesan AI & ML ke database dalam 1 transaksi massal...")
+    print(f"[INFO] Menyimpan hasil pemrosesan AI & ML ke database dalam 1 transaksi massal...", flush=True)
     batch_updates = [
         (cleaned_texts[i], sentiment_labels[i], confidence_scores[i], pids[i])
         for i in range(len(rows))
@@ -244,8 +271,9 @@ def process_pipeline():
     try:
         db_manager.perbarui_cuitan_batch(batch_updates)
         success_count = len(batch_updates)
+        print(f"[PROGRESS_SENTIMEN] Berhasil memproses sentimen: {success_count}/{len(rows)} baris data tersimpan ke database.", flush=True)
     except Exception as e:
-        print(f"[ERROR] Bulk update DB gagal: {e}")
+        print(f"[ERROR] Bulk update DB gagal: {e}", flush=True)
         success_count = 0
 
     failed_count = len(rows) - success_count

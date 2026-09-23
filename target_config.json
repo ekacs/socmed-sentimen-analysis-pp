@@ -7,10 +7,10 @@
     ],
     "config": {
         "twitter": {
-            "start_date": "2026-09-14",
+            "start_date": "2026-09-01",
             "end_date": "2026-09-23",
             "keywords": [
-                "purbaya"
+                "piala teluk"
             ],
             "profiles": [],
             "hashtags": [],
@@ -27,10 +27,10 @@
             "max_results_instagram": 100
         },
         "linkedin": {
-            "start_date": "2026-09-14",
+            "start_date": "2026-09-01",
             "end_date": "2026-09-23",
             "keywords": [
-                "purbaya"
+                "piala teluk"
             ],
             "profiles": [],
             "sort_by": "relevance",
@@ -39,10 +39,10 @@
             "max_results_linkedin": 100
         },
         "threads": {
-            "start_date": "2026-09-14",
+            "start_date": "2026-09-01",
             "end_date": "2026-09-23",
             "keywords": [
-                "purbaya"
+                "piala teluk"
             ],
             "hashtags": [],
             "profiles": [],
@@ -52,21 +52,21 @@
             "max_results_threads": 100
         },
         "website": {
-            "start_date": "2026-09-14",
+            "start_date": "2026-09-01",
             "end_date": "2026-09-23",
             "website_urls": [],
             "start_urls": [],
             "keywords": [
-                "purbaya"
+                "piala teluk"
             ],
             "max_results": 100,
             "max_results_website": 100
         },
         "general": {
-            "start_date": "2026-09-14",
+            "start_date": "2026-09-01",
             "end_date": "2026-09-23",
             "keywords": [
-                "purbaya"
+                "piala teluk"
             ],
             "max_results": 100,
             "max_results_twitter": 100,

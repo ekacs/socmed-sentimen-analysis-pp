@@ -11,6 +11,7 @@ from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 import plotly.express as px
 import db_manager
 import session_credentials
@@ -509,8 +510,37 @@ if df_all.empty:
     df_all = pd.DataFrame(columns=[
         'platform_id', 'date', 'username', 'raw_text', 'cleaned_text', 
         'sentiment_label', 'confidence_score', 'likes', 'retweets', 'views', 
-        'status', 'source_platform', 'log_activity', 'user_app'
+        'status', 'source_platform', 'log_activity', 'user_app', 'session_id'
     ])
+
+def get_available_sessions_options():
+    try:
+        sessions = db_manager.ambil_semua_sesi()
+    except Exception:
+        sessions = []
+    
+    options = []
+    map_id = {}
+    if sessions:
+        for idx, s in enumerate(sessions):
+            sid = s["session_id"]
+            tot = s["total_rows"]
+            raw = s["raw_count"]
+            cln = s["cleaned_count"]
+            prefix = "🚀 Sesi Terkini" if idx == 0 else "📁 Sesi Historis"
+            label = f"{prefix}: {sid} ({tot:,} baris | {raw} RAW, {cln} Selesai)"
+            options.append(label)
+            map_id[label] = sid
+            
+    opt_all = "🌐 Semua Sesi / Akumulatif (Seluruh Data)"
+    options.append(opt_all)
+    map_id[opt_all] = "ALL"
+    return sessions, options, map_id
+
+# Inisialisasi awal sesi aktif di session_state
+if "active_session_id" not in st.session_state:
+    _init_sessions, _, _ = get_available_sessions_options()
+    st.session_state["active_session_id"] = _init_sessions[0]["session_id"] if _init_sessions else "ALL"
 
 # =====================================================================
 # SIDEBAR
@@ -549,7 +579,7 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
     st.markdown("**Status Kredensial & Storage Aktif:**")
     st.text(f"• Apify: {'🟢 Terdeteksi (' + session_credentials.mask_credential(cur_apify) + ')' if cur_apify else '🔴 Belum Diisi'}")
     st.text(f"• LLM Gemini: {'🟢 Terdeteksi (' + session_credentials.mask_credential(cur_gemini) + ')' if cur_gemini else '🔴 Belum Diisi'}")
-    st.text(f"• Varian Model: 🤖 {cur_model}")
+    st.text(f"• Varian Model: 🤖 {cur_model} (Otomatis)")
     st.text(f"• Storage DB: {'🔵 Lokal (SQLite)' if cur_db_mode == 'sqlite' else '🟢 Awan (PostgreSQL / Supabase)'}")
     if cur_db_mode == "postgresql":
         st.text(f"  URL Cloud DB: {'🟢 Terdeteksi (' + session_credentials.mask_credential(cur_supabase) + ')' if cur_supabase else '🔴 Belum Diisi'}")
@@ -572,36 +602,8 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
         st.markdown("**🧠 Pengaturan LLM AI Gemini:**")
         input_gemini = st.text_input("🧠 LLM API Key:", type="password", placeholder=session_credentials.mask_credential(cur_gemini) or "Masukkan LLM API Key...", help="Kunci API LLM untuk pembersihan EYD dan NLG Laporan.")
         
-        # Pilihan Model Dinamis
-        detected_models = session_credentials.fetch_available_gemini_models() if cur_gemini else []
-        model_options = [
-            "gemini-1.5-flash",
-            "gemini-2.5-flash",
-            "gemini-3.1-flash-lite",
-            "gemini-2.5-flash-lite",
-            "gemini-1.5-pro",
-            "Varian Model Kustom..."
-        ]
-        if detected_models:
-            for dm in detected_models:
-                if dm not in model_options:
-                    model_options.insert(0, dm)
-
-        default_model_idx = model_options.index(cur_model) if cur_model in model_options else (len(model_options) - 1)
-        selected_model_option = st.selectbox(
-            "🤖 Varian Model Gemini AI:",
-            options=model_options,
-            index=default_model_idx,
-            help="Pilih versi model Gemini AI resmi dari Google yang ingin digunakan."
-        )
-        if selected_model_option == "Varian Model Kustom...":
-            input_model_custom = st.text_input("✍️ Ketik Identifier Model Kustom:", value=cur_model if cur_model not in model_options else "", placeholder="misal: gemini-3.1-flash-lite", help="Ketik identifier resmi nama model Gemini baru saat menginput API LLM Key.")
-            chosen_gemini_model = input_model_custom.strip() if input_model_custom.strip() else cur_model
-        else:
-            chosen_gemini_model = selected_model_option
-
-        if cur_gemini and detected_models:
-            st.caption(f"✨ *Terdeteksi {len(detected_models)} model aktif dari API Key Anda.*")
+        # Penentuan Model Otomatis - Pengguna tidak perlu repot memilih atau menentukan nama model
+        st.caption(f"🤖 **Model AI Gemini:** *Otomatis dipilih & dioptimalkan oleh sistem* (`{cur_model}`). Pengguna cukup memasukkan API Key tanpa perlu menentukan nama model.")
 
         st.markdown("---")
         input_supabase = st.text_input("🗄️ Cloud PostgreSQL DATABASE_URL:", type="password", placeholder=session_credentials.mask_credential(cur_supabase) or "postgresql://postgres:...@db...", help="URL PostgreSQL kustom.")
@@ -635,11 +637,15 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
         if btn_save_cred:
             new_db_mode = "sqlite" if selected_db_mode == "Lokal (SQLite)" else "postgresql"
             st.session_state[session_credentials.KEY_DB_MODE] = new_db_mode
-            st.session_state[session_credentials.KEY_GEMINI_MODEL] = chosen_gemini_model
             
             apify_val = input_apify.strip() if input_apify.strip() else None
             gemini_val = input_gemini.strip() if input_gemini.strip() else None
             supabase_val = input_supabase.strip() if input_supabase.strip() else None
+
+            # Deteksi otomatis model terbaik dari API Key yang aktif atau baru diinput
+            active_key_for_model = gemini_val or cur_gemini
+            chosen_gemini_model = session_credentials.auto_detect_gemini_model(active_key_for_model)
+            st.session_state[session_credentials.KEY_GEMINI_MODEL] = chosen_gemini_model
 
             if apify_val:
                 st.session_state[session_credentials.KEY_APIFY] = apify_val
@@ -669,17 +675,17 @@ with st.sidebar.popover("🔐 Pengaturan API & Database", use_container_width=Tr
             except Exception:
                 pass
                 
-            st.success("✅ Pengaturan database, model AI, & kredensial berhasil diperbarui dan disimpan ke file `.env`!")
+            st.success("✅ Pengaturan database & kredensial berhasil disimpan! Model AI otomatis disesuaikan.")
             st.rerun()
             
         if btn_reset_cred:
             st.session_state[session_credentials.KEY_APIFY] = ""
             st.session_state[session_credentials.KEY_GEMINI] = ""
-            st.session_state[session_credentials.KEY_GEMINI_MODEL] = "gemini-1.5-flash"
+            st.session_state[session_credentials.KEY_GEMINI_MODEL] = "gemini-3.6-flash"
             st.session_state[session_credentials.KEY_SUPABASE] = ""
             st.session_state[session_credentials.KEY_DB_MODE] = "sqlite"
-            session_credentials.save_credentials_to_env(apify_tok="", gemini_key="", supabase_url="", gemini_model="gemini-1.5-flash")
-            st.info("ℹ️ Pengaturan dikembalikan ke nilai default (SQLite Lokal & gemini-1.5-flash).")
+            session_credentials.save_credentials_to_env(apify_tok="", gemini_key="", supabase_url="", gemini_model="gemini-3.6-flash")
+            st.info("ℹ️ Pengaturan dikembalikan ke nilai default (SQLite Lokal).")
             st.rerun()
 
 # # 1c. Popover Tools Migrasi Data (Lokal ↔ Cloud)
@@ -780,6 +786,40 @@ with st.sidebar.popover("🗑️ Reset Database", use_container_width=True, help
             st.rerun()
         else:
             st.error(f"❌ {msg_rst}")
+
+# 2b. Pemilih Sesi Data Aktif (Multi-Session Isolation)
+st.sidebar.divider()
+st.sidebar.markdown("### 🎯 Sesi Data Aktif")
+all_sessions, session_options, session_map = get_available_sessions_options()
+
+cur_active_sid = st.session_state.get("active_session_id", "ALL")
+default_idx = 0
+for idx, opt in enumerate(session_options):
+    if session_map.get(opt) == cur_active_sid:
+        default_idx = idx
+        break
+
+selected_session_label = st.sidebar.selectbox(
+    "Pilih Sesi Data untuk Dianalisis:",
+    options=session_options,
+    index=default_idx,
+    key="sb_select_active_session",
+    help="Data di Tab 2 (Proses AI/ML), Tab 3 (Review), dan Tab 4 (Visualisasi) akan otomatis terisolasi sesuai sesi yang Anda pilih di sini."
+)
+chosen_sid = session_map.get(selected_session_label, "ALL")
+if chosen_sid != st.session_state.get("active_session_id"):
+    st.session_state["active_session_id"] = chosen_sid
+    st.session_state["active_selected_batch"] = chosen_sid
+    st.session_state["raw_check_summary"] = None
+    st.session_state.pop("df_reviewed_final", None)
+    st.rerun()
+
+active_session_id = st.session_state.get("active_session_id", "ALL")
+
+if active_session_id != "ALL" and not df_all.empty and 'session_id' in df_all.columns:
+    df_session = df_all[df_all['session_id'] == active_session_id].copy().reset_index(drop=True)
+else:
+    df_session = df_all.copy().reset_index(drop=True)
 
 if check_db_storage_full():
     st.sidebar.error("🚨 Status Storage DB: Penyimpanan Penuh (Hubungi Developer untuk Pembersihan Storage)")
@@ -935,12 +975,37 @@ st.sidebar.info("💡 **Tips Tema:** Klik ikon **⋮** di sudut kanan atas layar
 # =====================================================================
 # UTAMA: 4 TAB TAHAPAN KERJA
 # =====================================================================
-tab_scrape, tab_ml, tab_review, tab_viz = st.tabs([
+MAIN_WORKFLOW_TABS = [
     "📥 1. Penarikan Data", 
     "🧠 2. Proses AI & ML", 
     "📋 3. Review Data", 
     "📊 4. Visualisasi & Analisis"
-])
+]
+
+def switch_to_tab_scrape():
+    st.session_state["active_main_workflow_tab"] = MAIN_WORKFLOW_TABS[0]
+    st.session_state["scroll_to_top_needed"] = True
+
+def switch_to_tab_ml():
+    st.session_state["active_main_workflow_tab"] = MAIN_WORKFLOW_TABS[1]
+    st.session_state["scroll_to_top_needed"] = True
+
+def switch_to_tab_review():
+    st.session_state["active_main_workflow_tab"] = MAIN_WORKFLOW_TABS[2]
+    st.session_state["scroll_to_top_needed"] = True
+
+def switch_to_tab_viz():
+    st.session_state["active_main_workflow_tab"] = MAIN_WORKFLOW_TABS[3]
+    st.session_state["scroll_to_top_needed"] = True
+
+tab_scrape, tab_ml, tab_review, tab_viz = st.tabs(
+    MAIN_WORKFLOW_TABS,
+    key="active_main_workflow_tab",
+    on_change="rerun"
+)
+
+if st.session_state.pop("scroll_to_top_needed", False):
+    st.html("<script>window.scrollTo({ top: 0, behavior: 'smooth' });</script>", unsafe_allow_javascript=True)
 
 # =====================================================================
 # TAB 1: PENARIKAN DATA (SCRAPER)
@@ -975,6 +1040,18 @@ with tab_scrape:
         st.caption(f"📦 Status Storage Database: 🟢 **Normal** ({total_db_rows:,} baris tersimpan) | 🚨 **Kuota APIFY Habis**")
     else:
         st.caption(f"📦 Status Storage Database: 🟢 **Normal** ({total_db_rows:,} baris tersimpan).")
+        with st.expander("ℹ️ Mengapa jumlah data di database bisa berbeda dengan data yang ditarik?", expanded=False):
+            st.markdown(
+                """
+                **Mekanisme Penyaringan & Deduplikasi Otomatis:**
+                
+                Jumlah baris yang tersimpan di database dapat lebih sedikit dibandingkan total data mentah (*raw data*) yang ditarik oleh mesin penarikan data (scraper). Hal ini merupakan mekanisme standar sistem:
+                
+                1. 🔍 **Deduplikasi Otomatis:** Postingan atau cuitan ganda (ID sama atau kombinasi *username*, teks, dan tanggal yang identik) disaring agar tidak tersimpan ganda di database. Sistem memprioritaskan data dengan interaksi (*engagement*) tertinggi.
+                2. 🧹 **Penyaringan Konten Kosong (*No Content*):** Data hasil crawling yang tidak memuat teks atau hanya bertuliskan *No Content* langsung dibersihkan.
+                3. ⚡ **Efisiensi Kuota Token AI:** Menjamin kuota API AI pada **Tahap 2 (Proses AI & ML)** hanya dialokasikan untuk menganalisis data yang benar-benar bersih, unik, dan bermakna.
+                """
+            )
     
     # Muat Konfigurasi Target dari target_config.json
     if os.path.exists(CONFIG_FILE):
@@ -1278,8 +1355,7 @@ with tab_scrape:
                     if sp == "Twitter (X)":
                         st.markdown("##### 🐦 Twitter (X)")
                         prof_str = ", ".join(tw_prof) or "*(Kosong)*"
-                        hash_str = ", ".join(tw_hash) or "*(Kosong)*"
-                        st.markdown(f"• **Kata Kunci:** `{kw_display}`\n• **Profil:** `{prof_str}`\n• **Hashtag:** `{hash_str}`\n• **Mode Sortir:** `Top`\n• **Batas Max:** `{active_max}` cuitan")
+                        st.markdown(f"• **Kata Kunci:** `{kw_display}`\n• **Profil:** `{prof_str}`\n• **Mode Sortir:** `Top`\n• **Batas Max:** `{active_max}` cuitan")
                     elif sp == "Threads":
                         st.markdown("##### 🧵 Meta Threads")
                         prof_str = ", ".join(th_prof) or "*(Kosong)*"
@@ -1440,7 +1516,14 @@ with tab_scrape:
             start_time = datetime.datetime.now()
             start_str = start_time.strftime("%H:%M:%S UTC")
 
-            with st.status("⚡ Menghubungkan ke Apify Cloud & menarik data mentah (SIMULTAN)...", expanded=True) as status_s:
+            # Inisialisasi Session ID Unik untuk penarikan data sesi saat ini
+            new_session_id = db_manager.generate_session_id(global_kw_input, start_time)
+            st.session_state["active_session_id"] = new_session_id
+
+            scraper_env = session_credentials.get_session_env_dict()
+            scraper_env["TARGET_SESSION_ID"] = new_session_id
+
+            with st.status(f"⚡ Menghubungkan ke Apify Cloud & menarik data mentah untuk sesi '{new_session_id}' (SIMULTAN)...", expanded=True) as status_s:
                 try:
                     proc = subprocess.Popen(
                         [sys.executable, "01_run_scraper.py"],
@@ -1448,7 +1531,7 @@ with tab_scrape:
                         stderr=subprocess.PIPE,
                         text=True,
                         bufsize=1,
-                        env=session_credentials.get_session_env_dict()
+                        env=scraper_env
                     )
                     st.session_state["proc_scraper_obj"] = proc
 
@@ -1478,7 +1561,23 @@ with tab_scrape:
                     t_err.start()
 
                     info_placeholder = st.empty()
+                    progress_placeholder = st.empty()
+                    dino_placeholder = st.empty()
                     log_placeholder = st.empty()
+
+                    # Tampilkan Game Dino Interaktif tepat satu kali sebelum perulangan pemantauan
+                    # agar iframe game tidak mengalami reset / reload setiap 0.5 detik
+                    with dino_placeholder.container():
+                        st.markdown("#### 🦖 Game Dino Interaktif *(Sambil Menunggu Penarikan Data Selesai)*")
+                        st.caption("💡 *Klik pada area game di bawah, lalu tekan tombol **Spasi** atau **Panah Atas** pada keyboard untuk mulai melompat & bermain!*")
+                        components.html(
+                            """
+                            <div style="position: relative; width: 100%; height: 260px; overflow: hidden; border-radius: 12px; border: 1px solid rgba(128,128,128,0.25); background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+                                <iframe src="https://chromedino.com/dina/embed/" frameborder="0" scrolling="no" width="100%" height="100%" loading="lazy" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;"></iframe>
+                            </div>
+                            """,
+                            height=275,
+                        )
 
                     time_series_data = []
 
@@ -1503,10 +1602,19 @@ with tab_scrape:
                             m3.metric("⚡ Status Mesin", "Proses Scraping Aktif...")
                             st.caption(f"🎯 **Platform Target (Simultan):** {', '.join(selected_platforms)}")
 
-                        # Catat time-series aktivitas log per detik
+                        # Ekstrak data riil yang berhasil ditarik per platform sejauh ini
+                        current_p_counts = {}
+                        for l_str in log_lines:
+                            m_p = re.search(r"Platform '([^']+)'[^\d]+(\d+)\s+baris data", l_str, re.IGNORECASE)
+                            if m_p:
+                                current_p_counts[m_p.group(1).lower()] = int(m_p.group(2))
+
+                        total_data_now = sum(current_p_counts.values())
+
+                        # Catat time-series akumulasi jumlah data riil per detik
                         time_series_data.append({
                             "Waktu (s)": elapsed_seconds,
-                            "Log Event (Aktivitas)": len(log_lines)
+                            "Jumlah Data Ditarik (Baris)": total_data_now
                         })
 
                         # Deteksi error / warning / kendala secara real-time
@@ -1534,19 +1642,15 @@ with tab_scrape:
                             if "[INFO]" in l or "[WARNING]" in l or "[ERROR]" in l
                         ]
 
-                        with log_placeholder.container():
+                        with progress_placeholder.container():
                             st.markdown("### 📊 Monitoring Visual Penarikan Data (Real-Time)")
                             
                             # 1. Dynamic Progress Bar
                             prog_percent = min(98, max(5, int((elapsed_seconds / 60.0) * 100)))
                             st.progress(prog_percent, text=f"⚡ Proses penarikan data sedang berlangsung... ({elapsed_seconds} detik berlalu)")
 
-                            # 2. Real-Time Streaming Chart
-                            if len(time_series_data) > 1:
-                                df_chart = pd.DataFrame(time_series_data).set_index("Waktu (s)")
-                                st.line_chart(df_chart, height=180, use_container_width=True)
-
-                            # 3. Real-time Issue & Health Detector
+                        with log_placeholder.container():
+                            # 2. Real-time Issue & Health Detector
                             if detected_issues:
                                 st.error(f"🚨 **Kendala Terdeteksi ({len(detected_issues)} Peringatan/Error):** Mesin menemukan error/masalah di tengah proses penarikan.")
                                 with st.expander("🔍 Lihat Detail Pesan Error / Kendala Terdeteksi", expanded=True):
@@ -1554,7 +1658,7 @@ with tab_scrape:
                             else:
                                 st.success("🟢 **Kesehatan Mesin & Koneksi:** Normal — Tidak ada kendala/error terdeteksi.")
 
-                            # 3b. Info Inisialisasi Kontainer Apify (Warna Ungu)
+                            # 2b. Info Inisialisasi Kontainer Apify (Warna Ungu)
                             if system_container_logs:
                                 latest_sys = system_container_logs[-1]
                                 st.markdown(f"""
@@ -1568,9 +1672,20 @@ with tab_scrape:
                                 </div>
                                 """, unsafe_allow_html=True)
 
-                            # 4. Status Aktivitas Terkini
+                            # 3. Status Aktivitas Terkini
                             if latest_activity:
                                 st.caption(f"📌 **Aktivitas Mesin Terkini:** `{latest_activity[-1]}`")
+
+                            # 4. Grafik Akumulasi Data Ditarik (Opsional Collapsible)
+                            if len(time_series_data) > 1:
+                                with st.expander("📈 Lihat Grafik Akumulasi Data yang Berhasil Ditarik (Real-Time)", expanded=False):
+                                    df_chart = pd.DataFrame(time_series_data).set_index("Waktu (s)")
+                                    st.line_chart(df_chart, height=160, use_container_width=True)
+                                    if total_data_now > 0:
+                                        detail_str = ", ".join([f"{k.capitalize()}: {v}" for k, v in current_p_counts.items()])
+                                        st.caption(f"📊 **Data Terkumpul:** `{total_data_now:,} baris` ({detail_str})")
+                                    else:
+                                        st.caption("⏳ *Menunggu platform pertama selesai mengirimkan data...*")
 
                             # 5. Raw Log Drawer (Collapsible)
                             with st.expander("📑 Lihat Terminal Output Mentah (Detail System Log)", expanded=False):
@@ -1606,6 +1721,8 @@ with tab_scrape:
                     dur_str = f"{t_mins} menit {t_secs} detik" if t_mins > 0 else f"{total_sec:.1f} detik"
 
                     info_placeholder.empty()
+                    progress_placeholder.empty()
+                    dino_placeholder.empty()
                     log_placeholder.empty()
 
                     full_log_str = "".join(log_lines) or stderr_text
@@ -1640,12 +1757,23 @@ with tab_scrape:
                     else:
                         total_data_fetched = sum(platform_counts.values())
 
+                    current_db_total = 0
+                    try:
+                        if hasattr(db_manager, 'hitung_total_baris'):
+                            current_db_total = db_manager.hitung_total_baris(session_id=new_session_id)
+                        else:
+                            current_db_total = len(df_all) if not df_all.empty else 0
+                    except Exception:
+                        current_db_total = 0
+
                     st.session_state["last_run_summary_s1"] = {
                         "is_success": (proc.returncode == 0),
+                        "session_id": new_session_id,
                         "start_str": start_str,
                         "end_str": end_str,
                         "dur_str": dur_str,
                         "total_data_fetched": total_data_fetched,
+                        "final_stored_count": current_db_total,
                         "platform_counts": platform_counts,
                         "selected_platforms": list(selected_platforms),
                         "full_log_str": full_log_str,
@@ -1663,13 +1791,44 @@ with tab_scrape:
         s1 = st.session_state["last_run_summary_s1"]
         st.markdown("---")
         if s1["is_success"]:
-            st.success(f"✅ **Penarikan data mentah selesai!** Berhasil menarik total **{s1['total_data_fetched']:,} baris data** dalam waktu **{s1['dur_str']}**.")
+            sid_s1 = s1.get("session_id", "N/A")
+            st.success(f"✅ **Penarikan data mentah selesai!** Berhasil menarik total **{s1['total_data_fetched']:,} data mentah** dalam waktu **{s1['dur_str']}**.")
+            st.info(f"🏷️ **Sesi Penarikan Data Aktif:** `{sid_s1}` (Batch data terisolasi & independen, tanpa akumulasi)")
             
+            stored_now = s1.get("final_stored_count")
+            if stored_now is None or stored_now == 0:
+                try:
+                    stored_now = db_manager.hitung_total_baris(session_id=s1.get("session_id")) if hasattr(db_manager, 'hitung_total_baris') else (len(df_all) if not df_all.empty else 0)
+                except Exception:
+                    stored_now = s1["total_data_fetched"]
+
             m_res1, m_res2, m_res3, m_res4 = st.columns(4)
             m_res1.metric("🕒 Waktu Mulai (UTC)", s1["start_str"])
             m_res2.metric("🏁 Waktu Selesai", s1["end_str"])
             m_res3.metric("⏱️ Total Durasi", s1["dur_str"])
-            m_res4.metric("📦 Total Data Ditarik", f"{s1['total_data_fetched']:,} Baris")
+            m_res4.metric("📥 Total Data Mentah Ditarik", f"{s1['total_data_fetched']:,} Baris")
+            
+            # Kartu Informasi Penyusutan & Integritas Data
+            with st.container(border=True):
+                c_inf_m, c_inf_t = st.columns([1, 2])
+                with c_inf_m:
+                    diff_cnt = stored_now - s1['total_data_fetched']
+                    delta_label = f"{diff_cnt:,} (Deduplikasi)" if diff_cnt < 0 else "100% Tersimpan"
+                    st.metric("💾 Data Bersih Sesi Ini", f"{stored_now:,} Baris", delta=delta_label)
+                with c_inf_t:
+                    st.markdown(
+                        f"💡 **Informasi Penyaringan & Deduplikasi Sesi `{sid_s1}`:**\n\n"
+                        f"Dari **{s1['total_data_fetched']:,} data mentah** yang ditarik dari Apify, sesi ini tersimpan sebanyak **{stored_now:,} baris data unik & bersih** di database tanpa bercampur dengan sesi sebelumnya.\n"
+                        "Penyusutan jumlah data merupakan **mekanisme normal sistem**: data duplikat/ganda dan artikel tanpa teks (*No Content*) otomatis dibersihkan demi efisiensi kuota token AI di Tahapan 2."
+                    )
+                with st.expander("🔍 Rincian: Mengapa Data Tersimpan Bisa Lebih Sedikit dari Data yang Ditarik?", expanded=False):
+                    st.markdown(
+                        """
+                        1. **Deduplikasi Postingan / Cuitan:** Konten dengan ID atau teks dan username identik langsung disaring agar tidak tersimpan ganda di database. Sistem memprioritaskan data dengan interaksi (*engagement*) tertinggi.
+                        2. **Penyaringan Konten Kosong (*No Content*):** Data hasil scraping/crawling yang tidak memuat teks atau hanya bertuliskan *No Content* otomatis dibuang.
+                        3. **Efisiensi Kuota Token AI:** Menjamin kuota token Gemini AI pada **Tahap 2 (Proses AI & ML)** hanya dialokasikan untuk menganalisis data unik dan bermakna.
+                        """
+                    )
             
             with st.container(border=True):
                 st.markdown("#### 📊 Rincian Perolehan Data Per Platform")
@@ -1706,6 +1865,18 @@ with tab_scrape:
 
             with st.expander("📋 Log Lengkap Scraper"):
                 st.code(s1["full_log_str"], language="text")
+
+            # Tombol Navigasi Next ke Tahap Selanjutnya (Tab 2: Proses AI & ML)
+            st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+            col_nx1, col_nx2, col_nx3 = st.columns([1, 2, 1])
+            with col_nx2:
+                st.button(
+                    "➡️ Lanjut ke Tab 2 (Proses AI & ML)", 
+                    type="primary", 
+                    use_container_width=True, 
+                    key="btn_next_tab2",
+                    on_click=switch_to_tab_ml
+                )
         else:
             st.error(f"❌ **Penarikan Data Dihentikan / Gagal (Exit code: {s1['returncode']})**")
             m_res1, m_res2, m_res3, m_res4 = st.columns(4)
@@ -1721,6 +1892,17 @@ with tab_scrape:
             
             with st.expander("📋 Log Kesalahan"):
                 st.code(s1["full_log_str"], language="text")
+    elif total_db_rows > 0 and not st.session_state.get("last_run_summary_s1"):
+        st.markdown("<hr style='margin: 28px 0 16px 0; opacity: 0.3;'>", unsafe_allow_html=True)
+        col_nx1, col_nx2, col_nx3 = st.columns([1, 2, 1])
+        with col_nx2:
+            st.button(
+                "➡️ Lanjut ke Tab 2 (Proses AI & ML)", 
+                type="primary", 
+                use_container_width=True, 
+                key="btn_next_tab2_standby",
+                on_click=switch_to_tab_ml
+            )
 
 # =====================================================================
 # TAB 2: PROSES AI & KLASIFIKASI ML
@@ -1733,15 +1915,41 @@ with tab_ml:
         "sistem mempertahankan data dengan **informasi engagement paling tinggi**, dan jika engagement sama maka mempertahankan **urutan terakhir yang masuk scraping**)."
     )
     
-    # Hitung data RAW yang tersedia
-    rows_raw = db_manager.ambil_cuitan_mentah()
+    cur_sid_t2 = st.session_state.get("active_session_id", "ALL")
+    if cur_sid_t2 and cur_sid_t2 != "ALL":
+        st.info(f"🎯 **Target Sesi Aktif:** `{cur_sid_t2}` — Menjalankan AI & ML khusus antrean data dari sesi ini.")
+    else:
+        st.info("🌐 **Target Sesi Aktif:** `Semua Sesi (ALL)` — Menjalankan AI & ML untuk seluruh antrean data di database.")
+    
+    # Hitung data RAW yang tersedia untuk sesi aktif
+    rows_raw = db_manager.ambil_cuitan_mentah(session_id=cur_sid_t2)
     raw_count = len(rows_raw)
     
-    c_raw1, c_raw2 = st.columns([3, 1])
+    c_raw1, c_raw2, c_raw3 = st.columns([2.2, 1.3, 1.5])
     with c_raw1:
-        st.markdown(f"📦 Total Data Mentah (`RAW`) yang Siap Diproses: **{raw_count:,}** baris.")
+        st.markdown(f"📦 Data Mentah (`RAW`) Sesi Ini: **{raw_count:,}** baris.")
     with c_raw2:
         btn_cek_raw = st.button("🔄 Cek Data RAW Baru", use_container_width=True, key="btn_cek_raw_baru")
+    with c_raw3:
+        btn_reset_raw = st.button(
+            "🔁 Proses Ulang Sesi (Reset RAW)", 
+            use_container_width=True, 
+            key="btn_reset_raw_all", 
+            help="Ubah kembali status data sesi ini di database menjadi RAW agar dapat diproses ulang dari awal oleh Gemini AI & SVM."
+        )
+
+    if btn_reset_raw:
+        if hasattr(db_manager, 'reset_status_ke_raw'):
+            ok_rst, cnt_rst, msg_rst = db_manager.reset_status_ke_raw(session_id=cur_sid_t2)
+            if ok_rst:
+                st.success(f"✅ {msg_rst} Sekarang Anda dapat mengklik tombol '🧠 Jalankan Proses AI & ML Sekarang' di bawah.")
+                st.cache_data.clear()
+                st.session_state["last_run_summary_s2"] = None
+                st.rerun()
+            else:
+                st.error(f"❌ {msg_rst}")
+        else:
+            st.error("Fungsi reset_status_ke_raw belum tersedia.")
 
     if btn_cek_raw:
         placeholder_cek = st.empty()
@@ -1755,7 +1963,7 @@ with tab_ml:
         
         steps = [
             (25, "🔌 Menghubungkan ke basis data & memindai tabel log_cuitan..."),
-            (50, "🔍 Membaca baris data mentah (status = 'RAW') dan menghitung volume..."),
+            (50, f"🔍 Membaca baris data mentah sesi '{cur_sid_t2}' (status = 'RAW')..."),
             (75, "⚡ Menganalisis kesiapan Local EYD Cache & kuota model AI..."),
             (95, "⏱️ Menghitung kalkulasi beban batch dan estimasi waktu selesai pipeline..."),
         ]
@@ -1775,7 +1983,7 @@ with tab_ml:
                 st.progress(pct, text=f"{step_text} ({elapsed_sec:.1f}s berlalu)")
             
             if pct == 50:
-                fresh_raw_rows = db_manager.ambil_cuitan_mentah()
+                fresh_raw_rows = db_manager.ambil_cuitan_mentah(session_id=cur_sid_t2)
             elif pct == 75:
                 fresh_cache = db_manager.ambil_eyd_cache()
             
@@ -1887,11 +2095,16 @@ with tab_ml:
         import threading
         import time
 
-        initial_clean_count = len(db_manager.baca_data_untuk_streamlit())
+        initial_clean_count = len(db_manager.baca_data_untuk_streamlit(session_id=cur_sid_t2))
         start_time_ml = datetime.datetime.now()
         start_str_ml = start_time_ml.strftime("%H:%M:%S UTC")
 
-        with st.status("🧠 Melakukan pembersihan duplikat RAW, standardisasi EYD (LLM), & klasifikasi SVM...", expanded=True) as status_ml:
+        pipeline_env = session_credentials.get_session_env_dict()
+        if cur_sid_t2 and cur_sid_t2 != "ALL":
+            pipeline_env["TARGET_SESSION_ID"] = cur_sid_t2
+
+        status_label_s2 = f"🧠 Memproses AI (EYD) & ML (SVM) untuk sesi '{cur_sid_t2}'..." if cur_sid_t2 != 'ALL' else "🧠 Melakukan pembersihan duplikat RAW, standardisasi EYD (LLM), & klasifikasi SVM..."
+        with st.status(status_label_s2, expanded=True) as status_ml:
             try:
                 proc = subprocess.Popen(
                     [sys.executable, "01_pipeline_data.py"],
@@ -1899,7 +2112,7 @@ with tab_ml:
                     stderr=subprocess.PIPE,
                     text=True,
                     bufsize=1,
-                    env=session_credentials.get_session_env_dict()
+                    env=pipeline_env
                 )
                 st.session_state["proc_pipeline_obj"] = proc
 
@@ -1929,7 +2142,25 @@ with tab_ml:
                 t_err_ml.start()
 
                 info_placeholder_ml = st.empty()
+                dino_placeholder_ml = st.empty()
                 log_placeholder_ml = st.empty()
+
+                # Tampilkan Game Dino Interaktif tepat satu kali sebelum perulangan pemantauan
+                # agar iframe game tidak mengalami reset / reload setiap 0.5 detik
+                with dino_placeholder_ml.container():
+                    st.markdown("#### 🦖 Game Dino Interaktif *(Sambil Menunggu Pemrosesan AI & ML Selesai)*")
+                    st.caption("💡 *Klik pada area game di bawah, lalu tekan tombol **Spasi** atau **Panah Atas** pada keyboard untuk mulai melompat & bermain!*")
+                    components.html(
+                        """
+                        <style type="text/css">
+                            iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 999; border: none; }
+                        </style>
+                        <div style="position: relative; width: 100%; height: 280px; overflow: hidden; border-radius: 12px; border: 1px solid rgba(128,128,128,0.25); background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+                            <iframe src="https://chromedino.com/dina/embed/" frameborder="0" scrolling="no" width="100%" height="100%" loading="lazy"></iframe>
+                        </div>
+                        """,
+                        height=300,
+                    )
 
                 time_series_data_ml = []
                 est_pipe_total_sec = max(15, int(10 + (max(1, raw_count) / 60.0) * 8.0 + (max(1, raw_count) * 0.02)))
@@ -1950,17 +2181,51 @@ with tab_ml:
                     mins, secs = divmod(elapsed_seconds, 60)
                     time_str = f"{mins:02d}:{secs:02d}"
 
+                    # Ekstrak jumlah data yang berhasil diproses secara real-time dari log
+                    processed_sentiment_now = 0
+                    processed_ai_now = 0
+                    for l_str in log_lines_ml:
+                        # 1. Klasifikasi Sentimen ML (SVM)
+                        m_succ = re.search(r"Berhasil diproses\s*=\s*(\d+)", l_str)
+                        if m_succ:
+                            processed_sentiment_now = max(processed_sentiment_now, int(m_succ.group(1)))
+                        m_sent = re.search(r"\[PROGRESS_SENTIMEN\][^\d]+(\d+)/(\d+)", l_str)
+                        if m_sent:
+                            processed_sentiment_now = max(processed_sentiment_now, int(m_sent.group(1)))
+                        m_alt = re.search(r"memproses sentimen[:\s]+(\d+)", l_str, re.IGNORECASE)
+                        if m_alt:
+                            processed_sentiment_now = max(processed_sentiment_now, int(m_alt.group(1)))
+
+                        # 2. Pembersihan Teks & EYD AI (Gemini + Cache)
+                        m_ai = re.search(r"\[PROGRESS_AI\][^\d]+(\d+)/(\d+)", l_str)
+                        if m_ai:
+                            processed_ai_now = max(processed_ai_now, int(m_ai.group(1)))
+                        m_ai_batch = re.search(r"Progres AI:\s*Batch\s+(\d+)/(\d+)", l_str, re.IGNORECASE)
+                        if m_ai_batch:
+                            b_curr = int(m_ai_batch.group(1))
+                            b_tot = max(1, int(m_ai_batch.group(2)))
+                            processed_ai_now = max(processed_ai_now, int((b_curr / b_tot) * max(1, raw_count)))
+                        m_hit = re.search(r"Caching Hit:\s*(\d+)", l_str)
+                        if m_hit:
+                            processed_ai_now = max(processed_ai_now, int(m_hit.group(1)))
+
+                    if processed_sentiment_now > 0:
+                        processed_ai_now = max(processed_ai_now, processed_sentiment_now)
+
+                    target_val = max(1, raw_count)
+
                     with info_placeholder_ml.container():
                         m1, m2, m3, m4 = st.columns(4)
                         m1.metric("🕒 Waktu Mulai", start_str_ml)
                         m2.metric("⏱️ Waktu Berjalan", f"{time_str} ({elapsed_seconds}s)")
                         m3.metric("🏁 Estimasi Selesai (ETA)", est_eta_str)
-                        m4.metric("⚡ Status Mesin", "Proses AI & ML Aktif...")
+                        m4.metric("📊 Data Terproses Sentimen", f"{processed_sentiment_now:,} / {target_val:,} Baris")
 
-                    # Catat time-series aktivitas log per detik untuk AI & ML
+                    # Catat time-series akumulasi data yang diproses per detik
                     time_series_data_ml.append({
                         "Waktu (s)": elapsed_seconds,
-                        "Log Event (Pipeline AI/ML)": len(log_lines_ml)
+                        "Data Bersih (EYD AI)": processed_ai_now,
+                        "Data Sentimen (ML SVM)": processed_sentiment_now
                     })
 
                     # Deteksi error / warning / kendala secara real-time untuk AI & ML
@@ -1981,10 +2246,71 @@ with tab_ml:
                         prog_percent = min(98, max(5, int((elapsed_seconds / float(est_pipe_total_sec)) * 100)))
                         st.progress(prog_percent, text=f"🧠 Pembersihan EYD (LLM) & Klasifikasi SVM sedang berlangsung... (Waktu Berjalan: {time_str} | Estimasi Selesai: {est_eta_str})")
 
-                        # 2. Real-Time Streaming Chart
+                        # 2. Real-Time Streaming Chart (Plotly dengan Sumbu Y Terkalibrasi Integer)
                         if len(time_series_data_ml) > 1:
-                            df_chart_ml = pd.DataFrame(time_series_data_ml).set_index("Waktu (s)")
-                            st.line_chart(df_chart_ml, height=180, use_container_width=True)
+                            import plotly.graph_objects as go
+                            df_chart_ml = pd.DataFrame(time_series_data_ml)
+                            y_max = max(10, int(target_val * 1.15))
+
+                            fig_ml = go.Figure()
+                            # Garis 1: Progres Pembersihan Teks EYD AI
+                            fig_ml.add_trace(go.Scatter(
+                                x=df_chart_ml["Waktu (s)"],
+                                y=df_chart_ml["Data Bersih (EYD AI)"],
+                                mode='lines+markers',
+                                name='1. Pembersihan Teks & EYD (AI)',
+                                line=dict(color='#00ba38', width=2.5),
+                                marker=dict(size=4)
+                            ))
+                            # Garis 2: Progres Klasifikasi Sentimen ML SVM
+                            fig_ml.add_trace(go.Scatter(
+                                x=df_chart_ml["Waktu (s)"],
+                                y=df_chart_ml["Data Sentimen (ML SVM)"],
+                                mode='lines+markers',
+                                name='2. Klasifikasi Sentimen (ML)',
+                                line=dict(color='#1f77b4', width=2.5),
+                                marker=dict(size=4)
+                            ))
+                            # Garis Acuan: Total Target Data
+                            fig_ml.add_trace(go.Scatter(
+                                x=[df_chart_ml["Waktu (s)"].min(), df_chart_ml["Waktu (s)"].max()],
+                                y=[target_val, target_val],
+                                mode='lines',
+                                name=f'Target Total ({target_val:,} baris)',
+                                line=dict(color='#888888', width=1.5, dash='dash')
+                            ))
+                            fig_ml.update_layout(
+                                height=240,
+                                margin=dict(l=45, r=20, t=15, b=35),
+                                xaxis=dict(
+                                    title='Waktu Berjalan (detik)',
+                                    tickformat='d',
+                                    gridcolor='rgba(128,128,128,0.15)'
+                                ),
+                                yaxis=dict(
+                                    title='Jumlah Baris Data',
+                                    range=[0, y_max],
+                                    tickformat='d',
+                                    gridcolor='rgba(128,128,128,0.15)'
+                                ),
+                                legend=dict(
+                                    orientation='h',
+                                    yanchor='bottom',
+                                    y=1.02,
+                                    xanchor='right',
+                                    x=1,
+                                    font=dict(size=11)
+                                ),
+                                hovermode='x unified',
+                                template='plotly_white'
+                            )
+                            st.plotly_chart(fig_ml, use_container_width=True)
+
+                            c_sub1, c_sub2 = st.columns(2)
+                            with c_sub1:
+                                st.caption(f"🟢 **Teks Baku (EYD AI):** `{processed_ai_now:,}` / `{target_val:,}` baris")
+                            with c_sub2:
+                                st.caption(f"🔵 **Sentimen (ML SVM):** `{processed_sentiment_now:,}` / `{target_val:,}` baris")
 
                         # 3. Real-time Issue & Health Detector
                         if detected_issues_ml:
@@ -2032,13 +2358,15 @@ with tab_ml:
                 dur_str_ml = f"{t_mins_ml} menit {t_secs_ml} detik" if t_mins_ml > 0 else f"{total_sec_ml:.1f} detik"
 
                 info_placeholder_ml.empty()
+                dino_placeholder_ml.empty()
                 log_placeholder_ml.empty()
 
                 full_log_ml = "".join(log_lines_ml) or stderr_text
-                final_clean_count = len(db_manager.baca_data_untuk_streamlit())
+                final_clean_count = len(db_manager.baca_data_untuk_streamlit(session_id=cur_sid_t2))
 
                 st.session_state["last_run_summary_s2"] = {
                     "is_success": (proc.returncode == 0),
+                    "session_id": cur_sid_t2,
                     "start_str_ml": start_str_ml,
                     "end_str_ml": end_str_ml,
                     "dur_str_ml": dur_str_ml,
@@ -2072,7 +2400,7 @@ with tab_ml:
                 st.code(s2["full_log_ml"], language="text")
         else:
             if s2['returncode'] == 2:
-                st.info("ℹ️ **Pemrosesan AI & ML Tidak Mengubah Data (Exit code: 2)**")
+                st.info("ℹ️ **Pemrosesan AI & ML: Seluruh Data Sudah Selesai Diproses (Exit code: 2)**")
             else:
                 st.error(f"❌ **Pemrosesan AI & ML Dihentikan / Gagal (Exit code: {s2['returncode']})**")
             
@@ -2084,11 +2412,38 @@ with tab_ml:
 
             if s2['returncode'] in [-9, 15, 1] and ("taskkill" in (s2['stderr_text'] or "").lower() or "keyboardinterrupt" in (s2['stderr_text'] or "").lower()):
                 st.warning("⏹️ Pemrosesan AI & ML dihentikan secara paksa oleh pengguna.")
+            elif s2['returncode'] == 2:
+                st.info(
+                    "💡 **Status:** Seluruh data di database saat ini **sudah berstatus selesai diproses (`CLEANED`)**, "
+                    "sehingga tidak ada data mentah baru (`RAW`) yang mengantre.\n\n"
+                    "• Anda dapat langsung lanjut ke **Tab 3. Review Data** untuk meninjau hasil klasifikasi.\n"
+                    "• Jika Anda ingin memproses ulang seluruh data yang ada menggunakan model AI Gemini dan SVM yang baru, silakan klik tombol **🔁 Proses Ulang Semua (Reset ke RAW)** di bagian atas."
+                )
             else:
                 st.error("❌ Gagal memproses pipeline data. Silakan cek detail pada Log Kesalahan di bawah. (Pastikan kunci GEMINI_API_KEY terisi jika ingin menggunakan pembersihan EYD AI dan model SVM tersedia).")
 
             with st.expander("📋 Log Detail & Kesalahan"):
                 st.code(s2["full_log_ml"], language="text")
+
+    # Navigasi Tab: Previous (Tab 1) & Next (Tab 3)
+    st.markdown("<hr style='margin: 36px 0 16px 0; opacity: 0.25;'>", unsafe_allow_html=True)
+    c_nav_p2, c_nav_n2 = st.columns(2)
+    with c_nav_p2:
+        st.button(
+            "⬅️ Kembali ke Tab 1 (Penarikan Data)",
+            type="secondary",
+            use_container_width=True,
+            key="btn_prev_tab1_from_ml",
+            on_click=switch_to_tab_scrape
+        )
+    with c_nav_n2:
+        st.button(
+            "➡️ Lanjut ke Tab 3 (Review Data)",
+            type="primary",
+            use_container_width=True,
+            key="btn_next_tab3_from_ml",
+            on_click=switch_to_tab_review
+        )
 
 from collections import Counter
 
@@ -2668,62 +3023,89 @@ with tab_review:
     #             else:
     #                 st.error(f"❌ {msg_imp}")
 
-    # Formasi Tabel Live Lengkap (13 Kolom)
+    # Formasi Tabel Live Lengkap (14 Kolom)
     _all_cols_needed = [
-        'platform_id', 'username', 'date', 'raw_text', 'cleaned_text',
+        'session_id', 'platform_id', 'username', 'date', 'raw_text', 'cleaned_text',
         'sentiment_label', 'confidence_score', 'source_platform',
         'likes', 'retweets', 'views', 'log_activity', 'user_app'
     ]
 
-    # Ekstraksi Daftar Batch / Sesi Scraping & Pemrosesan
-    all_batches = []
-    if 'log_activity' in df_all.columns and not df_all.empty:
+    # Ekstraksi Daftar Sesi Scraping & Pemrosesan
+    all_sessions_info = []
+    if hasattr(db_manager, 'ambil_semua_sesi'):
+        try:
+            all_sessions_info = db_manager.ambil_semua_sesi()
+        except Exception:
+            all_sessions_info = []
+
+    batch_options = []
+    batch_map = {}
+
+    if all_sessions_info:
+        for idx, s_info in enumerate(all_sessions_info):
+            s_name = s_info['session_id']
+            cnt = s_info['total_rows']
+            clean_cnt = s_info['cleaned_count']
+            if idx == 0:
+                opt = f"🚀 Sesi Terkini ({s_name}) — {cnt:,} data ({clean_cnt:,} terolah)"
+            else:
+                opt = f"📁 Sesi Historis ({s_name}) — {cnt:,} data ({clean_cnt:,} terolah)"
+            batch_options.append(opt)
+            batch_map[opt] = s_name
+    elif 'session_id' in df_all.columns and not df_all.empty and df_all['session_id'].notna().any():
+        s_counts = df_all['session_id'].value_counts()
+        for idx, (s_name, s_cnt) in enumerate(s_counts.items()):
+            if pd.notna(s_name) and str(s_name).strip() and str(s_name).strip() != "-":
+                opt = f"📁 Sesi {s_name} ({s_cnt:,} data)"
+                batch_options.append(opt)
+                batch_map[opt] = str(s_name).strip()
+    elif 'log_activity' in df_all.columns and not df_all.empty:
         batch_counts = df_all['log_activity'].value_counts()
         for b_name, b_cnt in batch_counts.items():
             if pd.notna(b_name) and str(b_name).strip() and str(b_name).strip() != "-":
-                all_batches.append((str(b_name).strip(), int(b_cnt)))
+                opt = f"📁 Batch {b_name} ({b_cnt:,} data)"
+                batch_options.append(opt)
+                batch_map[opt] = str(b_name).strip()
 
-    latest_batch_name = all_batches[0][0] if all_batches else None
+    opt_all = "📦 Semua Riwayat Data (ALL)"
+    batch_options.append(opt_all)
+    batch_map[opt_all] = "ALL"
 
-    # Bentuk opsi dropdown yang informatif
-    batch_options = []
-    batch_map = {}
-    if all_batches:
-        opt_latest = f"🚀 Sesi Terkini yang Baru Diproses ({latest_batch_name})"
-        batch_options.append(opt_latest)
-        batch_map[opt_latest] = latest_batch_name
-        for b_name, b_cnt in all_batches[1:]:
-            opt_hist = f"📁 Sesi Historis ({b_name})"
-            batch_options.append(opt_hist)
-            batch_map[opt_hist] = b_name
-        opt_all = "📦 Semua Riwayat Data"
-        batch_options.append(opt_all)
-        batch_map[opt_all] = "ALL"
-    else:
-        opt_all = "📦 Semua Riwayat Data"
-        batch_options.append(opt_all)
-        batch_map[opt_all] = "ALL"
+    # Sinkronisasi index default dengan active_session_id
+    cur_active_sid = st.session_state.get('active_session_id', 'ALL')
+    default_idx = 0
+    for idx_b, b_opt in enumerate(batch_options):
+        if batch_map.get(b_opt) == cur_active_sid:
+            default_idx = idx_b
+            break
 
     col_batch_sel, col_batch_info = st.columns([3, 2])
     with col_batch_sel:
         cur_batch_choice = st.selectbox(
             "📂 Pilih Sesi / Batch Data yang Ditinjau & Dianalisis:",
             options=batch_options,
-            index=0,
+            index=default_idx,
             key="sel_active_batch_choice",
-            help="Secara default sistem menampilkan data dari sesi scraping/pemrosesan terkini agar analisis linier, atau pilih 'Semua Riwayat Data' untuk melihat data gabungan."
+            help="Sistem memisahkan setiap penarikan data ke dalam sesi mandiri. Pilih sesi yang ingin Anda tinjau atau pilih 'Semua Riwayat Data' untuk melihat data gabungan."
         )
     with col_batch_info:
         st.markdown("<br>", unsafe_allow_html=True)
         selected_batch_target = batch_map.get(cur_batch_choice, "ALL")
         st.session_state['active_selected_batch'] = selected_batch_target
+        if selected_batch_target != "ALL":
+            st.session_state['active_session_id'] = selected_batch_target
 
         if selected_batch_target == "ALL":
             df_live_full = df_all.copy().reset_index(drop=True)
-            st.info("🌐 Menampilkan **Seluruh Riwayat Database**.")
+            st.info(f"🌐 Menampilkan **Seluruh Riwayat Database** ({len(df_live_full):,} baris).")
         else:
-            df_live_full = df_all[df_all['log_activity'] == selected_batch_target].copy().reset_index(drop=True)
-            st.success(f"🎯 Menampilkan **Sesi {selected_batch_target}**.")
+            if 'session_id' in df_all.columns and (df_all['session_id'] == selected_batch_target).any():
+                df_live_full = df_all[df_all['session_id'] == selected_batch_target].copy().reset_index(drop=True)
+            elif 'log_activity' in df_all.columns and (df_all['log_activity'] == selected_batch_target).any():
+                df_live_full = df_all[df_all['log_activity'] == selected_batch_target].copy().reset_index(drop=True)
+            else:
+                df_live_full = df_all.copy().reset_index(drop=True)
+            st.success(f"🎯 Menampilkan **Sesi `{selected_batch_target}`** ({len(df_live_full):,} baris).")
 
     for col in _all_cols_needed:
         if col not in df_live_full.columns:
@@ -2732,6 +3114,7 @@ with tab_review:
     df_live_display = df_live_full[_all_cols_needed].copy().reset_index(drop=True)
     df_live_display.index = df_live_display.index + 1
     col_rename_map = {
+        'session_id': 'ID Sesi',
         'platform_id': 'ID Platform',
         'username': 'Username',
         'date': 'Tanggal Pembuatan',
@@ -2981,6 +3364,26 @@ with tab_review:
             }
         )
 
+    # Navigasi Tab: Previous (Tab 2) & Next (Tab 4)
+    st.markdown("<hr style='margin: 36px 0 16px 0; opacity: 0.25;'>", unsafe_allow_html=True)
+    c_nav_p3, c_nav_n3 = st.columns(2)
+    with c_nav_p3:
+        st.button(
+            "⬅️ Kembali ke Tab 2 (Proses AI & ML)",
+            type="secondary",
+            use_container_width=True,
+            key="btn_prev_tab2_from_review",
+            on_click=switch_to_tab_ml
+        )
+    with c_nav_n3:
+        st.button(
+            "➡️ Lanjut ke Tab 4 (Visualisasi & Analisis)",
+            type="primary",
+            use_container_width=True,
+            key="btn_next_tab4_from_review",
+            on_click=switch_to_tab_viz
+        )
+
 def _fallback_import_backup(file_obj, file_format: str = "csv"):
     """Fungsi cadangan impor file backup jika modul db_manager di memori belum ter-refresh."""
     try:
@@ -3113,25 +3516,30 @@ with tab_viz:
         df_base_viz = st.session_state['df_reviewed_final'].copy()
     else:
         active_b = st.session_state.get('active_selected_batch')
-        if active_b and active_b != "ALL" and 'log_activity' in df_all.columns:
-            df_base_viz = df_all[df_all['log_activity'] == active_b].copy()
-        elif 'log_activity' in df_all.columns and not df_all.empty:
-            b_counts = df_all['log_activity'].value_counts()
-            if not b_counts.empty:
-                latest_b = b_counts.index[0]
-                df_base_viz = df_all[df_all['log_activity'] == latest_b].copy()
+        active_sid = st.session_state.get('active_session_id')
+        target_sid = active_b if active_b else active_sid
+        
+        if target_sid and target_sid != "ALL":
+            if 'session_id' in df_all.columns and (df_all['session_id'] == target_sid).any():
+                df_base_viz = df_all[df_all['session_id'] == target_sid].copy()
+            elif 'log_activity' in df_all.columns and (df_all['log_activity'] == target_sid).any():
+                df_base_viz = df_all[df_all['log_activity'] == target_sid].copy()
             else:
                 df_base_viz = df_all.copy()
+        elif not df_session.empty and active_sid != "ALL":
+            df_base_viz = df_session.copy()
         else:
             df_base_viz = df_all.copy()
 
-    active_b_name = st.session_state.get('active_selected_batch')
-    if active_b_name and active_b_name != "ALL":
-        st.info(f"🎯 **Basis Data Analisis:** Menampilkan data dari sesi pemrosesan **{active_b_name}**.")
+    active_b_name = st.session_state.get('active_selected_batch') or st.session_state.get('active_session_id')
+    if 'df_reviewed_final' in st.session_state and not st.session_state['df_reviewed_final'].empty:
+        st.info(f"📊 **Basis Data Analisis:** Menampilkan hasil review & filter dari Tahap 3 ({len(df_base_viz):,} baris).")
+    elif active_b_name and active_b_name != "ALL":
+        st.info(f"🎯 **Basis Data Analisis:** Menampilkan data dari sesi pemrosesan **`{active_b_name}`** ({len(df_base_viz):,} baris).")
     elif active_b_name == "ALL":
-        st.info("🌐 **Basis Data Analisis:** Menampilkan **Seluruh Riwayat Database**.")
+        st.info(f"🌐 **Basis Data Analisis:** Menampilkan **Seluruh Riwayat Database** ({len(df_base_viz):,} baris).")
     else:
-        st.info("📊 **Basis Data Analisis:** Menampilkan data dari review Tahapan 3.")
+        st.info(f"📊 **Basis Data Analisis:** Menampilkan basis data analisis ({len(df_base_viz):,} baris).")
     
     # 6.1 Pengaturan Analisis
     st.markdown("### ⚙️ Pengaturan Parameter Analisis")
@@ -3799,6 +4207,26 @@ with tab_viz:
                 type="primary",
                 key="btn_dl_pdf_tab4_final"
             )
+
+    # Navigasi Tab: Previous (Tab 3) & Kembali ke Awal (Tab 1)
+    st.markdown("<hr style='margin: 36px 0 16px 0; opacity: 0.25;'>", unsafe_allow_html=True)
+    c_nav_p4, c_nav_n4 = st.columns(2)
+    with c_nav_p4:
+        st.button(
+            "⬅️ Kembali ke Tab 3 (Review Data)",
+            type="secondary",
+            use_container_width=True,
+            key="btn_prev_tab3_from_viz",
+            on_click=switch_to_tab_review
+        )
+    with c_nav_n4:
+        st.button(
+            "🔄 Kembali ke Tab 1 (Penarikan Data)",
+            type="secondary",
+            use_container_width=True,
+            key="btn_restart_tab1_from_viz",
+            on_click=switch_to_tab_scrape
+        )
 
 # =====================================================================
 # FOOTER APLIKASI

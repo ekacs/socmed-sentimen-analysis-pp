@@ -10,7 +10,7 @@ from apify_client.errors import ApifyApiError
 # Impor fungsi pembaca konfigurasi
 from config_parser import load_config, build_twitter_query
 # Impor fungsi basis data
-from db_manager import simpan_data_ke_db, buat_tabel, get_scraping_mode, simpan_keysearch_history, set_apify_quota_flag
+from db_manager import simpan_data_ke_db, buat_tabel, get_scraping_mode, simpan_keysearch_history, set_apify_quota_flag, generate_session_id
 
 def handle_apify_error(platform_name: str, e: Exception):
     err_str = str(e).lower()
@@ -1237,10 +1237,15 @@ def main():
     if not client:
         sys.exit(1)
     
-    # 3b. Generate log_activity — satu timestamp untuk seluruh sesi scraping ini
+    # 3b. Generate log_activity & session_id unik
     sesi_mulai = datetime.now()
     log_activity = format_log_activity(sesi_mulai)
-    print(f"[INFO] Sesi scraping dimulai: {log_activity}")
+    
+    session_id = os.environ.get("TARGET_SESSION_ID", "").strip()
+    if not session_id:
+        target_kw = general_cfg.get("keywords") or []
+        session_id = generate_session_id(target_kw, sesi_mulai)
+    print(f"[INFO] Sesi scraping dimulai: {log_activity} | Sesi ID: {session_id}")
     
     # 3c. User app — belum ada sistem login, gunakan default hostname atau env var
     user_app = os.environ.get("STREAMLIT_USER_APP", "local_user")
@@ -1299,8 +1304,10 @@ def main():
     print(f"\n{'='*60}")
     if all_results:
         print(f"[INFO] Total gabungan {len(all_results)} baris data dari {len(source_types)} platform. Menyimpan ke database...")
-        simpan_data_ke_db(all_results)
-        print("[SUCCESS] Penarikan data multi-platform selesai dengan sukses!")
+        for r in all_results:
+            r['session_id'] = session_id
+        simpan_data_ke_db(all_results, session_id=session_id)
+        print(f"[SUCCESS] Penarikan data multi-platform selesai dengan sukses! (Sesi: {session_id})")
     else:
         print("[INFO] Tidak ada data baru yang berhasil ditarik dari seluruh platform atau terjadi kesalahan.")
     print(f"{'='*60}")

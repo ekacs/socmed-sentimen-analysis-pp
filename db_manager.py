@@ -82,7 +82,7 @@ def buat_tabel():
     cursor = conn.cursor()
     
     try:
-        # Skema tabel log_cuitan (versi 2)
+        # Skema tabel log_cuitan (versi 3 - multi-session isolation)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS log_cuitan (
                 platform_id TEXT PRIMARY KEY,           -- ID unik konten dari platform sumber (pengganti tweet_id lama)
@@ -98,7 +98,8 @@ def buat_tabel():
                 status TEXT DEFAULT 'RAW',              -- Status pemrosesan data ('RAW' / 'CLEANED')
                 source_platform TEXT NOT NULL,          -- Keterangan sumber: 'Twitter / X', 'Threads', 'Instagram', 'LinkedIn', 'News'
                 log_activity TEXT,                      -- Timestamp aktivitas scraping (format: DD-MMMM-YYYY HH:MM:SS)
-                user_app TEXT                           -- Username pengguna aplikasi Streamlit yang memicu scraping
+                user_app TEXT,                          -- Username pengguna aplikasi Streamlit yang memicu scraping
+                session_id TEXT                         -- ID Sesi unik: gabungan kata kunci tanpa spasi + angka tanggal waktu
             )
         ''')
         
@@ -164,6 +165,8 @@ def buat_tabel():
                         cursor.execute("ALTER TABLE log_cuitan ADD COLUMN log_activity TEXT;")
                     if 'user_app' not in columns:
                         cursor.execute("ALTER TABLE log_cuitan ADD COLUMN user_app TEXT;")
+                    if 'session_id' not in columns:
+                        cursor.execute("ALTER TABLE log_cuitan ADD COLUMN session_id TEXT;")
                         
                 cursor.execute("""
                     SELECT column_name 
@@ -176,7 +179,6 @@ def buat_tabel():
                         cursor.execute("ALTER TABLE keysearch_history ADD COLUMN search_term TEXT;")
                     if 'keywords' not in kh_cols:
                         cursor.execute("ALTER TABLE keysearch_history ADD COLUMN keywords TEXT;")
-                    # Cek apakah constraint UNIQUE sudah ada di PostgreSQL sebelum menambahkan
                     try:
                         cursor.execute("SELECT 1 FROM pg_constraint WHERE conname = 'keysearch_history_search_term_key';")
                         has_const = cursor.fetchone()
@@ -184,7 +186,6 @@ def buat_tabel():
                             cursor.execute("ALTER TABLE keysearch_history ADD CONSTRAINT keysearch_history_search_term_key UNIQUE (search_term);")
                     except Exception:
                         conn.rollback()
-                    # Selaraskan nilai antar kolom search_term <-> keywords agar tampil sempurna di Supabase Table Editor
                     try:
                         cursor.execute("UPDATE keysearch_history SET search_term = keywords WHERE (search_term IS NULL OR search_term = '') AND keywords IS NOT NULL AND keywords != '';")
                         cursor.execute("UPDATE keysearch_history SET keywords = search_term WHERE (keywords IS NULL OR keywords = '') AND search_term IS NOT NULL AND search_term != '';")
@@ -202,11 +203,21 @@ def buat_tabel():
                         cursor.execute("ALTER TABLE log_cuitan ADD COLUMN log_activity TEXT;")
                     if 'user_app' not in columns:
                         cursor.execute("ALTER TABLE log_cuitan ADD COLUMN user_app TEXT;")
+                    if 'session_id' not in columns:
+                        cursor.execute("ALTER TABLE log_cuitan ADD COLUMN session_id TEXT;")
 
                 cursor.execute("PRAGMA table_info(keysearch_history);")
                 kh_cols = [row[1] for row in cursor.fetchall()]
                 if kh_cols and 'search_term' not in kh_cols:
                     cursor.execute("ALTER TABLE keysearch_history ADD COLUMN search_term TEXT;")
+
+            # Migrasi data historis yang belum memiliki session_id
+            try:
+                cursor.execute("UPDATE log_cuitan SET session_id = 'pialateluk_20260924055219' WHERE (session_id IS NULL OR session_id = '') AND log_activity LIKE '%05:52:19%';")
+                cursor.execute("UPDATE log_cuitan SET session_id = 'pialateluk_20260924073020' WHERE (session_id IS NULL OR session_id = '') AND log_activity LIKE '%07:30:20%';")
+                cursor.execute("UPDATE log_cuitan SET session_id = 'sesi_awal_20260924' WHERE (session_id IS NULL OR session_id = '');")
+            except Exception:
+                pass
         except Exception as mig_err:
             print(f"[WARNING] Migrasi skema otomatis log_cuitan / keysearch_history: {mig_err}")
             try:
@@ -223,6 +234,102 @@ def buat_tabel():
         print(f"[OK] Basis data ({get_db_type()}) dan tabel-tabel sistem berhasil diselaraskan!")
     except Exception as e:
         print(f"[ERROR] Gagal menyelaraskan tabel: {e}")
+    finally:
+        conn.close()
+
+def generate_session_id(keywords=None, dt=None) -> str:
+    """
+    Menghasilkan ID sesi unik yang merupakan gabungan kata kunci tanpa spasi
+    dan angka tanggal serta waktu (YYYYMMDDHHMMSS).
+    Contoh: keywords='piala teluk', waktu=2026-09-24 07:30:20 -> 'pialateluk_20260924073020'
+    """
+    from datetime import datetime
+    import re
+    if dt is None:
+        dt = datetime.now()
+    dt_str = dt.strftime("%Y%m%d%H%M%S")
+    
+    kw_str = ""
+    if keywords:
+        if isinstance(keywords, (list, tuple, set)):
+            kw_str = "".join([str(k) for k in keywords if k])
+        else:
+            kw_str = str(keywords)
+    
+    clean_kw = re.sub(r'[^a-zA-Z0-9]', '', kw_str).lower()
+    if not clean_kw:
+        clean_kw = "umum"
+    elif len(clean_kw) > 25:
+        clean_kw = clean_kw[:25]
+        
+    return f"{clean_kw}_{dt_str}"
+
+def ambil_semua_sesi() -> list:
+    """
+    Mengambil daftar seluruh ID sesi yang ada di tabel log_cuitan,
+    beserta total baris, jumlah baris RAW, jumlah baris CLEANED, tanggal terbaru, dan tanggal penarikan.
+    Return: list of dict, terurut dari sesi paling mutakhir.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        try:
+            cursor.execute("SELECT DISTINCT session_id FROM log_cuitan WHERE session_id IS NOT NULL AND session_id != '';")
+            raw_sids = [r[0] for r in cursor.fetchall()]
+        except Exception:
+            return []
+            
+        sessions = []
+        is_sqlite = (get_db_type() == 'sqlite')
+        for sid in raw_sids:
+            try:
+                if is_sqlite:
+                    q = """
+                        SELECT 
+                            COUNT(*),
+                            SUM(CASE WHEN status = 'RAW' THEN 1 ELSE 0 END),
+                            SUM(CASE WHEN status = 'CLEANED' THEN 1 ELSE 0 END),
+                            MAX(date),
+                            MIN(date),
+                            MAX(log_activity)
+                        FROM log_cuitan 
+                        WHERE session_id = ?
+                        GROUP BY session_id;
+                    """
+                    cursor.execute(q, (sid,))
+                else:
+                    q = """
+                        SELECT 
+                            COUNT(*),
+                            SUM(CASE WHEN status = 'RAW' THEN 1 ELSE 0 END),
+                            SUM(CASE WHEN status = 'CLEANED' THEN 1 ELSE 0 END),
+                            MAX(date),
+                            MIN(date),
+                            MAX(log_activity)
+                        FROM log_cuitan 
+                        WHERE session_id = %s
+                        GROUP BY session_id;
+                    """
+                    cursor.execute(q, (sid,))
+                row = cursor.fetchone()
+                if row:
+                    sessions.append({
+                        "session_id": sid,
+                        "total_rows": int(row[0] or 0),
+                        "raw_count": int(row[1] or 0),
+                        "cleaned_count": int(row[2] or 0),
+                        "latest_date": row[3] or "-",
+                        "earliest_date": row[4] or "-",
+                        "log_activity": row[5] or "-"
+                    })
+            except Exception as _e_row:
+                pass
+                
+        sessions.sort(key=lambda s: s["session_id"], reverse=True)
+        return sessions
+    except Exception as e:
+        print(f"[ERROR] Gagal mengambil daftar sesi: {e}")
+        return []
     finally:
         conn.close()
 
@@ -702,11 +809,11 @@ def set_gemini_quota_flag(is_exhausted: bool = True, db_url=None):
 def is_gemini_quota_exhausted(db_url=None) -> bool:
     return get_system_config_flag('GEMINI_QUOTA_EXHAUSTED', db_url)
 
-def simpan_data_ke_db(data_cuitan):
+def simpan_data_ke_db(data_cuitan, session_id=None):
     """
     Menyimpan data cuitan ke database menggunakan pendekatan UPSERT yang disesuaikan
     dengan tipe database aktif (ON CONFLICT untuk PostgreSQL, INSERT OR IGNORE untuk SQLite).
-    Menggunakan skema v2: platform_id sebagai primary key, dengan field views, log_activity, user_app.
+    Menggunakan skema v3: platform_id sebagai primary key, dengan field views, log_activity, user_app, session_id.
     """
     if not data_cuitan:
         return
@@ -730,8 +837,8 @@ def simpan_data_ke_db(data_cuitan):
                 INSERT INTO log_cuitan (
                     platform_id, date, username, raw_text, cleaned_text, 
                     sentiment_label, confidence_score, likes, retweets, views,
-                    status, source_platform, log_activity, user_app
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    status, source_platform, log_activity, user_app, session_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (platform_id) DO NOTHING
             '''
         else:
@@ -739,8 +846,8 @@ def simpan_data_ke_db(data_cuitan):
                 INSERT OR IGNORE INTO log_cuitan (
                     platform_id, date, username, raw_text, cleaned_text, 
                     sentiment_label, confidence_score, likes, retweets, views,
-                    status, source_platform, log_activity, user_app
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    status, source_platform, log_activity, user_app, session_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             '''
             
         data_tuple = [
@@ -758,7 +865,8 @@ def simpan_data_ke_db(data_cuitan):
                 d.get('status', 'RAW'),
                 d.get('source_platform', 'Twitter / X'),
                 d.get('log_activity', None),
-                d.get('user_app', None)
+                d.get('user_app', None),
+                d.get('session_id') or session_id or "sesi_awal_20260924"
             )
             for d in data_cuitan
         ]
@@ -792,9 +900,10 @@ def simpan_data_ke_db(data_cuitan):
     except Exception as _ex_nc:
         pass
 
-def baca_data_untuk_streamlit():
+def baca_data_untuk_streamlit(session_id=None):
     """
     Mengambil seluruh data dari basis data untuk disajikan di dasbor Streamlit.
+    Jika session_id diberikan (dan bukan 'ALL'), hanya memuat data dari sesi tersebut.
     Menggunakan SQLAlchemy untuk PostgreSQL agar kompatibel dengan Pandas,
     dengan fallback otomatis ke SQLite jika PostgreSQL tidak mengembalikan data / terkendala.
     """
@@ -824,6 +933,10 @@ def baca_data_untuk_streamlit():
                     if 'cleaned_text' in df.columns:
                         mask_v &= ~df['cleaned_text'].astype(str).str.strip().str.lower().isin(['no content', 'none', 'nan', 'null'])
                     df = df[mask_v].copy()
+                
+                # Filter per sesi jika diminta
+                if session_id and str(session_id).strip().upper() != "ALL" and 'session_id' in df.columns:
+                    df = df[df['session_id'] == str(session_id).strip()].copy()
                 return df
             print("[INFO] PostgreSQL Supabase terhubung tetapi belum memiliki data (0 baris). Memeriksa SQLite lokal...")
         except Exception as e:
@@ -844,6 +957,10 @@ def baca_data_untuk_streamlit():
                     if 'cleaned_text' in df_sqlite.columns:
                         mask_v &= ~df_sqlite['cleaned_text'].astype(str).str.strip().str.lower().isin(['no content', 'none', 'nan', 'null'])
                     df_sqlite = df_sqlite[mask_v].copy()
+                
+                # Filter per sesi jika diminta
+                if session_id and str(session_id).strip().upper() != "ALL" and 'session_id' in df_sqlite.columns:
+                    df_sqlite = df_sqlite[df_sqlite['session_id'] == str(session_id).strip()].copy()
                 print(f"[INFO] Menggunakan data dari SQLite lokal ({len(df_sqlite)} baris valid).")
                 return df_sqlite
         except Exception as e:
@@ -851,22 +968,34 @@ def baca_data_untuk_streamlit():
             
     return df
 
-def ambil_cuitan_mentah():
+def ambil_cuitan_mentah(session_id=None):
     """
     Mengambil konten mentah (status = 'RAW') dari database untuk diproses di pipeline AI.
+    Jika session_id diberikan (dan bukan 'ALL'), hanya mengambil data RAW untuk sesi tersebut.
     Mengabaikan data kosong / 'No Content'.
     Mengembalikan (platform_id, raw_text) untuk setiap baris RAW valid.
     """
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("""
-            SELECT platform_id, raw_text FROM log_cuitan 
-            WHERE status = 'RAW'
-              AND raw_text IS NOT NULL 
-              AND TRIM(raw_text) != '' 
-              AND LOWER(TRIM(raw_text)) NOT IN ('no content', 'none', 'nan', 'null')
-        """)
+        if session_id and str(session_id).strip().upper() != "ALL":
+            ph = get_placeholder()
+            cursor.execute(f"""
+                SELECT platform_id, raw_text FROM log_cuitan 
+                WHERE status = 'RAW'
+                  AND session_id = {ph}
+                  AND raw_text IS NOT NULL 
+                  AND TRIM(raw_text) != '' 
+                  AND LOWER(TRIM(raw_text)) NOT IN ('no content', 'none', 'nan', 'null')
+            """, (str(session_id).strip(),))
+        else:
+            cursor.execute("""
+                SELECT platform_id, raw_text FROM log_cuitan 
+                WHERE status = 'RAW'
+                  AND raw_text IS NOT NULL 
+                  AND TRIM(raw_text) != '' 
+                  AND LOWER(TRIM(raw_text)) NOT IN ('no content', 'none', 'nan', 'null')
+            """)
         rows = cursor.fetchall()
         return rows
     except Exception as e:
@@ -1007,14 +1136,19 @@ def set_scraping_mode(mode):
     finally:
         conn.close()
 
-def hitung_total_baris():
+def hitung_total_baris(session_id=None):
     """
     Menghitung total baris yang ada di tabel log_cuitan.
+    Jika session_id diberikan (dan bukan 'ALL'), hanya menghitung total baris pada sesi tersebut.
     """
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT COUNT(*) FROM log_cuitan")
+        if session_id and str(session_id).strip().upper() != "ALL":
+            ph = get_placeholder()
+            cursor.execute(f"SELECT COUNT(*) FROM log_cuitan WHERE session_id = {ph}", (str(session_id).strip(),))
+        else:
+            cursor.execute("SELECT COUNT(*) FROM log_cuitan")
         row = cursor.fetchone()
         return row[0] if row else 0
     except Exception as e:
@@ -1355,5 +1489,36 @@ def reset_database(clear_bookmarks=False, clear_history=True, db_url=None):
             conn.close()
         except Exception:
             pass
+
+def reset_status_ke_raw(session_id=None, db_url=None):
+    """
+    Mengubah kembali status data di log_cuitan menjadi 'RAW',
+    sehingga data dapat diproses ulang oleh pipeline AI & ML.
+    Jika session_id diberikan (dan bukan 'ALL'), hanya mereset data pada sesi tersebut.
+    """
+    conn = get_connection(db_url)
+    cursor = conn.cursor()
+    try:
+        if session_id and str(session_id).strip().upper() != "ALL":
+            ph = get_placeholder(db_url)
+            cursor.execute(f"UPDATE log_cuitan SET status = 'RAW' WHERE session_id = {ph} AND raw_text IS NOT NULL AND TRIM(raw_text) != '';", (str(session_id).strip(),))
+        else:
+            cursor.execute("UPDATE log_cuitan SET status = 'RAW' WHERE raw_text IS NOT NULL AND TRIM(raw_text) != '';")
+        conn.commit()
+        cnt = cursor.rowcount
+        target_label = f"sesi '{session_id}'" if (session_id and str(session_id).strip().upper() != "ALL") else "seluruh sesi"
+        return True, cnt, f"Berhasil mereset status {cnt:,} baris data pada {target_label} ke 'RAW'."
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return False, 0, f"Gagal mereset status data: {str(e)}"
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
 
 
