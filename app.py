@@ -1204,13 +1204,11 @@ with tab_scrape:
                 st.error(f"❌ Gagal menyimpan konfigurasi: {_e_save}")
 
     def render_active_config_summary_card():
-        """Menampilkan rangkuman status konfigurasi aktif per platform secara konsisten dan meyakinkan."""
+        """Menampilkan rangkuman status konfigurasi aktif per platform secara konsisten, responsif, dan mengikuti isian pengguna."""
         if not selected_platforms:
             return
         
-        last_saved = st.session_state.get("config_saved_at")
-        save_badge = f" (Tersimpan: {last_saved})" if last_saved else " (Siap Diberlakukan)"
-        
+        # Baca konfigurasi tersimpan dari file sebagai fallback
         try:
             if os.path.exists(CONFIG_FILE):
                 with open(CONFIG_FILE, 'r') as f:
@@ -1223,48 +1221,77 @@ with tab_scrape:
         
         tw_c = c_root.get("twitter", gen_c)
         th_c = c_root.get("threads", gen_c)
-        ig_c = c_root.get("instagram", gen_c)
         li_c = c_root.get("linkedin", gen_c)
         web_c = c_root.get("website", gen_c)
 
+        # Ambil nilai aktif LANGSUNG dari isian pengguna di form (st.session_state)
+        # Jika belum ada di session_state, gunakan fallback konfigurasi tersimpan
+        if "global_kw" in st.session_state:
+            g_kw_raw = str(st.session_state.get("global_kw", "")).strip()
+            active_keywords = [k.strip() for k in g_kw_raw.split(",") if k.strip()]
+        else:
+            active_keywords = gen_c.get("keywords", [])
+
+        if "global_max" in st.session_state:
+            active_max = int(st.session_state.get("global_max", 100))
+        else:
+            active_max = int(gen_c.get("max_results", 100))
+
+        if "global_start" in st.session_state and "global_end" in st.session_state:
+            curr_start = st.session_state.get("global_start")
+            curr_end = st.session_state.get("global_end")
+            start_str = curr_start.strftime("%Y-%m-%d") if hasattr(curr_start, 'strftime') else str(curr_start or "-")
+            end_str = curr_end.strftime("%Y-%m-%d") if hasattr(curr_end, 'strftime') else str(curr_end or "-")
+        else:
+            start_str = gen_c.get("start_date", "-")
+            end_str = gen_c.get("end_date", "-")
+
+        # Parameter akun/domain opsional dari session_state
+        tw_p_raw = str(st.session_state.get("tw_prof", ", ".join(tw_c.get("profiles", [])))).strip()
+        tw_prof = [p.strip() for p in tw_p_raw.split(",") if p.strip()]
+
+        tw_h_raw = str(st.session_state.get("tw_hash", ", ".join(tw_c.get("hashtags", [])))).strip()
+        tw_hash = [h.strip() for h in tw_h_raw.split(",") if h.strip()]
+
+        th_p_raw = str(st.session_state.get("th_prof", ", ".join(th_c.get("profiles", [])))).strip()
+        th_prof = [p.strip() for p in th_p_raw.split(",") if p.strip()]
+
+        li_p_raw = str(st.session_state.get("li_prof", ", ".join(li_c.get("profiles", [])))).strip()
+        li_prof = [p.strip() for p in li_p_raw.split(",") if p.strip()]
+
+        web_u_raw = str(st.session_state.get("web_urls", ", ".join(web_c.get("website_urls", [])))).strip()
+        web_urls = [u.strip() for u in web_u_raw.split(",") if u.strip()]
+
+        last_saved = st.session_state.get("config_saved_at")
+        save_badge = f" (Tersimpan: {last_saved})" if last_saved else " (Pratinjau Isian Langsung)"
+
+        kw_display = ", ".join(active_keywords) or "*(Kosong)*"
+        date_display = f"{start_str} s.d. {end_str}"
+
         with st.container(border=True):
             st.markdown(f"#### 📌 Informasi Konfigurasi Penarikan Data {save_badge}")
-            st.caption("Berikut adalah rangkuman parameter pencarian per platform yang aktif dan tersimpan saat ini:")
+            st.caption(f"Rangkuman parameter aktif yang akan digunakan saat proses penarikan data dijalankan (Rentang: **{date_display}**):")
             
             cols = st.columns(len(selected_platforms))
             for idx, sp in enumerate(selected_platforms):
                 with cols[idx]:
                     if sp == "Twitter (X)":
                         st.markdown("##### 🐦 Twitter (X)")
-                        kw = ", ".join(tw_c.get("keywords", [])) or "*(Kosong)*"
-                        prof = ", ".join(tw_c.get("profiles", [])) or "*(Kosong)*"
-                        hash_t = ", ".join(tw_c.get("hashtags", [])) or "*(Kosong)*"
-                        mx = tw_c.get("max_results_twitter") or tw_c.get("max_results", 500)
-                        st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Profil:** `{prof}`\n• **Hashtag:** `{hash_t}`\n• **Mode Sortir:** `Top`\n• **Batas Max:** `{mx}` cuitan")
+                        prof_str = ", ".join(tw_prof) or "*(Kosong)*"
+                        hash_str = ", ".join(tw_hash) or "*(Kosong)*"
+                        st.markdown(f"• **Kata Kunci:** `{kw_display}`\n• **Profil:** `{prof_str}`\n• **Hashtag:** `{hash_str}`\n• **Mode Sortir:** `Top`\n• **Batas Max:** `{active_max}` cuitan")
                     elif sp == "Threads":
                         st.markdown("##### 🧵 Meta Threads")
-                        kw = ", ".join(th_c.get("keywords", [])) or "*(Kosong)*"
-                        prof = ", ".join(th_c.get("profiles", [])) or "*(Kosong)*"
-                        mx = th_c.get("max_results_threads") or th_c.get("max_results", 100)
-                        st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Username:** `{prof}`\n• **Mode Sortir:** `Top`\n• **Batas Max:** `{mx}` posting")
-                    elif sp == "Instagram":
-                        st.markdown("##### 📸 Instagram")
-                        kw = ", ".join(ig_c.get("keywords", [])) or "*(Kosong)*"
-                        prof = ", ".join(ig_c.get("profiles", [])) or "*(Kosong)*"
-                        mode = ig_c.get("profile_mode", "username")
-                        mx = ig_c.get("max_results_instagram") or ig_c.get("max_results", 100)
-                        st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Username:** `{prof}`\n• **Mode:** `{mode}`\n• **Batas Max:** `{mx}` posting")
+                        prof_str = ", ".join(th_prof) or "*(Kosong)*"
+                        st.markdown(f"• **Kata Kunci:** `{kw_display}`\n• **Username:** `{prof_str}`\n• **Mode Sortir:** `Top`\n• **Batas Max:** `{active_max}` posting")
                     elif sp == "LinkedIn":
                         st.markdown("##### 💼 LinkedIn")
-                        kw = ", ".join(li_c.get("keywords", [])) or "*(Kosong)*"
-                        mx = li_c.get("max_results_linkedin") or li_c.get("max_results", 100)
-                        st.markdown(f"• **Kata Kunci:** `{kw}`\n• **Mode Sortir:** `Relevance`\n• **Batas Max:** `{mx}` posting")
+                        prof_str = ", ".join(li_prof) or "*(Kosong)*"
+                        st.markdown(f"• **Kata Kunci:** `{kw_display}`\n• **Profil:** `{prof_str}`\n• **Mode Sortir:** `Relevance`\n• **Batas Max:** `{active_max}` posting")
                     elif sp == "Website / Dokumen Publik":
                         st.markdown("##### 🌐 Website")
-                        urls = ", ".join(web_c.get("website_urls", [])) or "Semua Portal Berita"
-                        kw = ", ".join(web_c.get("keywords", [])) or "*(Kosong)*"
-                        mx = web_c.get("max_results_website") or web_c.get("max_results", 100)
-                        st.markdown(f"• **Target Domain:** `{urls}`\n• **Frasa Cari:** `{kw}`\n• **Batas Max:** `{mx}` artikel")
+                        urls_str = ", ".join(web_urls) or "Semua Portal Berita"
+                        st.markdown(f"• **Target Domain:** `{urls_str}`\n• **Frasa Cari:** `{kw_display}`\n• **Batas Max:** `{active_max}` artikel")
 
     # -----------------------------------------------------------------
     # 1. PARAMETER UTAMA PENARIKAN DATA (TERPADU UNTUK SEMUA MESIN)
