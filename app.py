@@ -1036,21 +1036,11 @@ with tab_scrape:
         "Website / Dokumen Publik"
     ]
     
-    # Default awal: Ikuti konfigurasi tersimpan (kosong jika belum ada yang dipilih)
-    default_selected = [mapping_source_types.get(s) for s in raw_source_list if mapping_source_types.get(s)]
-
-    selected_platforms = st.multiselect(
-        "Pilih Platform Sasaran Scraping (bisa pilih lebih dari satu):",
-        options=platform_options,
-        default=default_selected
-    )
+    # Otomatis mencakup dan menjalankan semua platform scraping aktif secara simultan
+    selected_platforms = list(platform_options)
 
     def save_platform_config(platform_key: str, plat_obj: dict):
         """Helper untuk menguji & menyimpan konfigurasi per platform ke target_config.json"""
-        if not selected_platforms:
-            st.error("❌ Pilih setidaknya satu platform sasaran pada multiselect di atas.")
-            return False
-        
         source_types_to_save = [rev_mapping[sp] for sp in selected_platforms if sp in rev_mapping]
         
         # Baca ulang konfigurasi terkini dari berkas
@@ -1320,6 +1310,7 @@ with tab_scrape:
         st.caption(
             "Isian di bawah bersifat opsional. Anda dapat mengisinya untuk membatasi pencarian ke akun atau situs tertentu, "
             "atau mengosongkannya jika ingin mencakup seluruh percakapan publik secara umum."
+            " dan secara default penarikan data diutamakan dari percakapan/sumber yang top trending dan relevan"
         )
 
         col_opt1, col_opt2 = st.columns(2)

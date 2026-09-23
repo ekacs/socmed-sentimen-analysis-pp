@@ -1,5 +1,8 @@
 {
     "source_types": [
+        "twitter",
+        "threads",
+        "linkedin",
         "website"
     ],
     "config": {
